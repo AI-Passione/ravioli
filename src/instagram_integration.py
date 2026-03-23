@@ -10,7 +10,7 @@ def instagram_feed(request):
     # For now, we just return a dummy feed.
     content = [
         {'image': 'https://example.com/image1.jpg', 'caption': 'Awesome post'}, 
-        {'image': 'https://example.com/image2.jpg', 'caption': 'Another great post'} 
+        {'image': 'https://example.com/image2.jpg', 'caption': 'Another great post'}
     ]
     return render(request, 'instagram_feed.html', {'content': content, 'user': user})
 
