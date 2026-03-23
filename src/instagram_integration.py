@@ -2,6 +2,7 @@ from .models import User
 from django.shortcuts import render
 from django.http import HttpResponse
 
+
 def instagram_feed(request):
     user = request.user  # Assuming user is logged in
     # Placeholder for Instagram API integration
