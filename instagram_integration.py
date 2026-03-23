@@ -18,6 +18,7 @@ def share_content(image_url, caption):
   except Exception as e:
     print(f"Error sharing content: {e}")
 
+
 def discover_content(user_interests):
   """Discovers content based on user interests.
 
