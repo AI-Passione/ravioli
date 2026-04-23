@@ -2,8 +2,8 @@ import { store } from '../store';
 import { api } from '../services/api';
 
 export function renderSidebar() {
-  const missions = store.getMissions();
-  const activeId = store.getActiveMissionId();
+  const analyses = store.getAnalyses();
+  const activeId = store.getActiveAnalysisId();
 
   const container = document.createElement('aside');
   container.className = 'w-64 h-screen surface-low flex flex-col pt-8 pb-4 px-4 overflow-y-auto';
@@ -18,8 +18,8 @@ export function renderSidebar() {
       <section>
         <p class="label text-[#a38b88] mb-4 px-2">System</p>
         <ul class="space-y-1">
-          <li><button class="nav-item active flex items-center gap-3" data-tab="missions">
-            <i data-lucide="layout-dashboard"></i> <span>Missions</span>
+          <li><button class="nav-item active flex items-center gap-3" data-tab="analyses">
+            <i data-lucide="layout-dashboard"></i> <span>Analyses</span>
           </button></li>
           <li><button class="nav-item flex items-center gap-3" data-tab="warehouse">
             <i data-lucide="database"></i> <span>Warehouse</span>
@@ -33,16 +33,16 @@ export function renderSidebar() {
       <section>
         <div class="flex items-center justify-between mb-4 px-2">
           <p class="label text-[#a38b88]">Investigations</p>
-          <button class="btn-icon" id="btn-new-mission">
+          <button class="btn-icon" id="btn-new-analysis">
             <i data-lucide="plus"></i>
           </button>
         </div>
-        <ul class="space-y-1" id="mission-list">
-          ${missions.map(m => `
+        <ul class="space-y-1" id="analysis-list">
+          ${analyses.map(a => `
             <li>
-              <button class="nav-item flex items-center gap-3 ${m.id === activeId ? 'active' : ''}" data-mission-id="${m.id}">
+              <button class="nav-item flex items-center gap-3 ${a.id === activeId ? 'active' : ''}" data-analysis-id="${a.id}">
                 <i data-lucide="message-square"></i>
-                <span class="truncate">${m.title}</span>
+                <span class="truncate">${a.title}</span>
               </button>
             </li>
           `).join('')}
@@ -56,19 +56,19 @@ export function renderSidebar() {
   `;
 
   // Event Listeners
-  container.querySelectorAll('[data-mission-id]').forEach(btn => {
+  container.querySelectorAll('[data-analysis-id]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const id = btn.getAttribute('data-mission-id');
-      if (id) store.setActiveMissionId(id);
+      const id = btn.getAttribute('data-analysis-id');
+      if (id) store.setActiveAnalysisId(id);
     });
   });
 
-  container.querySelector('#btn-new-mission')?.addEventListener('click', async () => {
-    const title = prompt('Mission Title:');
+  container.querySelector('#btn-new-analysis')?.addEventListener('click', async () => {
+    const title = prompt('Analysis Title:');
     if (title) {
-      const newMission = await api.createMission({ title });
-      store.setMissions([newMission, ...store.getMissions()]);
-      store.setActiveMissionId(newMission.id);
+      const newAnalysis = await api.createAnalysis({ title });
+      store.setAnalyses([newAnalysis, ...store.getAnalyses()]);
+      store.setActiveAnalysisId(newAnalysis.id);
     }
   });
 

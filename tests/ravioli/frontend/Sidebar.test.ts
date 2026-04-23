@@ -4,19 +4,19 @@ import { store } from '../../../src/ravioli/frontend/src/store';
 
 describe('Sidebar Component', () => {
   beforeEach(() => {
-    store.setMissions([{ id: 'm1', title: 'Test Mission', status: 'idle', created_at: '', updated_at: '' }]);
-    store.setActiveMissionId('m1');
+    store.setAnalyses([{ id: 'a1', title: 'Test Analysis', status: 'idle', created_at: '', updated_at: '' }]);
+    store.setActiveAnalysisId('a1');
   });
 
-  it('should render the mission title', () => {
+  it('should render the analysis title', () => {
     const sidebar = renderSidebar();
-    expect(sidebar.innerHTML).toContain('Test Mission');
+    expect(sidebar.innerHTML).toContain('Test Analysis');
   });
 
-  it('should highlight the active mission', () => {
+  it('should highlight the active analysis', () => {
     const sidebar = renderSidebar();
-    const activeBtn = sidebar.querySelector('[data-mission-id="m1"].active');
-    expect(activeBtn?.textContent).toContain('Test Mission');
+    const activeBtn = sidebar.querySelector('[data-analysis-id="a1"].active');
+    expect(activeBtn?.textContent).toContain('Test Analysis');
   });
 
   it('should render the system labels', () => {

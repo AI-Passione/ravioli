@@ -6,12 +6,12 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from ravioli.backend.core.database import Base
 
-class Mission(Base):
+class Analysis(Base):
     """
     Represents a high-level goal or task given to an agent.
     Stored in the 'app' schema.
     """
-    __tablename__ = "missions"
+    __tablename__ = "analyses"
     __table_args__ = {"schema": "app"}
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -24,22 +24,22 @@ class Mission(Base):
     # Final result or summary
     result: Mapped[Optional[str]] = mapped_column(Text)
     
-    # Metadata for the mission (e.g., config, parameters)
-    mission_metadata: Mapped[Optional[dict]] = mapped_column(JSON, name="mission_metadata")
+    # Metadata for the analysis (e.g., config, parameters)
+    analysis_metadata: Mapped[Optional[dict]] = mapped_column(JSON, name="analysis_metadata")
 
     # Relationships
-    logs: Mapped[List["ExecutionLog"]] = relationship("ExecutionLog", back_populates="mission", cascade="all, delete-orphan")
+    logs: Mapped[List["ExecutionLog"]] = relationship("ExecutionLog", back_populates="analysis", cascade="all, delete-orphan")
 
 class ExecutionLog(Base):
     """
-    Granular logs for agent execution steps within a mission.
+    Granular logs for agent execution steps within an analysis.
     Stored in the 'app' schema.
     """
     __tablename__ = "execution_logs"
     __table_args__ = {"schema": "app"}
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    mission_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("app.missions.id"), nullable=False)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("app.analyses.id"), nullable=False)
     
     # What was happening? (thought, tool_use, observation, error)
     log_type: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -56,4 +56,4 @@ class ExecutionLog(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
     # Relationships
-    mission: Mapped["Mission"] = relationship("Mission", back_populates="logs")
+    analysis: Mapped["Analysis"] = relationship("Analysis", back_populates="logs")

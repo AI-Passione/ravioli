@@ -34,10 +34,10 @@ function updateUI() {
 // Initial Load
 async function init() {
   try {
-    const missions = await api.listMissions();
-    store.setMissions(missions);
-    if (missions.length > 0) {
-      store.setActiveMissionId(missions[0].id);
+    const analyses = await api.listAnalyses();
+    store.setAnalyses(analyses);
+    if (analyses.length > 0) {
+      store.setActiveAnalysisId(analyses[0].id);
     }
   } catch (err) {
     console.error('Initialization failed', err);
@@ -47,7 +47,7 @@ async function init() {
 // Polling for logs
 let pollInterval: any;
 store.subscribe(() => {
-  const activeId = store.getActiveMissionId();
+  const activeId = store.getActiveAnalysisId();
   
   // Clear previous interval
   if (pollInterval) clearInterval(pollInterval);

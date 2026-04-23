@@ -3,10 +3,10 @@ from datetime import datetime, UTC
 
 def test_create_log(client, session):
     # Prepare mock data
-    mission_id = uuid.uuid4()
+    analysis_id = uuid.uuid4()
     log_id = uuid.uuid4()
     log_data = {
-        "mission_id": str(mission_id),
+        "analysis_id": str(analysis_id),
         "log_type": "thought",
         "content": "Agent is thinking...",
         "data": {"thought_id": 1}
@@ -19,7 +19,7 @@ def test_create_log(client, session):
 
     session.refresh.side_effect = mock_refresh
     
-    # Mock mission check
+    # Mock analysis check
     session.query().filter().first.return_value = True
 
     # Execute request
@@ -29,14 +29,14 @@ def test_create_log(client, session):
     assert response.status_code == 201
     data = response.json()
     assert data["content"] == "Agent is thinking..."
-    assert data["mission_id"] == str(mission_id)
+    assert data["analysis_id"] == str(analysis_id)
 
-def test_list_logs_for_mission(client, session):
-    mission_id = uuid.uuid4()
+def test_list_logs_for_analysis(client, session):
+    analysis_id = uuid.uuid4()
     class MockLog:
         def __init__(self):
             self.id = uuid.uuid4()
-            self.mission_id = mission_id
+            self.analysis_id = analysis_id
             self.log_type = "thought"
             self.content = "Thinking..."
             self.tool_name = None
@@ -47,7 +47,7 @@ def test_list_logs_for_mission(client, session):
     session.query().filter().order_by().all.return_value = [mock_log]
 
     # Execute request
-    response = client.get(f"/api/v1/logs/mission/{mission_id}")
+    response = client.get(f"/api/v1/logs/analysis/{analysis_id}")
 
     # Assertions
     assert response.status_code == 200
