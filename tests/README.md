@@ -11,9 +11,14 @@ All commands should be run from the project root (`ravioli/`):
 uv run pytest tests/
 ```
 
-# Run frontend tests
+# Run frontend tests (single run)
 ```bash
 npm --prefix src/ravioli/frontend test
+```
+
+# Run frontend tests (watch mode)
+```bash
+npm --prefix src/ravioli/frontend run test:watch
 ```
 
 ## Directory Structure
