@@ -1,4 +1,4 @@
-from ravioli.backend.ingestion.base import CSVIngestor
+from ravioli.backend.db.olap.ingestion.base import CSVIngestor
 from ravioli.backend.core.config import settings
 
 class SubstackIngestor(CSVIngestor):

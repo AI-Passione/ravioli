@@ -16,7 +16,7 @@ from langchain_community.utilities import SQLDatabase
 from langchain_community.agent_toolkits import create_sql_agent
 
 from ravioli.backend.core.config import settings
-from ravioli.backend.ingestion.base import CSVIngestor
+from ravioli.backend.db.olap.ingestion.base import CSVIngestor
 from ravioli.backend.core.dbt import run_dbt_command
 
 @tool
