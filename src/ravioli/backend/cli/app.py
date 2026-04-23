@@ -1,9 +1,9 @@
 import typer
 from typing import Optional
 from pathlib import Path
-from ravioli.core.config import settings
-from ravioli.core.dbt import run_dbt_command as dbt_run
-from ravioli.db.session import ensure_schema
+from ravioli.backend.core.config import settings
+from ravioli.backend.core.dbt import run_dbt_command as dbt_run
+from ravioli.backend.data.oltp.session import ensure_schema
 
 app = typer.Typer(help="Ravioli Data Platform CLI")
 ingest_app = typer.Typer(help="Data Ingestion Commands")
@@ -12,37 +12,37 @@ app.add_typer(ingest_app, name="ingest")
 @ingest_app.command("apple-health")
 def ingest_apple_health(file_path: Optional[Path] = None):
     """Ingest Apple Health XML export."""
-    from ravioli.ingestion.apple_health import AppleHealthIngestor
+    from ravioli.backend.data.olap.ingestion.apple_health import AppleHealthIngestor
     AppleHealthIngestor().run(file_path)
 
 @ingest_app.command("spotify")
 def ingest_spotify(data_path: Optional[Path] = None):
     """Ingest Spotify JSON/CSV export."""
-    from ravioli.ingestion.spotify import SpotifyIngestor
+    from ravioli.backend.data.olap.ingestion.spotify import SpotifyIngestor
     SpotifyIngestor().run(data_path)
 
 @ingest_app.command("linkedin")
 def ingest_linkedin(data_path: Optional[Path] = None):
     """Ingest LinkedIn Excel/CSV export."""
-    from ravioli.ingestion.linkedin import LinkedInIngestor
+    from ravioli.backend.data.olap.ingestion.linkedin import LinkedInIngestor
     LinkedInIngestor().run(data_path)
 
 @ingest_app.command("substack")
 def ingest_substack(data_path: Optional[Path] = None):
     """Ingest Substack CSV export."""
-    from ravioli.ingestion.substack import SubstackIngestor
+    from ravioli.backend.data.olap.ingestion.substack import SubstackIngestor
     SubstackIngestor().run(data_path)
 
 @ingest_app.command("bolt")
 def ingest_bolt(file_path: Optional[Path] = None):
     """Ingest Bolt rides CSV."""
-    from ravioli.ingestion.misc import BoltIngestor
+    from ravioli.backend.data.olap.ingestion.misc import BoltIngestor
     BoltIngestor().run(file_path)
 
 @ingest_app.command("telegram")
 def ingest_telegram(file_path: Optional[Path] = None):
     """Ingest Telegram messages CSV."""
-    from ravioli.ingestion.misc import TelegramIngestor
+    from ravioli.backend.data.olap.ingestion.misc import TelegramIngestor
     TelegramIngestor().run(file_path)
 
 @app.command()
@@ -56,7 +56,7 @@ def transform(command: str = "build"):
 def agent():
     """Start the AI Agent UI."""
     import subprocess
-    frontend_path = Path(__file__).parent / "apps" / "agents" / "ollama" / "frontend" / "app.py"
+    frontend_path = Path(__file__).parent.parent.parent / "ai" / "agents" / "ollama" / "frontend" / "app.py"
     print(f"Starting Streamlit agent from {frontend_path}...")
     subprocess.run(["streamlit", "run", str(frontend_path)])
 

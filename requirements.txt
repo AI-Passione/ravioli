@@ -1,6 +1,6 @@
 agate==1.9.1
 aiohappyeyeballs==2.6.1
-aiohttp==3.13.3
+aiohttp==3.13.4
 aiosignal==1.4.0
 altair==5.5.0
 annotated-types==0.7.0
@@ -41,7 +41,7 @@ jsonschema-specifications==2025.9.1
 langchain==0.3.27
 langchain-community==0.3.31
 langchain-core==0.3.83
-langchain-text-splitters==0.3.11
+langchain-text-splitters==1.1.2
 langsmith==0.4.37
 leather==0.4.1
 logbook==1.5.3
