@@ -4,8 +4,8 @@ from datetime import datetime
 from tqdm import tqdm
 from psycopg2 import sql
 from psycopg2.extras import execute_values
-from ravioli.backend.db.olap.ingestion.base import BaseIngestor
-from ravioli.backend.db.oltp.session import get_db_connection
+from ravioli.backend.data.olap.ingestion.base import BaseIngestor
+from ravioli.backend.data.oltp.session import get_db_connection
 from ravioli.backend.core.config import settings
 
 class AppleHealthIngestor(BaseIngestor):

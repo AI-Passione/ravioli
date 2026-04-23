@@ -8,7 +8,7 @@ def run_dbt_command(command: str = "build") -> str:
     Runs a dbt command in the transformation directory.
     Default command is 'build'.
     """
-    dbt_dir = Path(__file__).parent.parent / "db" / "olap" / "transformation" / "dbt"
+    dbt_dir = Path(__file__).parent.parent / "data" / "olap" / "transformation" / "dbt"
     
     try:
         result = subprocess.run(
