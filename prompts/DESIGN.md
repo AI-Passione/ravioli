@@ -3,7 +3,7 @@
 ## 1. Overview & Creative North Star
 The Creative North Star for this design system is **"The Silent Concierge."** 
 
-This is not a standard SaaS dashboard; it is a cinematic, high-performance environment for "La Passione Inc." The aesthetic rejects the cluttered, "boxy" nature of traditional control panels in favor of an editorial, high-contrast experience. It draws inspiration from mid-century Italian industrial design and modern neo-noir cinema—think sharp silhouettes, deep shadows, and precise gold mechanical accents. 
+This is not a standard SaaS dashboard; it is a cinematic, high-performance environment for **"AI Passione."** The aesthetic rejects the cluttered, "boxy" nature of traditional control panels in favor of an editorial, high-contrast experience. It draws inspiration from mid-century Italian industrial design and modern neo-noir cinema—think sharp silhouettes, deep shadows, and precise gold mechanical accents. 
 
 By leveraging intentional asymmetry and a "Tonal Layering" philosophy, we move away from the "template" look. Components should feel like they are emerging from the shadows, illuminated only by the data they carry.
 

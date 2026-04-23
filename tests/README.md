@@ -6,21 +6,19 @@ This directory mirrors the structure of `src/ravioli/` and contains all unit tes
 
 All commands should be run from the project root (`ravioli/`):
 
+# Run backend tests
 ```bash
-# Run all tests
 uv run pytest tests/
+```
 
-# Run with verbose output
-uv run pytest tests/ -v
+# Run frontend tests (single run)
+```bash
+npm --prefix src/ravioli/frontend test
+```
 
-# Run a specific test file
-uv run pytest tests/ravioli/backend/core/test_dbt.py
-
-# Run a specific test function
-uv run pytest tests/ravioli/backend/core/test_dbt.py::test_run_dbt_command_success
-
-# Run with coverage report
-uv run pytest tests/ --cov=src/ravioli
+# Run frontend tests (watch mode)
+```bash
+npm --prefix src/ravioli/frontend run test:watch
 ```
 
 ## Directory Structure

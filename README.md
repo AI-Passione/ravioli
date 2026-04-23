@@ -8,7 +8,7 @@
 
 ## 🚀 Vision: Vibe-Analytics for Everyone
 Traditional DWHs are stiff and complex. **ravioli** is different. It's built to be:
-- **AI-Native**: Built-in integration with LLMs (via Ollama) for natural language querying and automated insights.
+- **AI-Native**: Ready for integration with LLMs for natural language querying and automated insights.
 - **Notebook-Style**: Interactive, iterative, and visual.
 - **Business-Friendly**: Designed for people who want results, not just queries.
 - **100% Local**: Your data stays on your machine. Privacy by design.
@@ -20,7 +20,7 @@ Traditional DWHs are stiff and complex. **ravioli** is different. It's built to 
 - **Seamless Ingestion**: Python-based ingestors for Apple Health, Spotify, LinkedIn, Substack, and more.
 - **AI-Driven Insights**: Integrated AI agents that understand your data and help you explore it.
 - **Professional Transformation**: Powered by `dbt` for reliable, version-controlled data modeling.
-- **Vibrant Visualization**: Built on Streamlit for a premium, interactive analytics experience.
+- **Vibrant Visualization**: Built on Vanilla TypeScript for a premium, interactive analytics experience.
 
 ---
 
@@ -35,8 +35,7 @@ make up
 
 This will:
 1.  Start **Postgres** (Docker).
-2.  Start the **Ollama** server and pull the `qwen2.5:3b` model.
-3.  Launch the **Ravioli** Streamlit interface at `http://localhost:8501`.
+2.  Launch the **Ravioli** interface at `http://localhost:5173`.
 
 ### Python Setup
 We use [uv](https://github.com/astral-sh/uv) for lightning-fast dependency management.
@@ -57,8 +56,8 @@ uv sync
 | :--- | :--- |
 | **DWH** | Postgres |
 | **Transformation** | [dbt Core](https://github.com/dbt-labs/dbt-core) |
-| **AI Engine** | [Ollama](https://github.com/ollama/ollama) |
-| **Interface** | [Streamlit](https://github.com/streamlit/streamlit) |
+| **AI Engine** | LLM Ready |
+| **Interface** | Vanilla TypeScript |
 | **Orchestration** | Python / Makefile |
 | **Package Manager** | [uv](https://github.com/astral-sh/uv) |
 

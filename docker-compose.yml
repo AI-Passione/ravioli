@@ -16,40 +16,38 @@ services:
       - ravioli_net
     restart: always
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    networks:
-      - ravioli_net
-    restart: always
-
   app:
     build: .
     container_name: app
     environment:
       - DB_HOST=postgres
-      - OLLAMA_HOST=http://ollama:11434
     volumes:
       - .:/app
       - ${LOCAL_DATA_PATH:-~/Documents/ravioli_local_data}:/local_data:ro
     ports:
-      - "8501:8501"
+      - "8000:8000"
     depends_on:
       - postgres
-      - ollama
     env_file:
       - .env
     networks:
       - ravioli_net
     restart: always
 
+  frontend:
+    build:
+      context: ./src/ravioli/frontend
+    container_name: ravioli-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - app
+    networks:
+      - ravioli_net
+    restart: always
+
 volumes:
   postgres_data:
-  ollama_data:
 
 
 networks:

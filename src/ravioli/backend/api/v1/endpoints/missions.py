@@ -70,3 +70,34 @@ def delete_mission(mission_id: UUID, db: Session = Depends(get_db)):
     db.delete(db_mission)
     db.commit()
     return None
+
+@router.post("/{mission_id}/ask", status_code=status.HTTP_202_ACCEPTED)
+def ask_question(mission_id: UUID, question_in: schemas.QuestionCreate, db: Session = Depends(get_db)):
+    """
+    Submit a question to a mission.
+    """
+    mission = db.query(models.Mission).filter(models.Mission.id == mission_id).first()
+    if not mission:
+        raise HTTPException(status_code=404, detail="Mission not found")
+    
+    # 1. Create user log
+    user_log = models.ExecutionLog(
+        mission_id=mission_id,
+        log_type="user_query",
+        content=question_in.question
+    )
+    db.add(user_log)
+    
+    # 2. Update mission status
+    mission.status = "running"
+    
+    # 3. Create mock agent response (for UI testing)
+    agent_log = models.ExecutionLog(
+        mission_id=mission_id,
+        log_type="thought",
+        content=f"Analyzing your question: '{question_in.question}'..."
+    )
+    db.add(agent_log)
+    
+    db.commit()
+    return {"message": "Question received and processing started"}

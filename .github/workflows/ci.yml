@@ -26,8 +26,19 @@ jobs:
       - name: Install dependencies
         run: uv sync
         
-      - name: Run unit tests
+      - name: Run backend unit tests
         run: uv run pytest tests/
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          
+      - name: Install frontend dependencies
+        run: npm --prefix src/ravioli/frontend install
+        
+      - name: Run frontend unit tests
+        run: npm --prefix src/ravioli/frontend test
 
   docker-compose-check:
     runs-on: ubuntu-latest
@@ -47,8 +58,8 @@ jobs:
       - name: Build images
         run: docker compose build
         
-      - name: Start services (excluding ollama-pull)
-        run: docker compose up -d postgres ollama app
+      - name: Start services
+        run: docker compose up -d postgres app frontend
         
       - name: Check container status
         run: |
@@ -57,7 +68,7 @@ jobs:
           docker compose ps
           
           # Verify each critical service is Up
-          services=("postgres" "ollama" "app")
+          services=("postgres" "app" "frontend")
           for service in "${services[@]}"; do
             if ! docker compose ps | grep "$service" | grep -q "Up"; then
               echo "Error: Service $service is not running!"

@@ -53,14 +53,6 @@ def transform(command: str = "build"):
     print(result)
 
 @app.command()
-def agent():
-    """Start the AI Agent UI."""
-    import subprocess
-    frontend_path = Path(__file__).parent.parent.parent / "ai" / "agents" / "ollama" / "frontend" / "app.py"
-    print(f"Starting Streamlit agent from {frontend_path}...")
-    subprocess.run(["streamlit", "run", str(frontend_path)])
-
-@app.command()
 def db_init():
     """Initialize database schemas."""
     schemas = ["marts", "staging", "intermediate"]
