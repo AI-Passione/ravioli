@@ -22,6 +22,8 @@ dependencies = [
     "requests>=2.33.0",
     "fastapi>=0.109.0",
     "uvicorn>=0.27.0",
+    "jupyter>=1.1.1",
+    "nbformat>=5.10.0",
 ]
 
 
