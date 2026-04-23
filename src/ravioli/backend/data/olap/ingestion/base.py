@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Any
 import pandas as pd
 from tqdm import tqdm
-from ravioli.db.session import get_db_connection, ensure_schema, get_engine
-from ravioli.core.config import settings
+from ravioli.backend.data.oltp.session import get_db_connection, ensure_schema, get_engine
+from ravioli.backend.core.config import settings
 
 class BaseIngestor(ABC):
     """

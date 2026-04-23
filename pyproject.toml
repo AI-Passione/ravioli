@@ -9,7 +9,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "python-dotenv>=1.0.0",
+    "python-dotenv>=1.2.2",
     "dbt-core>=1.8.0",
     "dbt-postgres>=1.8.0",
     "langchain>=0.3.0",
@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ravioli = "ravioli.cli:app"
+ravioli = "ravioli.backend.cli.app:app"
 
 [build-system]
 requires = ["hatchling"]

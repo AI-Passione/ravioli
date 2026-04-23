@@ -1,7 +1,7 @@
 import psycopg2
 from psycopg2 import sql
 from sqlalchemy import create_engine, Engine
-from ravioli.core.config import settings
+from ravioli.backend.core.config import settings
 
 def get_db_connection():
     """Get a raw psycopg2 database connection."""

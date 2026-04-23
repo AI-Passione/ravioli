@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     # Postgres Configuration
     postgres_user: str = "ravioli_user"
     postgres_password: str = "ravioli_password"
-    postgres_db: str = "ravioli_db"
+    postgres_db: str = "ravioli.backend.data"
     db_host: str = "postgres"
     db_port: int = 5432
 
