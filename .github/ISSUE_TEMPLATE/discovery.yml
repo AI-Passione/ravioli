@@ -1,0 +1,18 @@
+name: "🔍 Discovery"
+description: Research or investigative task.
+labels: ["discovery"]
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What are we trying to find out?
+    validations:
+      required: true
+  - type: textarea
+    id: outcomes
+    attributes:
+      label: Expected Outcomes
+      description: What do we expect to have at the end (e.g. POC, research doc)?
+    validations:
+      required: true

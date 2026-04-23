@@ -1,0 +1,18 @@
+name: "✨ Feature Request"
+description: Suggest an idea.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: What should we add?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why?
+      description: What problem does this solve or what value does it add?
+    validations:
+      required: true
