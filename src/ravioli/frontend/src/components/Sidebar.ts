@@ -63,13 +63,8 @@ export function renderSidebar() {
     });
   });
 
-  container.querySelector('#btn-new-analysis')?.addEventListener('click', async () => {
-    const title = prompt('Analysis Title:');
-    if (title) {
-      const newAnalysis = await api.createAnalysis({ title });
-      store.setAnalyses([newAnalysis, ...store.getAnalyses()]);
-      store.setActiveAnalysisId(newAnalysis.id);
-    }
+  container.querySelector('#btn-new-analysis')?.addEventListener('click', () => {
+    store.setCurrentView('create-analysis');
   });
 
   return container;

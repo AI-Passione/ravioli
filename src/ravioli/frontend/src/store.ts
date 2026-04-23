@@ -6,6 +6,7 @@ class Store {
   private analyses: Analysis[] = [];
   private activeAnalysisId?: string;
   private logs: ExecutionLog[] = [];
+  private currentView: 'dashboard' | 'create-analysis' = 'dashboard';
   private listeners: Listener[] = [];
 
   subscribe(listener: Listener) {
@@ -28,10 +29,21 @@ class Store {
 
   setActiveAnalysisId(id?: string) {
     this.activeAnalysisId = id;
+    this.currentView = 'dashboard';
     this.notify();
   }
 
   getActiveAnalysisId() { return this.activeAnalysisId; }
+
+  setCurrentView(view: 'dashboard' | 'create-analysis') {
+    this.currentView = view;
+    if (view === 'create-analysis') {
+      this.activeAnalysisId = undefined;
+    }
+    this.notify();
+  }
+
+  getCurrentView() { return this.currentView; }
 
   setLogs(logs: ExecutionLog[]) {
     this.logs = logs;

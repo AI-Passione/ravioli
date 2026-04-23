@@ -4,6 +4,7 @@ import { store } from './store';
 import { api } from './services/api';
 import { renderSidebar } from './components/Sidebar';
 import { renderNotebook } from './components/Notebook';
+import { renderCreateAnalysis } from './components/CreateAnalysis';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -14,7 +15,13 @@ function updateUI() {
   shell.className = 'flex w-full h-screen overflow-hidden';
   
   shell.appendChild(renderSidebar());
-  shell.appendChild(renderNotebook());
+  
+  const currentView = store.getCurrentView();
+  if (currentView === 'create-analysis') {
+    shell.appendChild(renderCreateAnalysis());
+  } else {
+    shell.appendChild(renderNotebook());
+  }
   
   app.appendChild(shell);
 

@@ -13,11 +13,20 @@ def create_analysis(analysis_in: schemas.AnalysisCreate, db: Session = Depends(g
     """
     Create a new analysis.
     """
+    notebook = analysis_in.notebook
+    if not notebook:
+        notebook = {
+            "cells": [],
+            "metadata": {},
+            "nbformat": 4,
+            "nbformat_minor": 5
+        }
+        
     db_analysis = models.Analysis(
         title=analysis_in.title,
         description=analysis_in.description,
         analysis_metadata=analysis_in.analysis_metadata,
-        notebook=analysis_in.notebook
+        notebook=notebook
     )
     db.add(db_analysis)
     db.commit()
