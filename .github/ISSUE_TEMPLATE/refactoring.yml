@@ -1,0 +1,18 @@
+name: "🧹 Refactoring"
+description: Improve code structure.
+labels: ["refactor"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What are we cleaning up and why?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Which modules or components are affected?
+    validations:
+      required: true
