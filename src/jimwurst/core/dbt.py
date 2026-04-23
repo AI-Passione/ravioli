@@ -1,22 +1,23 @@
-
 import subprocess
 import os
+from pathlib import Path
+from jimwurst.core.config import settings
 
 def run_dbt_command(command: str = "build") -> str:
     """
-    Runs a dbt command in the data_transformation app.
+    Runs a dbt command in the transformation directory.
     Default command is 'build'.
     """
-    dbt_dir = os.path.join(os.path.dirname(__file__), '../apps/data_transformation/dbt')
+    # Note: Path will need to be updated after Phase 4 reorganization
+    dbt_dir = Path(__file__).parent.parent.parent / "apps" / "transformation" / "dbt"
     
     try:
-        # Ensure we capture stdout and stderr
         result = subprocess.run(
             ["dbt", command],
             cwd=dbt_dir,
             capture_output=True,
             text=True,
-            check=False # Don't raise exception on non-zero exit, just return output
+            check=False
         )
         
         output = result.stdout

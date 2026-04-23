@@ -4,30 +4,20 @@ import sys
 import argparse
 from typing import Optional
 
-# Add project root to sys.path to allow importing from utils
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, "../../../.."))
-if project_root not in sys.path:
-    sys.path.append(project_root)
+import os
+import sys
+import argparse
+from typing import Optional
 
-# Correctly handle imports depending on context
-try:
-    from langchain_community.llms import Ollama
-    from langchain.agents import initialize_agent, Tool, AgentType
-    from langchain.tools import tool
-    from utils.generic_ingestor import ingest_file
-    from utils.dbt_runner import run_dbt_command
-    from langchain_community.utilities import SQLDatabase
-    from langchain_community.agent_toolkits import create_sql_agent
-except ImportError:
-    # Fallback to absolute imports if running from root
-    from langchain_community.llms import Ollama
-    from langchain.agents import initialize_agent, Tool, AgentType
-    from langchain.tools import tool
-    from jimwurst.utils.generic_ingestor import ingest_file
-    from jimwurst.utils.dbt_runner import run_dbt_command
-    from langchain_community.utilities import SQLDatabase
-    from langchain_community.agent_toolkits import create_sql_agent
+from langchain_community.llms import Ollama
+from langchain.agents import initialize_agent, Tool, AgentType
+from langchain.tools import tool
+from langchain_community.utilities import SQLDatabase
+from langchain_community.agent_toolkits import create_sql_agent
+
+from jimwurst.core.config import settings
+from jimwurst.ingestion.base import CSVIngestor
+from jimwurst.core.dbt import run_dbt_command
 
 @tool
 def ingest_data_tool(file_path: str):
@@ -35,7 +25,12 @@ def ingest_data_tool(file_path: str):
     Ingests a CSV file into the database. 
     Input should be the full absolute path to the CSV file.
     """
-    return ingest_file(file_path)
+    ingestor = CSVIngestor(schema_name="staging", table_name="raw_ingestion")
+    try:
+        ingestor.run(file_path)
+        return f"Successfully ingested {file_path}"
+    except Exception as e:
+        return f"Error: {e}"
 
 @tool
 def run_transformations_tool(command: str = "build"):
@@ -157,20 +152,11 @@ WORKFLOW:
         )
 
     def _setup_agent(self):
-        from utils.ingestion_utils import load_env
-        load_env()
-        
-        DB_HOST = os.getenv("DB_HOST", "localhost")
-        DB_NAME = os.getenv("POSTGRES_DB", "jimwurst")
-        DB_USER = os.getenv("POSTGRES_USER", "jimwurst")
-        DB_PASS = os.getenv("POSTGRES_PASSWORD", "jimwurst")
-        DB_PORT = os.getenv("DB_PORT", "5432")
-        
         # Define the schemas we want to include in our search path (Focusing only on what matters)
         schemas = "public,marts,s_spotify,s_linkedin,s_substack,s_telegram,s_bolt,s_apple_health,s_google_sheet"
         
         # Update URI to include search_path
-        db_uri = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}?options=-csearch_path%3D{schemas}"
+        db_uri = f"{settings.database_url}?options=-csearch_path%3D{schemas}"
         db = SQLDatabase.from_uri(db_uri)
 
         sql_agent_executor = self._get_sql_agent(db)

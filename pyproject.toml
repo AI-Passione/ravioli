@@ -2,17 +2,36 @@
 name = "jimwurst"
 version = "0.1.0"
 description = "A monolithic repository of a DWH for personal data analytics and AI"
-requires-python = ">=3.9"
+readme = "README.md"
+requires-python = ">=3.10"
 dependencies = [
-    "psycopg2-binary==2.9.11",
-    "lxml==6.0.2",
-    "openpyxl==3.1.5",
-    "python-dotenv==1.2.1",
-    "tqdm==4.67.1",
-    "et-xmlfile==2.0.0",
-    "dbt-core==1.8.7",
-    "dbt-postgres==1.8.2",
+    "psycopg2-binary>=2.9.0",
+    "sqlalchemy>=2.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "dbt-core>=1.8.0",
+    "dbt-postgres>=1.8.0",
+    "langchain>=0.3.0",
+    "langchain-community>=0.3.0",
+    "streamlit>=1.30.0",
+    "pandas>=2.0.0",
+    "lxml>=5.0.0",
+    "tqdm>=4.66.0",
+    "typer>=0.12.0",
+    "openpyxl>=3.1.0",
+    "requests>=2.31.0",
 ]
 
+[project.scripts]
+jimwurst = "jimwurst.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jimwurst"]
+
 [tool.uv]
-# UV-specific configuration can go here if needed
+managed = true
