@@ -15,9 +15,9 @@ from langchain.tools import tool
 from langchain_community.utilities import SQLDatabase
 from langchain_community.agent_toolkits import create_sql_agent
 
-from jimwurst.core.config import settings
-from jimwurst.ingestion.base import CSVIngestor
-from jimwurst.core.dbt import run_dbt_command
+from ravioli.core.config import settings
+from ravioli.ingestion.base import CSVIngestor
+from ravioli.core.dbt import run_dbt_command
 
 @tool
 def ingest_data_tool(file_path: str):
@@ -40,7 +40,7 @@ def run_transformations_tool(command: str = "build"):
     """
     return run_dbt_command(command)
 
-class JimwurstAgent:
+class RavioliAgent:
     def __init__(self, model_name: str = "qwen2.5:3b"):
         self.model_name = model_name
         self.llm = Ollama(model=model_name)
@@ -218,14 +218,14 @@ WORKFLOW:
             return f"Error: {e}"
 
 def main():
-    parser = argparse.ArgumentParser(description="Jimwurst AI Client")
+    parser = argparse.ArgumentParser(description="Ravioli AI Client")
     parser.add_argument("--prompt", type=str, help="The prompt to send to the AI")
     parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
     parser.add_argument("--model", type=str, default="qwen2.5:3b", help="Ollama model to use")
     
     args = parser.parse_args()
     
-    agent = JimwurstAgent(model_name=args.model)
+    agent = RavioliAgent(model_name=args.model)
 
     if not agent.check_ollama_connection():
         print("\n\033[91mError: Could not connect to Ollama.\033[0m")
@@ -234,7 +234,7 @@ def main():
         return
 
     if args.interactive:
-        print(f"Jimwurst AI Client ({args.model}) (Type 'exit' to quit)")
+        print(f"Ravioli AI Client ({args.model}) (Type 'exit' to quit)")
         while True:
             user_input = input(">> ")
             if user_input.lower() in ["exit", "quit"]:

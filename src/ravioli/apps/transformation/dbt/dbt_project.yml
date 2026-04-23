@@ -2,11 +2,11 @@
 # Name your project! Project names should contain only lowercase characters
 # and underscores. A good package name should reflect your organization's
 # name or the intended use of these models
-name: 'jimwurst'
+name: 'ravioli'
 version: '1.0.0'
 
 # This setting configures which "profile" dbt uses for this project.
-profile: 'jimwurst'
+profile: 'ravioli'
 
 # These configurations specify where dbt should look for different types of files.
 # The `model-paths` config, for example, states that models in this project can be
@@ -26,7 +26,7 @@ clean-targets:         # directories to be removed by `dbt clean`
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
 models:
-  jimwurst:
+  ravioli:
     staging:
       +materialized: view
       +schema: staging
@@ -37,7 +37,7 @@ models:
       +materialized: table
       +schema: marts
 seeds:
-  jimwurst:
+  ravioli:
     +schema: marts
 
 vars:

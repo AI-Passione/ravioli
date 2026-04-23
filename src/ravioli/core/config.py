@@ -5,9 +5,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # Postgres Configuration
-    postgres_user: str = "jimwurst_user"
-    postgres_password: str = "jimwurst_password"
-    postgres_db: str = "jimwurst_db"
+    postgres_user: str = "ravioli_user"
+    postgres_password: str = "ravioli_password"
+    postgres_db: str = "ravioli_db"
     db_host: str = "postgres"
     db_port: int = 5432
 

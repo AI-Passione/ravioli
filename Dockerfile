@@ -22,4 +22,4 @@ RUN uv pip install --system -e .
 EXPOSE 8501
 
 # Default command starts the AI Agent UI
-CMD ["jimwurst", "agent"]
+CMD ["ravioli", "agent"]

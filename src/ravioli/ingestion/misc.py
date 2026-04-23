@@ -1,5 +1,5 @@
-from jimwurst.ingestion.base import CSVIngestor
-from jimwurst.core.config import settings
+from ravioli.ingestion.base import CSVIngestor
+from ravioli.core.config import settings
 
 class BoltIngestor(CSVIngestor):
     def __init__(self):

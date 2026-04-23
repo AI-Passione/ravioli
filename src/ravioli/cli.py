@@ -1,48 +1,48 @@
 import typer
 from typing import Optional
 from pathlib import Path
-from jimwurst.core.config import settings
-from jimwurst.core.dbt import run_dbt_command as dbt_run
-from jimwurst.db.session import ensure_schema
+from ravioli.core.config import settings
+from ravioli.core.dbt import run_dbt_command as dbt_run
+from ravioli.db.session import ensure_schema
 
-app = typer.Typer(help="Jimwurst Data Platform CLI")
+app = typer.Typer(help="Ravioli Data Platform CLI")
 ingest_app = typer.Typer(help="Data Ingestion Commands")
 app.add_typer(ingest_app, name="ingest")
 
 @ingest_app.command("apple-health")
 def ingest_apple_health(file_path: Optional[Path] = None):
     """Ingest Apple Health XML export."""
-    from jimwurst.ingestion.apple_health import AppleHealthIngestor
+    from ravioli.ingestion.apple_health import AppleHealthIngestor
     AppleHealthIngestor().run(file_path)
 
 @ingest_app.command("spotify")
 def ingest_spotify(data_path: Optional[Path] = None):
     """Ingest Spotify JSON/CSV export."""
-    from jimwurst.ingestion.spotify import SpotifyIngestor
+    from ravioli.ingestion.spotify import SpotifyIngestor
     SpotifyIngestor().run(data_path)
 
 @ingest_app.command("linkedin")
 def ingest_linkedin(data_path: Optional[Path] = None):
     """Ingest LinkedIn Excel/CSV export."""
-    from jimwurst.ingestion.linkedin import LinkedInIngestor
+    from ravioli.ingestion.linkedin import LinkedInIngestor
     LinkedInIngestor().run(data_path)
 
 @ingest_app.command("substack")
 def ingest_substack(data_path: Optional[Path] = None):
     """Ingest Substack CSV export."""
-    from jimwurst.ingestion.substack import SubstackIngestor
+    from ravioli.ingestion.substack import SubstackIngestor
     SubstackIngestor().run(data_path)
 
 @ingest_app.command("bolt")
 def ingest_bolt(file_path: Optional[Path] = None):
     """Ingest Bolt rides CSV."""
-    from jimwurst.ingestion.misc import BoltIngestor
+    from ravioli.ingestion.misc import BoltIngestor
     BoltIngestor().run(file_path)
 
 @ingest_app.command("telegram")
 def ingest_telegram(file_path: Optional[Path] = None):
     """Ingest Telegram messages CSV."""
-    from jimwurst.ingestion.misc import TelegramIngestor
+    from ravioli.ingestion.misc import TelegramIngestor
     TelegramIngestor().run(file_path)
 
 @app.command()

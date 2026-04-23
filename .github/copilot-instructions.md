@@ -1,7 +1,7 @@
-# AI Coding Agent Instructions for jimwurst
+# AI Coding Agent Instructions for ravioli
 
 ## Project Overview
-jimwurst is a monolithic data warehouse (DWH) repository for personal data analytics and AI. It implements an ELT (Extract, Load, Transform) pipeline designed to run 100% locally. The architecture emphasizes tool-agnostic design, with tooling abstracted into folder structure, prioritizing open-source solutions.
+ravioli is a monolithic data warehouse (DWH) repository for personal data analytics and AI. It implements an ELT (Extract, Load, Transform) pipeline designed to run 100% locally. The architecture emphasizes tool-agnostic design, with tooling abstracted into folder structure, prioritizing open-source solutions.
 
 ## Architecture
 - **Monolithic Structure**: All components in a single repo for simplicity and local execution.
@@ -23,8 +23,8 @@ jimwurst is a monolithic data warehouse (DWH) repository for personal data analy
 ## Developer Workflows
 - **Start Local Stack**: Run `make up` to launch Postgres via Docker Compose. Creates `.env` if missing.
 - **Dependency Management**: Use `uv` for Python deps (e.g., `uv pip install -r requirements.txt`). Root `requirements.txt` includes core libs; source-specific scripts may have additional deps.
-- **Run Ingestion**: Use `make ingest-<source>` (e.g., `make ingest-spotify`) to execute manual ingestion scripts. Scripts scan `~/Documents/jimwurst_local_data/<source>/` for JSON/CSV files.
-- **Environment**: Load config from `docker/.env` using `python-dotenv`. Defaults: host=localhost, db=jimwurst_db, user=jimwurst_user, pass=jimwurst_password.
+- **Run Ingestion**: Use `make ingest-<source>` (e.g., `make ingest-spotify`) to execute manual ingestion scripts. Scripts scan `~/Documents/ravioli_local_data/<source>/` for JSON/CSV files.
+- **Environment**: Load config from `docker/.env` using `python-dotenv`. Defaults: host=localhost, db=ravioli_db, user=ravioli_user, pass=ravioli_password.
 
 ## Coding Patterns
 - **Ingestion Scripts** (`apps/data_ingestion/manual_job/<source>/ingest.py`):
@@ -35,7 +35,7 @@ jimwurst is a monolithic data warehouse (DWH) repository for personal data analy
   - Use `tqdm` for progress bars, `execute_values` for batch inserts.
   - Import common utilities from `utils/ingestion_utils.py` (e.g., `load_env`, `get_db_connection`, `ensure_schema`).
   - Example: [apps/data_ingestion/manual_job/spotify/ingest.py](apps/data_ingestion/manual_job/spotify/ingest.py)
-- **Data Safety**: PII stays in local `LOCAL_DATA_PATH` (default `~/Documents/jimwurst_local_data/`), never committed to Git.
+- **Data Safety**: PII stays in local `LOCAL_DATA_PATH` (default `~/Documents/ravioli_local_data/`), never committed to Git.
 - **Error Handling**: Basic try/except with sys.exit(1) on critical failures.
 - **Naming**: snake_case for files/folders, clean column names (lowercase, underscores).
 
@@ -56,4 +56,4 @@ jimwurst is a monolithic data warehouse (DWH) repository for personal data analy
 - Open-source first.
 - 100% local runnable.
 - Casual attitude, serious architecture ("Es ist mir wurst" - it doesn't matter, but excellence in DWH design).</content>
-<parameter name="filePath">/Users/jimmypang/VSCodeProjects/jimwurst/.github/copilot-instructions.md
+<parameter name="filePath">/Users/jimmypang/VSCodeProjects/ravioli/.github/copilot-instructions.md
