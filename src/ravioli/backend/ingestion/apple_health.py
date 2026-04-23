@@ -4,9 +4,9 @@ from datetime import datetime
 from tqdm import tqdm
 from psycopg2 import sql
 from psycopg2.extras import execute_values
-from ravioli.ingestion.base import BaseIngestor
-from ravioli.db.session import get_db_connection
-from ravioli.core.config import settings
+from ravioli.backend.ingestion.base import BaseIngestor
+from ravioli.db.oltp.session import get_db_connection
+from ravioli.backend.core.config import settings
 
 class AppleHealthIngestor(BaseIngestor):
     def __init__(self):

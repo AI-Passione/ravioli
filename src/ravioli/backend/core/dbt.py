@@ -1,15 +1,14 @@
 import subprocess
 import os
 from pathlib import Path
-from ravioli.core.config import settings
+from ravioli.backend.core.config import settings
 
 def run_dbt_command(command: str = "build") -> str:
     """
     Runs a dbt command in the transformation directory.
     Default command is 'build'.
     """
-    # Note: Path will need to be updated after Phase 4 reorganization
-    dbt_dir = Path(__file__).parent.parent / "apps" / "transformation" / "dbt"
+    dbt_dir = Path(__file__).parent.parent.parent / "db" / "olap" / "transformation" / "dbt"
     
     try:
         result = subprocess.run(

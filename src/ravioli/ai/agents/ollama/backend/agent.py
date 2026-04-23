@@ -15,9 +15,9 @@ from langchain.tools import tool
 from langchain_community.utilities import SQLDatabase
 from langchain_community.agent_toolkits import create_sql_agent
 
-from ravioli.core.config import settings
-from ravioli.ingestion.base import CSVIngestor
-from ravioli.core.dbt import run_dbt_command
+from ravioli.backend.core.config import settings
+from ravioli.backend.ingestion.base import CSVIngestor
+from ravioli.backend.core.dbt import run_dbt_command
 
 @tool
 def ingest_data_tool(file_path: str):
