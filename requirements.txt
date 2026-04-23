@@ -72,7 +72,7 @@ pydantic==2.12.5
 pydantic-core==2.41.5
 pydeck==0.9.1
 python-dateutil==2.9.0.post0
-python-dotenv==1.2.1
+python-dotenv==1.2.2
 python-slugify==8.0.4
 pytimeparse==1.1.8
 pytz==2025.2
