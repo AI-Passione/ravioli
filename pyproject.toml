@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ravioli = "ravioli.cli:app"
+ravioli = "ravioli.backend.cli.app:app"
 
 [build-system]
 requires = ["hatchling"]
