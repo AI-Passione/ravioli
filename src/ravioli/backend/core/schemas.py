@@ -27,6 +27,7 @@ class AnalysisBase(BaseModel):
     title: str
     description: Optional[str] = None
     analysis_metadata: Optional[dict] = None
+    notebook: Optional[dict] = None
 
 class AnalysisCreate(AnalysisBase):
     pass
@@ -37,6 +38,7 @@ class AnalysisUpdate(BaseModel):
     status: Optional[str] = None
     result: Optional[str] = None
     analysis_metadata: Optional[dict] = None
+    notebook: Optional[dict] = None
 
 class QuestionCreate(BaseModel):
     question: str

@@ -26,6 +26,9 @@ class Analysis(Base):
     
     # Metadata for the analysis (e.g., config, parameters)
     analysis_metadata: Mapped[Optional[dict]] = mapped_column(JSON, name="analysis_metadata")
+    
+    # Notebook content (storing ipynb as JSON)
+    notebook: Mapped[Optional[dict]] = mapped_column(JSON)
 
     # Relationships
     logs: Mapped[List["ExecutionLog"]] = relationship("ExecutionLog", back_populates="analysis", cascade="all, delete-orphan")

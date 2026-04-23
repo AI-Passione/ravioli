@@ -68,3 +68,43 @@ def test_get_analysis_not_found(client, session):
     # Assertions
     assert response.status_code == 404
     assert response.json()["detail"] == "Analysis not found"
+
+def test_create_analysis_with_notebook(client, session):
+    # Prepare mock data with notebook
+    analysis_id = uuid.uuid4()
+    notebook_content = {
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": ["# Test Notebook"]
+            }
+        ],
+        "metadata": {},
+        "nbformat": 4,
+        "nbformat_minor": 5
+    }
+    analysis_data = {
+        "title": "Notebook Analysis",
+        "description": "Testing notebook storage",
+        "notebook": notebook_content
+    }
+    
+    def mock_refresh(obj):
+        obj.id = analysis_id
+        obj.status = "pending"
+        obj.created_at = datetime.now(UTC)
+        obj.updated_at = datetime.now(UTC)
+        obj.notebook = notebook_content
+
+    session.refresh.side_effect = mock_refresh
+
+    # Execute request
+    response = client.post("/api/v1/analyses/", json=analysis_data)
+
+    # Assertions
+    assert response.status_code == 201
+    data = response.json()
+    assert data["title"] == "Notebook Analysis"
+    assert data["notebook"] == notebook_content
+    assert data["notebook"]["cells"][0]["source"] == ["# Test Notebook"]

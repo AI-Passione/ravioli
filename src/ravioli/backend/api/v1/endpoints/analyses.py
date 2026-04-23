@@ -16,7 +16,8 @@ def create_analysis(analysis_in: schemas.AnalysisCreate, db: Session = Depends(g
     db_analysis = models.Analysis(
         title=analysis_in.title,
         description=analysis_in.description,
-        analysis_metadata=analysis_in.analysis_metadata
+        analysis_metadata=analysis_in.analysis_metadata,
+        notebook=analysis_in.notebook
     )
     db.add(db_analysis)
     db.commit()
