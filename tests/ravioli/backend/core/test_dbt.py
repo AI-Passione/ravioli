@@ -1,7 +1,5 @@
-import pytest
 from unittest.mock import patch, MagicMock
 from ravioli.backend.core.dbt import run_dbt_command
-from pathlib import Path
 
 def test_run_dbt_command_success():
     with patch("subprocess.run") as mock_run:
