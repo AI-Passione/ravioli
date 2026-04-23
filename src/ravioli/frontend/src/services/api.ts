@@ -19,12 +19,6 @@ export const api = {
     return response.json();
   },
 
-  async getMission(id: string): Promise<Mission> {
-    const response = await fetch(`${API_BASE}/missions/${id}`);
-    if (!response.ok) throw new Error('Failed to fetch mission');
-    return response.json();
-  },
-
   async deleteMission(id: string): Promise<void> {
     const response = await fetch(`${API_BASE}/missions/${id}`, {
       method: 'DELETE',

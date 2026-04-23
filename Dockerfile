@@ -18,8 +18,8 @@ COPY . .
 # Install the project and its dependencies
 RUN uv pip install --system -e .
 
-# Expose the Streamlit port
-EXPOSE 8501
+# Expose the API port
+EXPOSE 8000
 
-# Default command starts the AI Agent UI
-CMD ["ravioli", "agent"]
+# Default command starts the FastAPI backend
+CMD ["uvicorn", "ravioli.backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
