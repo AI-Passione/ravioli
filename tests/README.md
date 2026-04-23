@@ -10,6 +10,8 @@ All commands should be run from the project root (`ravioli/`):
 uv run pytest tests/
 
 # Run frontend tests
+
+```
 npm --prefix src/ravioli/frontend test
 ```
 
