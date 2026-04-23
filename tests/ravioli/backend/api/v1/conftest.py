@@ -1,11 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from ravioli.backend.main import app
-from ravioli.backend.core.database import Base, get_db
+from ravioli.backend.core.database import get_db
 
 # Use a separate SQLite database for testing if possible, 
 # but since we use PostgreSQL types (UUID, JSON), 
