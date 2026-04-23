@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, DateTime, JSON, ForeignKey, Text, Table
+from sqlalchemy import String, DateTime, JSON, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from ravioli.backend.core.database import Base
