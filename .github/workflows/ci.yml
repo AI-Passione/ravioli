@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          enable-cache: true
+          version: "latest"
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+        
+      - name: Run unit tests
+        run: pytest tests/
+
+  docker-compose-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create .env file
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          else
+            echo "POSTGRES_USER=ravioli_user" > .env
+            echo "POSTGRES_PASSWORD=ravioli_password" >> .env
+            echo "POSTGRES_DB=ravioli_db" >> .env
+          fi
+        
+      - name: Build images
+        run: docker compose build
+        
+      - name: Start services (excluding ollama-pull)
+        run: docker compose up -d postgres ollama app
+        
+      - name: Check container status
+        run: |
+          echo "Waiting for containers to start..."
+          sleep 15
+          docker compose ps
+          
+          # Verify each critical service is Up
+          services=("ravioli_postgres" "ravioli_ollama" "ravioli_app")
+          for service in "${services[@]}"; do
+            if ! docker compose ps | grep "$service" | grep -q "Up"; then
+              echo "Error: Service $service is not running!"
+              docker compose logs "$service"
+              exit 1
+            fi
+          done
+          echo "All critical services are Up and running."
+          
+      - name: Shutdown services
+        run: docker compose down
