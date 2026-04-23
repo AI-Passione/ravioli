@@ -13,7 +13,7 @@ project_root = os.path.abspath(os.path.join(current_dir, "../../../.."))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from ravioli.apps.agents.ollama.backend.agent import RavioliAgent
+from ravioli.ai.agents.ollama.backend.agent import RavioliAgent
 
 st.set_page_config(
     page_title="Ravioli AI",
@@ -139,7 +139,7 @@ if next_prompt:
             
             try:
                 # Import our custom callback
-                from ravioli.core.callbacks import StreamlitThinkingCallback
+                from ravioli.backend.core.callbacks import StreamlitThinkingCallback
                 
                 # Create callback handler pointing to the placeholder
                 st_callback = StreamlitThinkingCallback(thoughts_placeholder)
