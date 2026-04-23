@@ -9,7 +9,7 @@ def run_dbt_command(command: str = "build") -> str:
     Default command is 'build'.
     """
     # Note: Path will need to be updated after Phase 4 reorganization
-    dbt_dir = Path(__file__).parent.parent.parent / "apps" / "transformation" / "dbt"
+    dbt_dir = Path(__file__).parent.parent / "apps" / "transformation" / "dbt"
     
     try:
         result = subprocess.run(

@@ -44,7 +44,7 @@ def transform(command: str = "build"):
 def agent():
     """Start the AI Agent UI."""
     import subprocess
-    frontend_path = Path(__file__).parent.parent.parent / "apps" / "agents" / "ollama" / "frontend" / "app.py"
+    frontend_path = Path(__file__).parent / "apps" / "agents" / "ollama" / "frontend" / "app.py"
     print(f"Starting Streamlit agent from {frontend_path}...")
     subprocess.run(["streamlit", "run", str(frontend_path)])
 
