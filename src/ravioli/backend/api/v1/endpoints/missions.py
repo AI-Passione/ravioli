@@ -16,7 +16,7 @@ def create_mission(mission_in: schemas.MissionCreate, db: Session = Depends(get_
     db_mission = models.Mission(
         title=mission_in.title,
         description=mission_in.description,
-        metadata_field=mission_in.metadata
+        mission_metadata=mission_in.mission_metadata
     )
     db.add(db_mission)
     db.commit()
@@ -51,9 +51,7 @@ def update_mission(mission_id: UUID, mission_in: schemas.MissionUpdate, db: Sess
         raise HTTPException(status_code=404, detail="Mission not found")
     
     update_data = mission_in.model_dump(exclude_unset=True)
-    if "metadata" in update_data:
-        db_mission.metadata_field = update_data.pop("metadata")
-        
+    
     for field, value in update_data.items():
         setattr(db_mission, field, value)
     

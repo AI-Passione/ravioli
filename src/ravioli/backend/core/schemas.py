@@ -16,6 +16,7 @@ class ExecutionLogCreate(ExecutionLogBase):
 
 class ExecutionLog(ExecutionLogBase):
     id: UUID
+    mission_id: UUID
     timestamp: datetime
     
     model_config = ConfigDict(from_attributes=True)
@@ -25,7 +26,7 @@ class ExecutionLog(ExecutionLogBase):
 class MissionBase(BaseModel):
     title: str
     description: Optional[str] = None
-    metadata: Optional[dict] = None
+    mission_metadata: Optional[dict] = None
 
 class MissionCreate(MissionBase):
     pass
@@ -35,7 +36,7 @@ class MissionUpdate(BaseModel):
     description: Optional[str] = None
     status: Optional[str] = None
     result: Optional[str] = None
-    metadata: Optional[dict] = None
+    mission_metadata: Optional[dict] = None
 
 class Mission(MissionBase):
     id: UUID

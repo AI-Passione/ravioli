@@ -25,7 +25,7 @@ class Mission(Base):
     result: Mapped[Optional[str]] = mapped_column(Text)
     
     # Metadata for the mission (e.g., config, parameters)
-    metadata_field: Mapped[Optional[dict]] = mapped_column(JSON, name="metadata")
+    mission_metadata: Mapped[Optional[dict]] = mapped_column(JSON, name="mission_metadata")
 
     # Relationships
     logs: Mapped[List["ExecutionLog"]] = relationship("ExecutionLog", back_populates="mission", cascade="all, delete-orphan")
