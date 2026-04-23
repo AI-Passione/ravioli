@@ -1,20 +1,20 @@
 import uuid
 from datetime import datetime, UTC
 
-def test_create_mission(client, session):
+def test_create_analysis(client, session):
     # Prepare mock data
-    mission_id = uuid.uuid4()
-    mission_data = {
-        "title": "Test Mission",
+    analysis_id = uuid.uuid4()
+    analysis_data = {
+        "title": "Test Analysis",
         "description": "Testing the API",
-        "mission_metadata": {"key": "value"}
+        "analysis_metadata": {"key": "value"}
     }
     
     # Mock session behavior
     # When session.add is called, we don't do much
     # When session.refresh is called, we set the ID and timestamps
     def mock_refresh(obj):
-        obj.id = mission_id
+        obj.id = analysis_id
         obj.status = "pending"
         obj.created_at = datetime.now(UTC)
         obj.updated_at = datetime.now(UTC)
@@ -22,19 +22,19 @@ def test_create_mission(client, session):
     session.refresh.side_effect = mock_refresh
 
     # Execute request
-    response = client.post("/api/v1/missions/", json=mission_data)
+    response = client.post("/api/v1/analyses/", json=analysis_data)
 
     # Assertions
     assert response.status_code == 201
     data = response.json()
-    assert data["title"] == "Test Mission"
-    assert data["id"] == str(mission_id)
+    assert data["title"] == "Test Analysis"
+    assert data["id"] == str(analysis_id)
     assert session.add.called
     assert session.commit.called
 
-def test_list_missions(client, session):
-    mission_id = uuid.uuid4()
-    class MockMission:
+def test_list_analyses(client, session):
+    analysis_id = uuid.uuid4()
+    class MockAnalysis:
         def __init__(self, id, title):
             self.id = id
             self.title = title
@@ -43,28 +43,28 @@ def test_list_missions(client, session):
             self.created_at = datetime.now(UTC)
             self.updated_at = datetime.now(UTC)
             self.result = None
-            self.mission_metadata = {}
+            self.analysis_metadata = {}
             self.logs = []
     
-    mock_mission = MockMission(mission_id, "Test Mission")
-    session.query().offset().limit().all.return_value = [mock_mission]
+    mock_analysis = MockAnalysis(analysis_id, "Test Analysis")
+    session.query().offset().limit().all.return_value = [mock_analysis]
 
     # Execute request
-    response = client.get("/api/v1/missions/")
+    response = client.get("/api/v1/analyses/")
 
     # Assertions
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["title"] == "Test Mission"
+    assert data[0]["title"] == "Test Analysis"
 
-def test_get_mission_not_found(client, session):
+def test_get_analysis_not_found(client, session):
     # Mock session to return None
     session.query().filter().first.return_value = None
 
     # Execute request
-    response = client.get(f"/api/v1/missions/{uuid.uuid4()}")
+    response = client.get(f"/api/v1/analyses/{uuid.uuid4()}")
 
     # Assertions
     assert response.status_code == 404
-    assert response.json()["detail"] == "Mission not found"
+    assert response.json()["detail"] == "Analysis not found"

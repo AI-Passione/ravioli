@@ -1,10 +1,10 @@
-import type { Mission, ExecutionLog } from './types';
+import type { Analysis, ExecutionLog } from './types';
 
 type Listener = () => void;
 
 class Store {
-  private missions: Mission[] = [];
-  private activeMissionId?: string;
+  private analyses: Analysis[] = [];
+  private activeAnalysisId?: string;
   private logs: ExecutionLog[] = [];
   private listeners: Listener[] = [];
 
@@ -19,19 +19,19 @@ class Store {
     this.listeners.forEach(l => l());
   }
 
-  setMissions(missions: Mission[]) {
-    this.missions = missions;
+  setAnalyses(analyses: Analysis[]) {
+    this.analyses = analyses;
     this.notify();
   }
 
-  getMissions() { return this.missions; }
+  getAnalyses() { return this.analyses; }
 
-  setActiveMissionId(id?: string) {
-    this.activeMissionId = id;
+  setActiveAnalysisId(id?: string) {
+    this.activeAnalysisId = id;
     this.notify();
   }
 
-  getActiveMissionId() { return this.activeMissionId; }
+  getActiveAnalysisId() { return this.activeAnalysisId; }
 
   setLogs(logs: ExecutionLog[]) {
     this.logs = logs;

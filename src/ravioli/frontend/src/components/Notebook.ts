@@ -5,18 +5,18 @@ import MarkdownIt from 'markdown-it';
 const md = new MarkdownIt();
 
 export function renderNotebook() {
-  const activeId = store.getActiveMissionId();
-  const missions = store.getMissions();
-  const mission = missions.find(m => m.id === activeId);
+  const activeId = store.getActiveAnalysisId();
+  const analyses = store.getAnalyses();
+  const analysis = analyses.find(a => a.id === activeId);
   const logs = store.getLogs();
 
   const container = document.createElement('div');
   container.className = 'flex-1 overflow-y-auto relative px-16 pt-10 pb-32';
 
-  if (!mission) {
+  if (!analysis) {
     container.innerHTML = `
       <div class="flex flex-col items-center justify-center h-[60vh] text-[#a38b88]">
-        <h2 class="mb-4">Select a Mission</h2>
+        <h2 class="mb-4">Select an Analysis</h2>
         <p class="label opacity-60">The Silent Concierge is waiting.</p>
       </div>
     `;
@@ -25,9 +25,9 @@ export function renderNotebook() {
 
   container.innerHTML = `
     <header class="mb-16">
-      <h2 class="mb-2 text-white">${mission.title}</h2>
+      <h2 class="mb-2 text-white">${analysis.title}</h2>
       <div class="flex items-center gap-4">
-        <span class="label text-[#eac34a]">${mission.status}</span>
+        <span class="label text-[#eac34a]">${analysis.status}</span>
         <span class="label text-[#554240]"># ${logs.length} Steps</span>
       </div>
     </header>

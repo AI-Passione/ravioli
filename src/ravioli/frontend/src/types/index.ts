@@ -1,4 +1,4 @@
-export interface Mission {
+export interface Analysis {
   id: string;
   title: string;
   description?: string;
@@ -9,7 +9,7 @@ export interface Mission {
 
 export interface ExecutionLog {
   id: string;
-  mission_id: string;
+  analysis_id: string;
   log_type: string;
   content: string;
   tool_name?: string;
@@ -17,8 +17,8 @@ export interface ExecutionLog {
   timestamp: string;
 }
 
-export interface MissionCreate {
+export interface AnalysisCreate {
   title: string;
   description?: string;
-  mission_metadata?: any;
+  analysis_metadata?: any;
 }

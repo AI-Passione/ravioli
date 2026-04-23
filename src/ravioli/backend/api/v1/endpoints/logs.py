@@ -13,13 +13,13 @@ def create_log(log_in: schemas.ExecutionLogCreate, db: Session = Depends(get_db)
     """
     Create a new execution log entry.
     """
-    # Verify mission exists
-    mission = db.query(models.Mission).filter(models.Mission.id == log_in.mission_id).first()
-    if not mission:
-        raise HTTPException(status_code=404, detail="Mission not found")
+    # Verify analysis exists
+    analysis = db.query(models.Analysis).filter(models.Analysis.id == log_in.analysis_id).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
         
     db_log = models.ExecutionLog(
-        mission_id=log_in.mission_id,
+        analysis_id=log_in.analysis_id,
         log_type=log_in.log_type,
         content=log_in.content,
         tool_name=log_in.tool_name,
@@ -30,10 +30,10 @@ def create_log(log_in: schemas.ExecutionLogCreate, db: Session = Depends(get_db)
     db.refresh(db_log)
     return db_log
 
-@router.get("/mission/{mission_id}", response_model=List[schemas.ExecutionLog])
-def list_logs_for_mission(mission_id: UUID, db: Session = Depends(get_db)):
+@router.get("/analysis/{analysis_id}", response_model=List[schemas.ExecutionLog])
+def list_logs_for_analysis(analysis_id: UUID, db: Session = Depends(get_db)):
     """
-    List all logs for a specific mission.
+    List all logs for a specific analysis.
     """
-    logs = db.query(models.ExecutionLog).filter(models.ExecutionLog.mission_id == mission_id).order_by(models.ExecutionLog.timestamp.asc()).all()
+    logs = db.query(models.ExecutionLog).filter(models.ExecutionLog.analysis_id == analysis_id).order_by(models.ExecutionLog.timestamp.asc()).all()
     return logs

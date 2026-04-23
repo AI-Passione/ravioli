@@ -12,36 +12,36 @@ class ExecutionLogBase(BaseModel):
     data: Optional[dict] = None
 
 class ExecutionLogCreate(ExecutionLogBase):
-    mission_id: UUID
+    analysis_id: UUID
 
 class ExecutionLog(ExecutionLogBase):
     id: UUID
-    mission_id: UUID
+    analysis_id: UUID
     timestamp: datetime
     
     model_config = ConfigDict(from_attributes=True)
 
-# --- Mission Schemas ---
+# --- Analysis Schemas ---
 
-class MissionBase(BaseModel):
+class AnalysisBase(BaseModel):
     title: str
     description: Optional[str] = None
-    mission_metadata: Optional[dict] = None
+    analysis_metadata: Optional[dict] = None
 
-class MissionCreate(MissionBase):
+class AnalysisCreate(AnalysisBase):
     pass
 
-class MissionUpdate(BaseModel):
+class AnalysisUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     status: Optional[str] = None
     result: Optional[str] = None
-    mission_metadata: Optional[dict] = None
+    analysis_metadata: Optional[dict] = None
 
 class QuestionCreate(BaseModel):
     question: str
 
-class Mission(MissionBase):
+class Analysis(AnalysisBase):
     id: UUID
     status: str
     created_at: datetime
