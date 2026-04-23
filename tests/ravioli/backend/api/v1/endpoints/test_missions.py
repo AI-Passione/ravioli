@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 
 def test_create_mission(client, session):
     # Prepare mock data
@@ -16,8 +16,8 @@ def test_create_mission(client, session):
     def mock_refresh(obj):
         obj.id = mission_id
         obj.status = "pending"
-        obj.created_at = datetime.utcnow()
-        obj.updated_at = datetime.utcnow()
+        obj.created_at = datetime.now(UTC)
+        obj.updated_at = datetime.now(UTC)
 
     session.refresh.side_effect = mock_refresh
 
@@ -40,8 +40,8 @@ def test_list_missions(client, session):
             self.title = title
             self.description = "Testing"
             self.status = "pending"
-            self.created_at = datetime.utcnow()
-            self.updated_at = datetime.utcnow()
+            self.created_at = datetime.now(UTC)
+            self.updated_at = datetime.now(UTC)
             self.result = None
             self.mission_metadata = {}
             self.logs = []

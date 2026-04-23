@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, List
 from sqlalchemy import String, DateTime, JSON, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
@@ -18,8 +18,8 @@ class Mission(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(50), default="pending")  # pending, running, completed, failed
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
     
     # Final result or summary
     result: Mapped[Optional[str]] = mapped_column(Text)
@@ -53,7 +53,7 @@ class ExecutionLog(Base):
     # Structured data if needed
     data: Mapped[Optional[dict]] = mapped_column(JSON)
     
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
     # Relationships
     mission: Mapped["Mission"] = relationship("Mission", back_populates="logs")

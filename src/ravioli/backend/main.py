@@ -1,6 +1,7 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
 from ravioli.backend.core.database import engine, Base
 from ravioli.backend.data.oltp.session import ensure_schema
@@ -17,10 +18,18 @@ def init_db():
     except Exception as e:
         print(f"Error initializing database: {e}")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_db()
+    yield
+    # Shutdown (if needed)
+
 app = FastAPI(
     title="Ravioli API",
     description="Backend API for Ravioli AI Data Warehouse",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan
 )
 
 # CORS Middleware
@@ -32,9 +41,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-def startup_event():
-    init_db()
 
 @app.get("/")
 def read_root():

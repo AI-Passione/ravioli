@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 
 def test_create_log(client, session):
     # Prepare mock data
@@ -15,7 +15,7 @@ def test_create_log(client, session):
     # Mock session behavior
     def mock_refresh(obj):
         obj.id = log_id
-        obj.timestamp = datetime.utcnow()
+        obj.timestamp = datetime.now(UTC)
 
     session.refresh.side_effect = mock_refresh
     
@@ -41,7 +41,7 @@ def test_list_logs_for_mission(client, session):
             self.content = "Thinking..."
             self.tool_name = None
             self.data = {}
-            self.timestamp = datetime.utcnow()
+            self.timestamp = datetime.now(UTC)
             
     mock_log = MockLog()
     session.query().filter().order_by().all.return_value = [mock_log]
