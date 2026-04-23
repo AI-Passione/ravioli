@@ -8,7 +8,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-ravioli_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./src/ravioli/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./src/ravioli/backend/data/oltp/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ${LOCAL_DATA_PATH:-~/Documents/ravioli_local_data}:/local_data:ro
     ports:
       - "5432:5432"
