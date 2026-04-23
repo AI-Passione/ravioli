@@ -1,11 +1,8 @@
 import uvicorn
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from typing import List
 
-from ravioli.backend.core.database import engine, Base, get_db
-from ravioli.backend.core.config import settings
+from ravioli.backend.core.database import engine, Base
 from ravioli.backend.data.oltp.session import ensure_schema
 
 # Create tables in the specified schemas
