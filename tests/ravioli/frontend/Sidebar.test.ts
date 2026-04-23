@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderSidebar } from './Sidebar';
-import { store } from '../store';
+import { renderSidebar } from '../../../src/ravioli/frontend/src/components/Sidebar';
+import { store } from '../../../src/ravioli/frontend/src/store';
 
 describe('Sidebar Component', () => {
   beforeEach(() => {

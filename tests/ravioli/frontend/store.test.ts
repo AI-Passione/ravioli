@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { store } from './store';
+import { store } from '../../../src/ravioli/frontend/src/store';
 
 describe('Store', () => {
   beforeEach(() => {
