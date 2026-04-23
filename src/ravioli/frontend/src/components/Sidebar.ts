@@ -51,7 +51,7 @@ export function renderSidebar() {
     </nav>
 
     <div class="px-2 pt-4 border-t border-[#554240] opacity-20">
-      <p class="label text-[10px]">La Passione Inc. &copy; 2026</p>
+      <p class="label text-[10px]">AI Passione &copy; 2026</p>
     </div>
   `;
 
