@@ -23,6 +23,7 @@ dependencies = [
     "requests>=2.31.0",
 ]
 
+
 [project.scripts]
 ravioli = "ravioli.backend.cli.app:app"
 
@@ -32,6 +33,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ravioli"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.12.0",
+]
 
 [tool.uv]
 managed = true
