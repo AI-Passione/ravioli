@@ -7,11 +7,14 @@ This directory mirrors the structure of `src/ravioli/` and contains all unit tes
 All commands should be run from the project root (`ravioli/`):
 
 # Run backend tests
+
+```bash
 uv run pytest tests/
+```
 
 # Run frontend tests
 
-```
+```bash
 npm --prefix src/ravioli/frontend test
 ```
 
