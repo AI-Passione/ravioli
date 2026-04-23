@@ -45,7 +45,7 @@ langchain-text-splitters==0.3.11
 langsmith==0.4.37
 leather==0.4.1
 logbook==1.5.3
-lxml==6.0.2
+lxml==6.1.0
 markupsafe==3.0.3
 mashumaro==3.17
 minimal-snowplow-tracker==0.0.2
