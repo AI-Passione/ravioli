@@ -1,35 +1,35 @@
 services:
   postgres:
     image: postgres:15
-    container_name: jimwurst_postgres
+    container_name: ravioli_postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-jimwurst_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jimwurst_password}
-      POSTGRES_DB: ${POSTGRES_DB:-jimwurst_db}
+      POSTGRES_USER: ${POSTGRES_USER:-ravioli_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ravioli_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ravioli_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./src/jimwurst/db/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ${LOCAL_DATA_PATH:-~/Documents/jimwurst_local_data}:/local_data:ro
+      - ./src/ravioli/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ${LOCAL_DATA_PATH:-~/Documents/ravioli_local_data}:/local_data:ro
     ports:
       - "5432:5432"
     networks:
-      - jimwurst_net
+      - ravioli_net
     restart: always
 
   ollama:
     image: ollama/ollama:latest
-    container_name: jimwurst_ollama
+    container_name: ravioli_ollama
     volumes:
       - ollama_data:/root/.ollama
     ports:
       - "11434:11434"
     networks:
-      - jimwurst_net
+      - ravioli_net
     restart: always
 
   ollama-pull:
     image: ollama/ollama:latest
-    container_name: jimwurst_ollama_pull
+    container_name: ravioli_ollama_pull
     volumes:
       - ollama_data:/root/.ollama
     entrypoint: /bin/sh
@@ -37,17 +37,17 @@ services:
     depends_on:
       - ollama
     networks:
-      - jimwurst_net
+      - ravioli_net
 
   app:
     build: .
-    container_name: jimwurst_app
+    container_name: ravioli_app
     environment:
       - DB_HOST=postgres
       - OLLAMA_HOST=http://ollama:11434
     volumes:
       - .:/app
-      - ${LOCAL_DATA_PATH:-~/Documents/jimwurst_local_data}:/local_data:ro
+      - ${LOCAL_DATA_PATH:-~/Documents/ravioli_local_data}:/local_data:ro
     ports:
       - "8501:8501"
     depends_on:
@@ -56,7 +56,7 @@ services:
     env_file:
       - .env
     networks:
-      - jimwurst_net
+      - ravioli_net
     restart: always
 
 volumes:
@@ -64,5 +64,5 @@ volumes:
   ollama_data:
 
 networks:
-  jimwurst_net:
+  ravioli_net:
     driver: bridge

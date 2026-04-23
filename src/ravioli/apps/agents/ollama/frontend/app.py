@@ -13,15 +13,15 @@ project_root = os.path.abspath(os.path.join(current_dir, "../../../.."))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from apps.data_activation.ollama_agent.backend.agent import JimwurstAgent
+from ravioli.apps.agents.ollama.backend.agent import RavioliAgent
 
 st.set_page_config(
-    page_title="Jimwurst AI",
+    page_title="Ravioli AI",
     page_icon="🌭",
     layout="wide"
 )
 
-st.title("🌭 Jimwurst AI")
+st.title("🌭 Ravioli AI")
 
 # Sidebar
 with st.sidebar:
@@ -33,7 +33,7 @@ with st.sidebar:
     )
     if st.button("Check Connection"):
         # Temporary agent to check connection
-        temp_agent = JimwurstAgent(model_name=model_name)
+        temp_agent = RavioliAgent(model_name=model_name)
         if temp_agent.check_ollama_connection():
             st.success("Connected to Ollama!")
         else:
@@ -58,7 +58,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "agent" not in st.session_state:
-    st.session_state.agent = JimwurstAgent(model_name=model_name)
+    st.session_state.agent = RavioliAgent(model_name=model_name)
 
 # Display Chat History
 for message in st.session_state.messages:
@@ -95,11 +95,11 @@ with st.container():
             if st.button("Process Uploaded File"):
                 # Define persistent storage path
                 user_home = os.path.expanduser("~")
-                jimwurst_data_dir = os.path.join(user_home, ".jimwurst_data")
-                os.makedirs(jimwurst_data_dir, exist_ok=True)
+                ravioli_data_dir = os.path.join(user_home, ".ravioli_data")
+                os.makedirs(ravioli_data_dir, exist_ok=True)
                 
                 # Save to persistent file
-                file_path = os.path.join(jimwurst_data_dir, uploaded_file.name)
+                file_path = os.path.join(ravioli_data_dir, uploaded_file.name)
                 with open(file_path, "wb") as f:
                     f.write(uploaded_file.getvalue())
                 
@@ -135,11 +135,11 @@ if next_prompt:
             
             # Ensure agent model matches sidebar
             if st.session_state.agent.model_name != model_name:
-                 st.session_state.agent = JimwurstAgent(model_name=model_name)
+                 st.session_state.agent = RavioliAgent(model_name=model_name)
             
             try:
                 # Import our custom callback
-                from utils.streamlit_callback import StreamlitThinkingCallback
+                from ravioli.core.callbacks import StreamlitThinkingCallback
                 
                 # Create callback handler pointing to the placeholder
                 st_callback = StreamlitThinkingCallback(thoughts_placeholder)

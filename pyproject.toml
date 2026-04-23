@@ -1,7 +1,7 @@
 [project]
-name = "jimwurst"
+name = "ravioli"
 version = "0.1.0"
-description = "A monolithic repository of a DWH for personal data analytics and AI"
+description = "AI-native, Notebook-style personal DWH for business-friendly vibe-analytics"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -24,14 +24,14 @@ dependencies = [
 ]
 
 [project.scripts]
-jimwurst = "jimwurst.cli:app"
+ravioli = "ravioli.cli:app"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/jimwurst"]
+packages = ["src/ravioli"]
 
 [tool.uv]
 managed = true

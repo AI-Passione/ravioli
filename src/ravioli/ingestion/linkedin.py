@@ -2,9 +2,9 @@ import os
 import pandas as pd
 from tqdm import tqdm
 from psycopg2 import sql
-from jimwurst.ingestion.base import BaseIngestor
-from jimwurst.db.session import get_db_connection, ensure_schema, get_engine
-from jimwurst.core.config import settings
+from ravioli.ingestion.base import BaseIngestor
+from ravioli.db.session import get_db_connection, ensure_schema, get_engine
+from ravioli.core.config import settings
 
 class LinkedInIngestor(BaseIngestor):
     def __init__(self):

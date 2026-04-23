@@ -1,7 +1,7 @@
 import subprocess
 import os
 from pathlib import Path
-from jimwurst.core.config import settings
+from ravioli.core.config import settings
 
 def run_dbt_command(command: str = "build") -> str:
     """

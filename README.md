@@ -1,130 +1,88 @@
-# jimwurst
+# ravioli 🍝
 
-![jimwurst](docs/jimwurst.png)
+![ravioli](docs/ravioli.png)
 
-> "Es ist mir wurst." Germans 🇩🇪 
+> AI-native, Notebook-style personal Data Warehouse for business-friendly vibe-analytics.
 
-It is a German expression meaning that "It doesn't matter to me", literally translated as "This is sausage to me". 🌭 (yeah no there is no sausage emoji so I am putting a hotdog here instead)
+**ravioli** is a modern, open-source personal Data Warehouse (DWH) designed for the AI era. It combines the power of a professional data stack with the casual, interactive feel of a notebook. Part of the **AI Passione** ecosystem.
 
-Casual in attitude, serious about DWH architecture. 
+## 🚀 Vision: Vibe-Analytics for Everyone
+Traditional DWHs are stiff and complex. **ravioli** is different. It's built to be:
+- **AI-Native**: Built-in integration with LLMs (via Ollama) for natural language querying and automated insights.
+- **Notebook-Style**: Interactive, iterative, and visual.
+- **Business-Friendly**: Designed for people who want results, not just queries.
+- **100% Local**: Your data stays on your machine. Privacy by design.
+- **Tool-Agnostic**: Abstractions that let you swap tools while keeping your data architecture intact.
 
-# Table of Contents
-- [Tenet](#tenet)
-- [Getting Started](#getting-started)
-- [Technical Details](#technical-details)
-  - [Connectivity & Schemas](#connectivity--schemas)
-  - [Python Environment Setup](#python-environment-setup)
-  - [Abstraction & Toolings](#abstraction--toolings)
-  - [Folder Structure](#-folder-structure)
+---
 
-# Tenet
-This is a monolithic repository of a DWH for personal data analytics and AI. Everything in this repo is expected to be **100% running locally**.
+## 🛠 Features
+- **Seamless Ingestion**: Python-based ingestors for Apple Health, Spotify, LinkedIn, Substack, and more.
+- **AI-Driven Insights**: Integrated AI agents that understand your data and help you explore it.
+- **Professional Transformation**: Powered by `dbt` for reliable, version-controlled data modeling.
+- **Vibrant Visualization**: Built on Streamlit for a premium, interactive analytics experience.
 
-A very core idea here is **tools agnostic**. Any tooling in modern data stack will be abstracted, and materialize in places like folder structure. Open source tooling will be prioritized.
+---
 
-The pholosophy behind can be found in [Data Biz](https://jimmypang.substack.com/s/engineering-value-at-scale).
+## 🚦 Getting Started
 
-# Getting Started
-
-## Launch Everything
-Run the following command to spin up the database, start Ollama (if needed), pull the AI model, and launch the AI Agent interface:
+### Launch Everything
+Spin up the database, AI models, and the interface with a single command:
 
 ```bash
 make up
 ```
 
 This will:
-1.  Start Postgres (Docker).
-2.  Start the Ollama server in the background if it is not already running.
-3.  Pull the required LLM (`qwen2.5:3b`).
-4.  Launch the Streamlit web interface at `http://localhost:8501`.
+1.  Start **Postgres** (Docker).
+2.  Start the **Ollama** server and pull the `qwen2.5:3b` model.
+3.  Launch the **Ravioli** Streamlit interface at `http://localhost:8501`.
 
-# Technical Details
-
-## Python Environment Setup
-
-This project uses [uv](https://github.com/astral-sh/uv) for fast, reliable Python dependency management.
-
-### Installing uv
+### Python Setup
+We use [uv](https://github.com/astral-sh/uv) for lightning-fast dependency management.
 
 ```bash
+# Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Sync environment
+uv sync
 ```
 
-After installation, restart your shell or run:
-```bash
-source $HOME/.local/bin/env
-```
+---
 
-### Managing Dependencies
+## 🏗 Architecture & Tooling
 
-**Create a virtual environment:**
-```bash
-uv venv
-```
+| Category | Tools |
+| :--- | :--- |
+| **DWH** | Postgres |
+| **Transformation** | [dbt Core](https://github.com/dbt-labs/dbt-core) |
+| **AI Engine** | [Ollama](https://github.com/ollama/ollama) |
+| **Interface** | [Streamlit](https://github.com/streamlit/streamlit) |
+| **Orchestration** | Python / Makefile |
+| **Package Manager** | [uv](https://github.com/astral-sh/uv) |
 
-**Install dependencies:**
-```bash
-uv pip install -r requirements.txt
-```
-
-**Add a new dependency:**
-```bash
-uv pip install <package>
-uv pip freeze > requirements.txt
-```
-
-**Sync dependencies (ensure exact match with requirements.txt):**
-```bash
-uv pip sync requirements.txt
-```
-
-## Connectivity & Schemas
-You can connect to the local PostgreSQL instance with:
-* **Host**: `localhost` | **Port**: `5432` | **User/Pass**: `jimwurst_user`/`jimwurst_password`
-
-The following schemas are initialized by default:
-* `marts`, `intermediate`, `staging`, and `s_<app_name>` (ODS).
-
-## Abstraction & Toolings
-
-### Data Ops
-* Containerization: [Docker](https://github.com/docker/docker)
-* CI/CD: [Github Actions](https://github.com/features/actions)
-* Job Orchestration: Python / [Makefile](Makefile)
-* DWH: Postgres
-* Package Manager: [uv](https://github.com/astral-sh/uv)
-
-### Data Engineering
-* Data Ingestion: Python / SQL
-* Data Transformation: [dbt Core](https://github.com/dbt-labs/dbt-core)
-* Data Activation:
-  * Reporting: (tbd) [Metabase](https://github.com/metabase/metabase)/[lightdash](https://github.com/lightdash/lightdash)
-  * adhoc analysis: [Jupyter](https://github.com/jupyter/jupyter)
-  * AI: [Ollama](https://github.com/ollama/ollama)
-
-### Scalability (Optional)
-For larger-scale data operations, the following tools can be integrated:
-* Job Orchestration: [Apache Airflow](https://github.com/apache/airflow)
-* Data Ingestion: [Airbyte](https://github.com/airbytehq/airbyte)
+---
 
 ## 🏗 Folder Structure
-Each application follows a strict modular structure using `snake_case`. Tooling is materialized through structure:
+Ravioli follows a strict modular structure where tooling is materialized through the filesystem:
 
 ```text
 .
-├── .github/                 # GitHub Actions workflows and CI config
-├── apps/                    # Tool-specific configurations and deployments
-│   ├── data_ingestion/      # Ingestion tools
-│   │   └── airbyte/
-│   ├── data_transformation/ # Transformation tools
-│   │   └── dbt/             # Central dbt project
-│   ├── data_activation/     # BI & activation tools
-│   │   └── metabase/
-│   └── job_orchestration/   # Orchestration tools
-│       └── airflow/
-├── docker/                  # Local orchestration (Docker Compose, .env)
-├── docs/                    # Documentation, diagrams, and architecture RFCs
-├── prompts/                 # AI system prompts and LLM context files
-│── utils/                   # Shared internal packages (Python utils, custom operators)
+├── src/ravioli/             # Core logic & applications
+│   ├── apps/                # Interactive analytics & AI agents
+│   ├── ingestion/           # Data connectors (Apple Health, Spotify, etc.)
+│   ├── db/                  # Database session & initialization
+│   └── core/                # Shared configurations & dbt wrappers
+├── docker/                  # Infrastructure (Docker Compose, .env)
+├── docs/                    # Architecture RFCs & diagrams
+├── prompts/                 # AI system prompts & LLM context
+└── pyproject.toml           # Project metadata
 ```
+
+---
+
+## 🇮🇹 AI Passione Theme
+Ravioli is part of the **AI Passione** suite—rebranded from the ground up to bring "passione" back into data engineering. It's about craft, quality, and the joy of discovery.
+
+*Formerly known as Jimwurst.*

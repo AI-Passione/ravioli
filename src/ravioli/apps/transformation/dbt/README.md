@@ -1,6 +1,6 @@
-# dbt Core for jimwurst
+# dbt Core for ravioli
 
-This directory contains the dbt Core project for data transformation in jimwurst.
+This directory contains the dbt Core project for data transformation in ravioli.
 
 ## Structure
 

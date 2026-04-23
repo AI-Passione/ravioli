@@ -1,8 +1,8 @@
-# Data Transformation in jimwurst
+# Data Transformation in ravioli
 
 ## Overview
 
-This document outlines the best practices for structuring and building dbt projects, tailored for the jimwurst data warehouse. jimwurst is a monolithic data warehouse repository implementing an ELT (Extract, Load, Transform) pipeline designed to run 100% locally. It emphasizes tool-agnostic design with tooling abstracted into folder structure, prioritizing open-source solutions.
+This document outlines the best practices for structuring and building dbt projects, tailored for the ravioli data warehouse. ravioli is a monolithic data warehouse repository implementing an ELT (Extract, Load, Transform) pipeline designed to run 100% locally. It emphasizes tool-agnostic design with tooling abstracted into folder structure, prioritizing open-source solutions.
 
 The architecture includes:
 - **Extract & Load**: Data ingestion from various sources (manual scripts or Airbyte).
@@ -45,7 +45,7 @@ This guide covers:
 
 Analytics engineering is about enabling collaborative decision-making at scale. Consistent structure reduces decision fatigue by establishing patterns for file organization, naming, and materializations. It helps teams focus on unique problems rather than reinventing conventions.
 
-In jimwurst, structure ensures the ELT pipeline flows smoothly from source-conformed data (e.g., raw JSON/CSV from local files) to business-conformed models in the `marts` schema.
+In ravioli, structure ensures the ELT pipeline flows smoothly from source-conformed data (e.g., raw JSON/CSV from local files) to business-conformed models in the `marts` schema.
 
 Key goals:
 - Move data from narrow, source-shaped models to wider, business-shaped entities.
@@ -54,7 +54,7 @@ Key goals:
 
 ### Learning Goals
 
-- Master recommendations for dbt project structure in jimwurst.
+- Master recommendations for dbt project structure in ravioli.
 - See examples adapted to local ELT pipeline.
 - Understand reasoning to customize for your needs.
 
@@ -66,7 +66,7 @@ We'll cover the transformation layers in DAG order:
 3. **Marts**: Cells representing business entities.
 4. **Project Organization**: YAML, folders, and splitting.
 
-Example project structure for jimwurst:
+Example project structure for ravioli:
 ```
 models/
 ├── staging/
@@ -107,9 +107,9 @@ This structure reflects data flow from sources to business entities, using schem
 
 ### Overview
 
-The staging layer is the foundation of jimwurst's ELT pipeline. It transforms raw, source-conformed data from local files (e.g., JSON/CSV in `~/Documents/jimwurst_local_data/<source>/`) into clean, modular building blocks. These "atoms" are used throughout the project for downstream transformations.
+The staging layer is the foundation of ravioli's ELT pipeline. It transforms raw, source-conformed data from local files (e.g., JSON/CSV in `~/Documents/ravioli_local_data/<source>/`) into clean, modular building blocks. These "atoms" are used throughout the project for downstream transformations.
 
-In jimwurst, staging models load data into the `staging` schema and source-specific `s_<source>` schemas.
+In ravioli, staging models load data into the `staging` schema and source-specific `s_<source>` schemas.
 
 ### Files and Folders
 
@@ -187,7 +187,7 @@ For general models like date spines, not in staging.
 #### Development Flow
 Start with staging all needed sources before building intermediate/marts. Use selectors like `dbt build --select staging.spotify+`.
 
-This layer ensures DRY transformations and clean atoms for the rest of jimwurst.
+This layer ensures DRY transformations and clean atoms for the rest of ravioli.
 
 ## Intermediate Models
 
@@ -195,7 +195,7 @@ This layer ensures DRY transformations and clean atoms for the rest of jimwurst.
 
 The intermediate layer builds on staging "atoms" to create "molecules" — modular components with specific purposes. It prepares staging models for joining into the entities needed in marts.
 
-In jimwurst, intermediate models transform data towards business-conformed concepts, using the `intermediate` schema.
+In ravioli, intermediate models transform data towards business-conformed concepts, using the `intermediate` schema.
 
 ### Files and Folders
 
@@ -249,15 +249,15 @@ select * from pivot_and_aggregate_payments_to_order_grain
 - **Narrow DAG**: Multiple inputs OK; avoid multiple outputs.
 - **Warehouse tidiness**: Materialize thoughtfully to avoid clutter.
 
-This layer modularizes complexity, enabling cleaner marts in jimwurst.
+This layer modularizes complexity, enabling cleaner marts in ravioli.
 
 ## Mart Models
 
 ### Overview
 
-The marts layer represents the final business-defined entities in jimwurst. These are wide, denormalized tables containing all useful data about a concept at its grain (e.g., orders, customers). They are designed for end-user consumption in BI tools like Metabase.
+The marts layer represents the final business-defined entities in ravioli. These are wide, denormalized tables containing all useful data about a concept at its grain (e.g., orders, customers). They are designed for end-user consumption in BI tools like Metabase.
 
-In jimwurst, marts populate the `marts` schema with consumer-ready data.
+In ravioli, marts populate the `marts` schema with consumer-ready data.
 
 ### Files and Folders
 
@@ -350,15 +350,15 @@ select * from customers_and_customer_orders_joined
 Without Semantic Layer: Denormalize heavily.
 With Semantic Layer: Normalize more for MetricFlow flexibility.
 
-In jimwurst, focus on denormalized marts for BI consumption.
+In ravioli, focus on denormalized marts for BI consumption.
 
-This layer delivers the "cells" powering jimwurst's data products.
+This layer delivers the "cells" powering ravioli's data products.
 
 ## Project Organization
 
 ### Overview
 
-Beyond the `models/` folder, jimwurst uses other dbt folders for specific purposes. This ensures clean separation of concerns in the ELT pipeline.
+Beyond the `models/` folder, ravioli uses other dbt folders for specific purposes. This ensures clean separation of concerns in the ELT pipeline.
 
 ### YAML Configuration
 
@@ -370,7 +370,7 @@ Beyond the `models/` folder, jimwurst uses other dbt folders for specific purpos
 #### Example dbt_project.yml
 ```yaml
 models:
-  jimwurst:
+  ravioli:
     staging:
       +materialized: view
       +schema: staging
@@ -394,7 +394,7 @@ Define access controls:
 groups:
   - name: finance
     owner:
-      email: finance@jimwurst.com
+      email: finance@ravioli.com
 ```
 
 ### Other Folders
@@ -424,14 +424,14 @@ groups:
 - **Data governance**: Separate sensitive data.
 - **Size**: >1000 models.
 
-#### jimwurst Approach
+#### ravioli Approach
 As a monolithic repo, keep together unless governance requires splitting. Use Mesh for collaboration.
 
 ### Final Considerations
 
-Consistency trumps perfection. Document deviations. This guide evolves with dbt and jimwurst's needs.
+Consistency trumps perfection. Document deviations. This guide evolves with dbt and ravioli's needs.
 
-For jimwurst's local, open-source focus, prioritize simplicity and reusability.
+For ravioli's local, open-source focus, prioritize simplicity and reusability.
 
 ## Additional Resources
 

@@ -6,9 +6,9 @@ from typing import List, Dict, Any
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 from tqdm import tqdm
-from jimwurst.ingestion.base import BaseIngestor
-from jimwurst.db.session import get_db_connection, ensure_schema
-from jimwurst.core.config import settings
+from ravioli.ingestion.base import BaseIngestor
+from ravioli.db.session import get_db_connection, ensure_schema
+from ravioli.core.config import settings
 
 class SpotifyIngestor(BaseIngestor):
     def __init__(self):
