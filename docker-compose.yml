@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: jimwurst_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jimwurst_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jimwurst_password}
+      POSTGRES_DB: ${POSTGRES_DB:-jimwurst_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/jimwurst/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ${LOCAL_DATA_PATH:-~/Documents/jimwurst_local_data}:/local_data:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - jimwurst_net
+    restart: always
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: jimwurst_ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - jimwurst_net
+    restart: always
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: jimwurst_ollama_pull
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: /bin/sh
+    command: -c "sleep 5; ollama pull qwen2.5:3b"
+    depends_on:
+      - ollama
+    networks:
+      - jimwurst_net
+
+  app:
+    build: .
+    container_name: jimwurst_app
+    environment:
+      - DB_HOST=postgres
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - .:/app
+      - ${LOCAL_DATA_PATH:-~/Documents/jimwurst_local_data}:/local_data:ro
+    ports:
+      - "8501:8501"
+    depends_on:
+      - postgres
+      - ollama
+    env_file:
+      - .env
+    networks:
+      - jimwurst_net
+    restart: always
+
+volumes:
+  postgres_data:
+  ollama_data:
+
+networks:
+  jimwurst_net:
+    driver: bridge
