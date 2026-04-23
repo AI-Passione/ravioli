@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:15
-    container_name: ravioli_postgres
+    container_name: postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ravioli_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ravioli_password}
@@ -18,7 +18,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    container_name: ravioli_ollama
+    container_name: ollama
     volumes:
       - ollama_data:/root/.ollama
     ports:
@@ -27,21 +27,9 @@ services:
       - ravioli_net
     restart: always
 
-  ollama-pull:
-    image: ollama/ollama:latest
-    container_name: ravioli_ollama_pull
-    volumes:
-      - ollama_data:/root/.ollama
-    entrypoint: /bin/sh
-    command: -c "sleep 5; ollama pull qwen2.5:3b"
-    depends_on:
-      - ollama
-    networks:
-      - ravioli_net
-
   app:
     build: .
-    container_name: ravioli_app
+    container_name: app
     environment:
       - DB_HOST=postgres
       - OLLAMA_HOST=http://ollama:11434
@@ -62,6 +50,7 @@ services:
 volumes:
   postgres_data:
   ollama_data:
+
 
 networks:
   ravioli_net:
