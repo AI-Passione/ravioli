@@ -62,7 +62,7 @@ packaging==25.0
 pandas==2.3.3
 parsedatetime==2.6
 pathspec==0.12.1
-pillow==11.3.0
+pillow==12.2.0
 pip==25.3
 propcache==0.4.1
 protobuf==4.25.8
