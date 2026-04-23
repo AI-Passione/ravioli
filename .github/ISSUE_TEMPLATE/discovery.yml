@@ -1,50 +1,18 @@
 name: "🔍 Discovery"
-description: Research, spike, or investigative task for Ravioli.
+description: Research or investigative task.
 labels: ["discovery"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Use this for research, technical spikes, or exploring new possibilities.
   - type: textarea
     id: objective
     attributes:
       label: Objective
-      description: What are we trying to learn or discover?
-      placeholder: Explore the feasibility of using [...]
+      description: What are we trying to find out?
     validations:
       required: true
   - type: textarea
-    id: background
+    id: outcomes
     attributes:
-      label: Background
-      description: Context for this investigation. Why are we looking into this now?
+      label: Expected Outcomes
+      description: What do we expect to have at the end (e.g. POC, research doc)?
     validations:
       required: true
-  - type: textarea
-    id: key-questions
-    attributes:
-      label: Key Questions
-      description: What specific questions do we need to answer?
-      placeholder: |
-        - Can it handle X?
-        - What is the cost of Y?
-        - Is there a library for Z?
-    validations:
-      required: true
-  - type: textarea
-    id: deliverables
-    attributes:
-      label: Deliverables
-      description: What is the expected output of this discovery?
-      placeholder: |
-        - A research document in the wiki
-        - A proof-of-concept branch
-        - A list of recommendations
-    validations:
-      required: true
-  - type: textarea
-    id: success-criteria
-    attributes:
-      label: Success Criteria
-      description: How do we know this discovery task is complete?

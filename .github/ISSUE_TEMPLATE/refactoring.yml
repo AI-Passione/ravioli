@@ -1,47 +1,18 @@
 name: "🧹 Refactoring"
-description: Improve Ravioli's code structure, performance, or maintainability.
+description: Improve code structure.
 labels: ["refactor"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        "Clean code always looks like it was written by someone who cares." — Robert C. Martin
   - type: textarea
-    id: current-state
+    id: goal
     attributes:
-      label: Current State
-      description: What is the current situation? What's messy, slow, or hard to maintain?
-      placeholder: The module X has high cyclomatic complexity and [...]
+      label: Goal
+      description: What are we cleaning up and why?
     validations:
       required: true
   - type: textarea
-    id: proposed-changes
+    id: scope
     attributes:
-      label: Proposed Changes
-      description: What are we cleaning up or restructuring?
-      placeholder: |
-        - Extract class Y from Z
-        - Simplify the logic in [...]
-        - Update dependencies to [...]
+      label: Scope
+      description: Which modules or components are affected?
     validations:
       required: true
-  - type: textarea
-    id: rationale
-    attributes:
-      label: Rationale
-      description: Why is this refactoring necessary now? What value does it add (speed, readability, etc.)?
-    validations:
-      required: true
-  - type: textarea
-    id: risk-assessment
-    attributes:
-      label: Risk Assessment
-      description: What could break? How will we ensure no regression?
-      placeholder: This touches the core ingestion logic, so we need full test coverage [...]
-    validations:
-      required: true
-  - type: textarea
-    id: context
-    attributes:
-      label: Additional Context
-      description: Add any other context or diagrams here.
