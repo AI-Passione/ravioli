@@ -15,7 +15,7 @@ down:
 # Setup environment
 setup:
 	uv pip install -e .
-	@if [ ! -f docker/.env ]; then cp docker/.env.example docker/.env; fi
+	@if [ ! -f .env ]; then cp .env.example .env; fi
 	@echo "Setup complete. Use 'jimwurst' command or 'make' targets."
 
 # Ingestion targets (wrappers around CLI)
