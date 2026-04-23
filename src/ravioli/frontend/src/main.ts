@@ -1,5 +1,4 @@
 import './style.css';
-import { createIcons, MessageSquare, LayoutDashboard, Database, Settings, Plus, Play } from 'lucide';
 import { store } from './store';
 import { api } from './services/api';
 import { renderSidebar } from './components/Sidebar';
@@ -12,7 +11,7 @@ function updateUI() {
   app.innerHTML = '';
   
   const shell = document.createElement('div');
-  shell.className = 'flex w-full h-screen overflow-hidden';
+  shell.className = 'flex w-full h-screen overflow-hidden relative';
   
   shell.appendChild(renderSidebar());
   
@@ -24,18 +23,6 @@ function updateUI() {
   }
   
   app.appendChild(shell);
-
-  // Initialize Icons
-  createIcons({
-    icons: {
-      MessageSquare,
-      LayoutDashboard,
-      Database,
-      Settings,
-      Plus,
-      Play
-    }
-  });
 }
 
 // Initial Load
