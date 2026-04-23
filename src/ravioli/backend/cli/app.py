@@ -3,7 +3,7 @@ from typing import Optional
 from pathlib import Path
 from ravioli.backend.core.config import settings
 from ravioli.backend.core.dbt import run_dbt_command as dbt_run
-from ravioli.db.oltp.session import ensure_schema
+from ravioli.backend.db.oltp.session import ensure_schema
 
 app = typer.Typer(help="Ravioli Data Platform CLI")
 ingest_app = typer.Typer(help="Data Ingestion Commands")

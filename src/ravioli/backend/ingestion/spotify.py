@@ -7,7 +7,7 @@ from psycopg2 import sql
 from psycopg2.extras import execute_values
 from tqdm import tqdm
 from ravioli.backend.ingestion.base import BaseIngestor
-from ravioli.db.oltp.session import get_db_connection, ensure_schema
+from ravioli.backend.db.oltp.session import get_db_connection, ensure_schema
 from ravioli.backend.core.config import settings
 
 class SpotifyIngestor(BaseIngestor):
