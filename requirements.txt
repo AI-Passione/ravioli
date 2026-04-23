@@ -42,7 +42,7 @@ langchain==0.3.27
 langchain-community==0.3.31
 langchain-core==0.3.83
 langchain-text-splitters==1.1.2
-langsmith==0.4.37
+langsmith==0.7.31
 leather==0.4.1
 logbook==1.5.3
 lxml==6.0.2
