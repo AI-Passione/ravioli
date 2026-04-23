@@ -33,6 +33,18 @@ def ingest_substack(data_path: Optional[Path] = None):
     from jimwurst.ingestion.substack import SubstackIngestor
     SubstackIngestor().run(data_path)
 
+@ingest_app.command("bolt")
+def ingest_bolt(file_path: Optional[Path] = None):
+    """Ingest Bolt rides CSV."""
+    from jimwurst.ingestion.misc import BoltIngestor
+    BoltIngestor().run(file_path)
+
+@ingest_app.command("telegram")
+def ingest_telegram(file_path: Optional[Path] = None):
+    """Ingest Telegram messages CSV."""
+    from jimwurst.ingestion.misc import TelegramIngestor
+    TelegramIngestor().run(file_path)
+
 @app.command()
 def transform(command: str = "build"):
     """Run dbt transformations."""
