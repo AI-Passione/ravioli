@@ -38,6 +38,9 @@ class MissionUpdate(BaseModel):
     result: Optional[str] = None
     mission_metadata: Optional[dict] = None
 
+class QuestionCreate(BaseModel):
+    question: str
+
 class Mission(MissionBase):
     id: UUID
     status: str
