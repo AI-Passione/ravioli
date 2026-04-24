@@ -74,4 +74,4 @@ def update_setting(key: str, setting_in: SystemSettingBase, db: Session = Depend
 
     # Return redacted response
     redacted_value = _redact_sensitive(existing.value)
-    return SystemSetting(key=existing.key, value=redacted_value, updated_at=existing.updated_at)
+    return SystemSettingSchema(key=existing.key, value=redacted_value, updated_at=existing.updated_at)

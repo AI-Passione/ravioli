@@ -58,7 +58,7 @@ export function renderSettings() {
           </div>
           
           <div class="space-y-4 pt-2 border-t border-outline-variant/30">
-            ${ollamaConfig.mode === 'local' || ollamaConfig.mode === 'cloud' ? `
+            ${ollamaConfig.mode === 'local' ? `
               <div>
                 <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Base URL</label>
                 <input id="ollama-base-url" type="text" value="${ollamaConfig.base_url}" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="e.g. http://localhost:11434" />
