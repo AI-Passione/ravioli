@@ -28,6 +28,7 @@ dependencies = [
     "duckdb>=1.0.0",
     "duckdb-engine>=0.13.0",
     "cryptography>=43.0.0",
+    "httpx>=0.28.1",
 ]
 
 

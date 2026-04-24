@@ -14,6 +14,8 @@ from ravioli.backend.core.config import settings
 from ravioli.backend.core.models import UploadedFile
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
 
+from ravioli.backend.core.ollama import OllamaClient
+
 router = APIRouter()
 
 # Ensure upload directory exists
@@ -178,3 +180,34 @@ async def update_file(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update file: {str(e)}")
+
+@router.post("/files/{file_id}/generate-description", response_model=schemas.UploadedFile)
+async def generate_file_description(
+    file_id: uuid.UUID,
+    db: Session = Depends(get_db)
+):
+    db_file = db.execute(select(UploadedFile).where(UploadedFile.id == file_id)).scalar_one_or_none()
+    if not db_file:
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    if not db_file.table_name:
+        raise HTTPException(status_code=400, detail="File has no associated table")
+
+    try:
+        # 1. Get sample data from DuckDB as CSV
+        df_sample = duckdb_manager.connection.execute(f"SELECT * FROM {db_file.table_name} LIMIT 5").fetchdf()
+        csv_sample = df_sample.to_csv(index=False)
+        
+        # 2. Generate description with Ollama
+        ollama = OllamaClient(db)
+        description = await ollama.generate_description(db_file.original_filename, csv_sample)
+        
+        # 3. Update database
+        db_file.description = description
+        db.commit()
+        db.refresh(db_file)
+        
+        return db_file
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to generate description: {str(e)}")

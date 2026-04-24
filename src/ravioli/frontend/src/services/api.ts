@@ -94,6 +94,14 @@ export const api = {
     return response.json();
   },
 
+  async generateFileDescription(fileId: string): Promise<UploadedFile> {
+    const response = await fetch(`${API_BASE}/data/files/${fileId}/generate-description`, {
+      method: 'POST',
+    });
+    if (!response.ok) throw new Error('Failed to generate file description');
+    return response.json();
+  },
+
   async getSetting(key: string): Promise<any> {
     const response = await fetch(`${API_BASE}/settings/${key}`);
     if (response.status === 404) return { key, value: {} };

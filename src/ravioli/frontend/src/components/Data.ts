@@ -72,9 +72,14 @@ export function renderData() {
                     <div class="desc-container flex items-center gap-2 group/desc max-w-xs w-full" data-id="${file.id}">
                       <span class="desc-text text-neutral-400 text-sm truncate cursor-pointer hover:text-neutral-200 transition-colors flex-1" title="${file.description || ''}" data-desc="${file.description || ''}">${file.description || '<span class="italic opacity-50">Add description...</span>'}</span>
                       <input type="text" class="desc-input hidden w-full bg-surface-container-highest border border-primary/30 rounded px-2 py-1 text-sm text-neutral-200 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all" value="${file.description || ''}" placeholder="Enter description..." />
-                      <button class="btn-edit-desc p-1 rounded-md opacity-0 group-hover/desc:opacity-100 hover:bg-white/10 text-neutral-500 hover:text-primary transition-all flex-shrink-0" title="Edit Description">
-                        <span class="material-symbols-outlined text-[16px]">edit</span>
-                      </button>
+                      <div class="flex items-center gap-1 opacity-0 group-hover/desc:opacity-100 transition-opacity">
+                        <button class="btn-generate-desc p-1 rounded-md hover:bg-primary/10 text-primary/70 hover:text-primary transition-all flex-shrink-0" title="AI Generate Description">
+                          <span class="material-symbols-outlined text-[16px]">auto_awesome</span>
+                        </button>
+                        <button class="btn-edit-desc p-1 rounded-md hover:bg-white/10 text-neutral-500 hover:text-primary transition-all flex-shrink-0" title="Edit Description">
+                          <span class="material-symbols-outlined text-[16px]">edit</span>
+                        </button>
+                      </div>
                     </div>
                   </td>
                   <td class="px-8 py-5">
@@ -197,11 +202,12 @@ export function renderData() {
     const textSpan = descContainer.querySelector('.desc-text') as HTMLSpanElement;
     const inputEl = descContainer.querySelector('.desc-input') as HTMLInputElement;
     const editBtn = descContainer.querySelector('.btn-edit-desc') as HTMLButtonElement;
+    const generateBtn = descContainer.querySelector('.btn-generate-desc') as HTMLButtonElement;
     const fileId = descContainer.getAttribute('data-id');
 
     const startEditing = () => {
       textSpan.classList.add('hidden');
-      editBtn.classList.add('hidden');
+      editBtn.closest('div')?.classList.add('hidden'); // Hide the button container
       inputEl.classList.remove('hidden');
       inputEl.focus();
       // Move cursor to end
@@ -214,7 +220,7 @@ export function renderData() {
 
       inputEl.classList.add('hidden');
       textSpan.classList.remove('hidden');
-      editBtn.classList.remove('hidden');
+      editBtn.closest('div')?.classList.remove('hidden');
       
       if (save && fileId) {
         const newDesc = inputEl.value.trim();
@@ -248,6 +254,35 @@ export function renderData() {
         inputEl.value = textSpan.getAttribute('data-desc') || '';
       }
     };
+
+    generateBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!fileId) return;
+
+      const originalContent = generateBtn.innerHTML;
+      generateBtn.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">sync</span>';
+      generateBtn.disabled = true;
+      textSpan.classList.add('opacity-50');
+
+      try {
+        const result = await api.generateFileDescription(fileId);
+        textSpan.textContent = result.description || '';
+        textSpan.setAttribute('title', result.description || '');
+        textSpan.setAttribute('data-desc', result.description || '');
+        inputEl.value = result.description || '';
+        
+        // Sync store
+        const updatedFiles = await api.listFiles();
+        store.setUploadedFiles(updatedFiles);
+      } catch (err) {
+        console.error('Generation failed', err);
+        alert('Failed to generate description. Make sure Ollama is running and configured.');
+      } finally {
+        generateBtn.innerHTML = originalContent;
+        generateBtn.disabled = false;
+        textSpan.classList.remove('opacity-50');
+      }
+    });
 
     textSpan.addEventListener('click', startEditing);
     editBtn.addEventListener('click', startEditing);
