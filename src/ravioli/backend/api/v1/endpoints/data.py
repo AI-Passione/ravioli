@@ -1,3 +1,4 @@
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -89,6 +90,9 @@ async def list_duckdb_tables():
 
 @router.get("/preview/{table_name}")
 async def get_table_preview(table_name: str):
+    if not re.match(r"^[a-zA-Z0-9_]+$", table_name):
+        raise HTTPException(status_code=400, detail="Invalid table name")
+
     try:
         # Validate table name to prevent SQL injection
         tables = duckdb_manager.list_tables()
