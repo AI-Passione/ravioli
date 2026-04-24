@@ -142,6 +142,8 @@ def prepare_dataframe_for_analysis(df: pd.DataFrame) -> pd.DataFrame:
                 # Try to convert to numeric (Int64 handles nulls better than int)
                 df[col] = pd.to_numeric(df[col], errors='ignore')
             except Exception:
+                # Best-effort conversion: leave the original column dtype unchanged
+                # if pandas cannot safely coerce this column to numeric.
                 pass
 
         # 3. Handle low-cardinality strings as categories
