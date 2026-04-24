@@ -271,7 +271,7 @@ export function renderSettings() {
             mode: ollamaConfig.mode,
             base_url: ollamaConfig.base_url,
             default_model: ollamaConfig.default_model,
-            api_key: ollamaConfig.api_key === '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : ollamaConfig.api_key
+            api_key: ollamaConfig.api_key === '••••••••' ? '••••••••' : ollamaConfig.api_key
           });
 
           const result = await api.testOllamaConnection();
@@ -302,13 +302,14 @@ export function renderSettings() {
         const modelInput = container.querySelector('#ollama-default-model') as HTMLInputElement;
         if (modelInput) ollamaConfig.default_model = modelInput.value;
         
+        const REDACTED = '••••••••';
         const keyInput = container.querySelector('#ollama-api-key') as HTMLInputElement;
-        if (keyInput && keyInput.value) {
+        if (keyInput && keyInput.value && keyInput.value !== REDACTED) {
           // User typed a new key — send it for encryption
           ollamaConfig.api_key = keyInput.value;
         } else if (apiKeyIsSet) {
-          // No new value — signal backend to keep the existing encrypted key
-          ollamaConfig.api_key = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+          // No new value — signal backend to keep the existing encrypted value
+          ollamaConfig.api_key = REDACTED;
         } else {
           ollamaConfig.api_key = '';
         }
@@ -359,8 +360,8 @@ export function renderSettings() {
   api.getSetting('ollama').then(setting => {
     if (setting && setting.value && Object.keys(setting.value).length > 0) {
       const { api_key, ...rest } = setting.value;
-      // The backend returns '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' when a key is stored — track that separately
-      apiKeyIsSet = api_key === '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+      // The backend returns '••••••••' when a key is stored — track that separately
+      apiKeyIsSet = api_key === '••••••••';
       ollamaConfig = { ...ollamaConfig, ...rest, api_key: '' };
       renderContent();
     }

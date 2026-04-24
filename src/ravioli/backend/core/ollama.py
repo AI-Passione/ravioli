@@ -1,5 +1,6 @@
 import httpx
 import json
+import os
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from ravioli.backend.core.models import SystemSetting
@@ -9,9 +10,7 @@ from ravioli.backend.core.encryption import decrypt_value
 class OllamaClient:
     def __init__(self, db: Session):
         self.db = db
-        print("OllamaClient: Initializing...")
         self._config = self._load_config()
-        print(f"OllamaClient: Loaded config: { {k: '***' if k == 'api_key' else v for k, v in self._config.items()} }")
 
     def _load_config(self) -> Dict[str, Any]:
         """Load Ollama configuration from the database, falling back to app settings."""
@@ -61,7 +60,7 @@ class OllamaClient:
 
     @property
     def api_key(self) -> str:
-        return self._config.get("api_key", "")
+        return self._config.get("api_key") or ""
 
     @property
     def mode(self) -> str:
@@ -98,22 +97,13 @@ Description:"""
             }
         }
 
-        print(f"Ollama Request: {url}")
-        print(f"Ollama Mode: {self.mode}")
-        print(f"Ollama Model: {self.model}")
-        print(f"Ollama Headers: { {k: '***' if k == 'Authorization' else v for k, v in headers.items()} }")
-
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(url, json=payload, headers=headers)
                 
                 if response.status_code == 401:
-                    print(f"Ollama 401 Error: {response.text}")
                     raise Exception("Ollama authentication failed. Please check your API key in Settings.")
                 
-                if response.status_code >= 400:
-                    print(f"Ollama Error ({response.status_code}): {response.text}")
-
                 response.raise_for_status()
                 result = response.json()
                 description = result.get("response", "").strip()
