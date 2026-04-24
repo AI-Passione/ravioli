@@ -1,7 +1,6 @@
 import httpx
-import json
 import os
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from sqlalchemy.orm import Session
 from ravioli.backend.core.models import SystemSetting
 from ravioli.backend.core.config import settings

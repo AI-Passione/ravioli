@@ -99,7 +99,7 @@ export const api = {
       method: 'POST',
     });
     if (!response.ok) {
-      let detail = 'Unknown error';
+      let detail: string;
       try {
         const errorData = await response.json();
         detail = errorData.detail || response.statusText;
