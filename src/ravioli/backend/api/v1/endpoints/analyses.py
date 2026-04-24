@@ -141,13 +141,20 @@ async def generate_summary(db: Session, filename: str, row_count: int, col_count
 - **Velocity Trend**: The data suggests a stable trajectory in engagement over the observed period.
 """
 
-    return template.format(
+    # Highlight numbers with backticks for visibility
+    import re
+    summary = template.format(
         filename=filename,
         row_count=row_count,
         col_count=col_count,
         columns=columns,
         key_insights=key_insights
     )
+    # Regex to find standalone numbers (including decimals) and wrap them in backticks
+    # We avoid wrapping numbers that are already wrapped in backticks
+    summary = re.sub(r'(?<!`)\b(\d+(?:\.\d+)?)\b(?!`)', r'`\1`', summary)
+    
+    return summary
 
 @router.post("/quick-insight", response_model=schemas.QuickInsightResponse)
 async def create_quick_insight(
