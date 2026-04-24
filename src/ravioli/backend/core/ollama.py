@@ -300,3 +300,51 @@ Answer:"""
             return await self._generate(prompt, "Agent Answer", temperature=0.4, num_predict=1000)
         except Exception as e:
             return f"> [!WARNING]\n> **Neural Link Interrupted**: {str(e)}\n\nKowalski is currently unable to process this request. Please check your AI node connection."
+
+    async def stream_answer(self, filename: str, summary: str, context: str, question: str):
+        """
+        Stream a clinical, precise answer to a user question.
+        Yields tokens as they are generated.
+        """
+        prompt = f"""{KOWALSKI_PERSONA}
+Context: You are analyzing the dataset "{filename}".
+Executive Summary of Data:
+{summary}
+
+Recent Investigation Steps:
+{context}
+
+Question: {question}
+
+Task: Provide a clinical, precise, and data-driven answer. If the data provided in the summary is insufficient, state what additional analysis might be needed.
+Return your answer in Markdown format.
+Answer:"""
+
+        url = f"{self.base_url}/api/generate"
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": True,
+            "options": {
+                "temperature": 0.4,
+                "num_predict": 1000
+            }
+        }
+
+        import httpx
+        import json
+        
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                async with client.stream("POST", url, json=payload) as response:
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        data = json.loads(line)
+                        token = data.get("response", "")
+                        if token:
+                            yield token
+                        if data.get("done", False):
+                            break
+        except Exception as e:
+            yield f"\n\n> [!ERROR]\n> **Stream Interrupted**: {str(e)}"

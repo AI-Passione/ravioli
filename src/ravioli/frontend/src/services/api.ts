@@ -40,6 +40,27 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to ask question');
   },
+  
+  streamQuestion(analysisId: string, question: string, onMessage: (token: string) => void, onComplete: () => void, onError: (err: any) => void) {
+    const url = `${API_BASE}/analyses/${analysisId}/stream?question=${encodeURIComponent(question)}`;
+    const eventSource = new EventSource(url);
+    
+    eventSource.onmessage = (event) => {
+      if (event.data === '[DONE]') {
+        eventSource.close();
+        onComplete();
+      } else {
+        onMessage(event.data);
+      }
+    };
+    
+    eventSource.onerror = (err) => {
+      eventSource.close();
+      onError(err);
+    };
+
+    return () => eventSource.close();
+  },
 
   async generateQuickInsight(file: File): Promise<QuickInsightResponse> {
     const formData = new FormData();

@@ -216,6 +216,14 @@ export function renderNotebook() {
     </div>
   `;
 
+  // Auto-scroll to bottom for latest convo
+  setTimeout(() => {
+    const scrollContainer = container.querySelector('#cell-container');
+    if (scrollContainer) {
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    }
+  }, 100);
+
   const input = container.querySelector('#cell-input') as HTMLTextAreaElement;
   const btn = container.querySelector('#btn-execute');
 
@@ -223,6 +231,14 @@ export function renderNotebook() {
   input?.addEventListener('input', () => {
     input.style.height = 'auto';
     input.style.height = input.scrollHeight + 'px';
+  });
+
+  // Enter to send (Shift+Enter for newline)
+  input?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      btn?.dispatchEvent(new Event('click'));
+    }
   });
 
   btn?.addEventListener('click', async () => {
@@ -234,26 +250,87 @@ export function renderNotebook() {
     btn.setAttribute('disabled', 'true');
     btn.classList.add('opacity-50');
 
-    try {
-      await api.askQuestion(activeId, question);
-    } catch (err) {
-      console.error('Failed to submit question', err);
-    } finally {
-      btn.removeAttribute('disabled');
-      btn.classList.remove('opacity-50');
-    }
+    // Create a temporary streaming bubble
+    const cellContainer = container.querySelector('#cell-container');
+    if (!cellContainer) return;
+
+    // 1. Add user query bubble immediately
+    const userBubble = document.createElement('div');
+    userBubble.className = 'group animate-in fade-in slide-in-from-bottom-4 duration-500';
+    userBubble.innerHTML = `
+      <div class="flex items-center gap-4 mb-4">
+         <div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 overflow-hidden border border-outline-variant/20">
+            <span class="material-symbols-outlined text-outline text-sm" data-icon="person">person</span>
+         </div>
+         <span class="text-[10px] uppercase tracking-[0.2em] text-outline font-label-sm">Operator</span>
+      </div>
+      <div class="pl-12">
+        <div class="prose prose-invert max-w-none text-on-surface-variant leading-relaxed font-body-lg">
+          ${renderMarkdown(question)}
+        </div>
+      </div>
+    `;
+    cellContainer.appendChild(userBubble);
+
+    // 2. Add Kowalski streaming bubble
+    const agentBubble = document.createElement('div');
+    agentBubble.className = 'group animate-in fade-in slide-in-from-bottom-4 duration-500 mt-12';
+    agentBubble.innerHTML = `
+      <div class="flex items-center gap-4 mb-4">
+         <div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 overflow-hidden border border-outline-variant/20">
+            <img src="/src/assets/kowalski.png" class="w-full h-full object-cover" alt="Kowalski">
+         </div>
+         <span class="text-[10px] uppercase tracking-[0.2em] text-outline font-label-sm">Kowalski</span>
+      </div>
+      <div class="pl-12">
+        <div class="prose prose-invert max-w-none text-on-surface-variant leading-relaxed font-body-lg" id="streaming-content">
+          <span class="inline-block w-1 h-4 bg-primary animate-pulse"></span>
+        </div>
+      </div>
+    `;
+    cellContainer.appendChild(agentBubble);
+    cellContainer.scrollTop = cellContainer.scrollHeight;
+
+    let fullText = "";
+    const streamingContent = agentBubble.querySelector('#streaming-content');
+
+    api.streamQuestion(activeId, question, 
+      (token) => {
+        fullText += token;
+        if (streamingContent) {
+          streamingContent.innerHTML = renderMarkdown(fullText) + '<span class="inline-block w-1 h-4 bg-primary animate-pulse ml-1"></span>';
+          cellContainer.scrollTop = cellContainer.scrollHeight;
+        }
+      },
+      async () => {
+        // Complete
+        if (streamingContent) {
+          streamingContent.innerHTML = renderMarkdown(fullText);
+        }
+        btn.removeAttribute('disabled');
+        btn.classList.remove('opacity-50');
+        // Refresh to get official logs and IDs
+        const newLogs = await api.listLogs(activeId);
+        store.setLogs(newLogs);
+      },
+      (err) => {
+        console.error('Streaming error', err);
+        btn.removeAttribute('disabled');
+        btn.classList.remove('opacity-50');
+      }
+    );
   });
 
   // Follow-up question clicks
-  container.querySelectorAll('.followup-question-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const question = btn.getAttribute('data-question');
-      if (!question || !activeId) return;
-      
-      try {
-        await api.askQuestion(activeId, question);
-      } catch (err) {
-        console.error('Failed to submit follow-up question', err);
+  container.querySelectorAll('.followup-question-btn').forEach(fBtn => {
+    fBtn.addEventListener('click', () => {
+      const question = fBtn.getAttribute('data-question');
+      if (!question) return;
+      if (input) {
+        input.value = question;
+        input.style.height = 'auto';
+        input.style.height = input.scrollHeight + 'px';
+        btn?.dispatchEvent(new Event('click'));
       }
     });
   });

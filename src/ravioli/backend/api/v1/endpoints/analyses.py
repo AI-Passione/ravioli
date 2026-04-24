@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, BackgroundTasks
+from fastapi.responses import StreamingResponse
 import pandas as pd
 import asyncio
 import io
@@ -168,6 +169,81 @@ async def process_analysis_question(analysis_id: str, question: str):
         # Optionally add an error log to the analysis
     finally:
         db.close()
+
+@router.get("/{analysis_id}/stream")
+async def stream_question(
+    analysis_id: UUID,
+    question: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Stream a response to a question using Server-Sent Events.
+    """
+    analysis = db.query(models.Analysis).filter(models.Analysis.id == analysis_id).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    # 1. Create user log
+    user_log = models.ExecutionLog(
+        analysis_id=analysis_id,
+        log_type="user_query",
+        content=question
+    )
+    db.add(user_log)
+    analysis.status = "running"
+    db.commit()
+
+    async def event_generator():
+        from ravioli.backend.core.database import SessionLocal
+        from ravioli.backend.core.ollama import OllamaClient
+        
+        # Context preparation (same as background task)
+        filename = analysis.analysis_metadata.get("filename", "Unknown Dataset")
+        summary = analysis.result or "No summary available."
+        
+        # Get last 5 logs for context
+        previous_logs = db.query(models.ExecutionLog)\
+            .filter(models.ExecutionLog.analysis_id == analysis_id)\
+            .order_by(models.ExecutionLog.timestamp.desc())\
+            .limit(6).all()
+        
+        context_str = ""
+        for log in reversed(previous_logs[1:]):
+            role = "Operator" if log.log_type == "user_query" else "Kowalski"
+            context_str += f"{role}: {log.content}\n"
+
+        client = OllamaClient(db)
+        full_response = ""
+        
+        try:
+            async for token in client.stream_answer(filename, summary, context_str, question):
+                full_response += token
+                yield f"data: {token}\n\n"
+            
+            # Persistence at the end
+            async_db = SessionLocal()
+            try:
+                agent_log = models.ExecutionLog(
+                    analysis_id=analysis_id,
+                    log_type="thought",
+                    content=full_response
+                )
+                async_db.add(agent_log)
+                
+                # Re-fetch analysis in this session
+                a = async_db.query(models.Analysis).filter(models.Analysis.id == analysis_id).first()
+                if a:
+                    a.status = "completed"
+                async_db.commit()
+            finally:
+                async_db.close()
+            
+            yield "data: [DONE]\n\n"
+                
+        except Exception as e:
+            yield f"data: [ERROR] Stream interrupted: {str(e)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 def prepare_dataframe_for_analysis(df: pd.DataFrame) -> pd.DataFrame:
     """Intelligently detects and casts column types for better statistical analysis."""
