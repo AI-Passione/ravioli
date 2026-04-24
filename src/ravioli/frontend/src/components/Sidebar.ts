@@ -9,9 +9,19 @@ export function renderSidebar() {
 
   container.innerHTML = `
     <!-- Brand Header -->
-    <div class="px-8 mb-12 cursor-pointer" id="brand-header">
-      <div class="text-2xl font-light tracking-tighter text-neutral-100">Vibe</div>
-      <div class="text-[10px] uppercase tracking-[0.3em] text-primary-fixed-dim opacity-80 mt-1">Analytics</div>
+    <div class="px-8 mb-12 flex items-center justify-between">
+      <div class="flex items-center gap-3 cursor-pointer" id="brand-header">
+        <img src="/ravioli-logo.png" alt="Ravioli Logo" class="w-8 h-8 rounded-lg shadow-lg shadow-primary/20">
+        <div class="flex flex-col">
+          <div class="text-xl font-medium tracking-tight text-neutral-100">Ravioli</div>
+          <div class="text-[9px] uppercase tracking-[0.2em] text-primary-fixed-dim opacity-70 -mt-0.5">AI Platform</div>
+        </div>
+      </div>
+      <a href="https://github.com/AI-Passione/ravioli" target="_blank" rel="noopener noreferrer" class="text-neutral-500 hover:text-white transition-colors p-1" title="GitHub Repository">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.042-1.416-4.042-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.744.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+        </svg>
+      </a>
     </div>
 
     <!-- Navigation Links -->
@@ -21,7 +31,7 @@ export function renderSidebar() {
         <div class="space-y-1">
           <button class="nav-item ${store.getCurrentView() === 'dashboard' && !activeId ? 'active' : ''} w-full" data-nav="home">
             <span class="material-symbols-outlined text-primary-fixed-dim" data-icon="dashboard">dashboard</span>
-            <span>Dashboard</span>
+            <span>Analyses</span>
           </button>
           <button class="nav-item w-full" data-nav="warehouse">
             <span class="material-symbols-outlined" data-icon="storage">storage</span>
