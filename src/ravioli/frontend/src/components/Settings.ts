@@ -10,6 +10,8 @@ export function renderSettings() {
     default_model: 'gemma3:4b',
     api_key: ''
   };
+  // True when the backend already has an encrypted key stored
+  let apiKeyIsSet = false;
   
   let isConfiguringOllama = false;
 
@@ -73,7 +75,17 @@ export function renderSettings() {
             ${ollamaConfig.mode === 'cloud' ? `
               <div>
                 <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">API Key</label>
-                <input id="ollama-api-key" type="password" value="${ollamaConfig.api_key}" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="Required for Ollama Cloud (e.g. sk-...)" />
+                ${apiKeyIsSet ? `
+                  <div class="flex items-center gap-3 mb-2">
+                    <span class="flex items-center gap-1 text-xs font-bold text-green-400 bg-green-400/10 border border-green-400/30 px-3 py-1 rounded-full">
+                      <span class="material-symbols-outlined text-sm">lock</span> Key stored securely
+                    </span>
+                    <button id="btn-clear-key" class="text-xs text-on-surface-variant hover:text-red-400 transition-colors underline">Replace key</button>
+                  </div>
+                  <input id="ollama-api-key" type="password" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="Enter new API key to replace the stored one" />
+                ` : `
+                  <input id="ollama-api-key" type="password" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="Required for Ollama Cloud (e.g. sk-...)" />
+                `}
               </div>
             ` : ''}
             
@@ -232,7 +244,15 @@ export function renderSettings() {
         if (modelInput) ollamaConfig.default_model = modelInput.value;
         
         const keyInput = container.querySelector('#ollama-api-key') as HTMLInputElement;
-        if (keyInput) ollamaConfig.api_key = keyInput.value;
+        if (keyInput && keyInput.value) {
+          // User typed a new key — send it for encryption
+          ollamaConfig.api_key = keyInput.value;
+        } else if (apiKeyIsSet) {
+          // No new value — signal backend to keep the existing encrypted key
+          ollamaConfig.api_key = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+        } else {
+          ollamaConfig.api_key = '';
+        }
         
         // If mode is default, force the values back to defaults just in case
         if (ollamaConfig.mode === 'default') {
@@ -279,7 +299,10 @@ export function renderSettings() {
   // Load actual data
   api.getSetting('ollama').then(setting => {
     if (setting && setting.value && Object.keys(setting.value).length > 0) {
-      ollamaConfig = { ...ollamaConfig, ...setting.value };
+      const { api_key, ...rest } = setting.value;
+      // The backend returns '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' when a key is stored — track that separately
+      apiKeyIsSet = api_key === '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+      ollamaConfig = { ...ollamaConfig, ...rest, api_key: '' };
       renderContent();
     }
   }).catch(e => console.error('Failed to fetch settings', e));
