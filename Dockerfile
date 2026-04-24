@@ -10,13 +10,15 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
 COPY . .
 
 # Install the project and its dependencies
-RUN uv pip install --system -e .
+# Install project in editable mode with dev dependencies for testing
+RUN uv pip install --system -e ".[dev]"
 
 # Expose the API port
 EXPOSE 8000

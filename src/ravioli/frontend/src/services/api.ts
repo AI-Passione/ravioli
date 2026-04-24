@@ -94,6 +94,23 @@ export const api = {
     return response.json();
   },
 
+  async generateFileDescription(fileId: string): Promise<UploadedFile> {
+    const response = await fetch(`${API_BASE}/data/files/${fileId}/generate-description`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      let detail: string;
+      try {
+        const errorData = await response.json();
+        detail = errorData.detail || response.statusText;
+      } catch (e) {
+        detail = response.statusText;
+      }
+      throw new Error(detail);
+    }
+    return response.json();
+  },
+
   async getSetting(key: string): Promise<any> {
     const response = await fetch(`${API_BASE}/settings/${key}`);
     if (response.status === 404) return { key, value: {} };
@@ -108,6 +125,15 @@ export const api = {
       body: JSON.stringify({ key, value }),
     });
     if (!response.ok) throw new Error('Failed to update setting');
+    return response.json();
+  },
+
+  async testOllamaConnection(): Promise<{status: string, message: string, models?: string[]}> {
+    const response = await fetch(`${API_BASE}/settings/ollama/test`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Connection test failed');
+    }
     return response.json();
   }
 };

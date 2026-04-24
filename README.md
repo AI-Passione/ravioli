@@ -50,37 +50,6 @@ uv sync
 
 ---
 
-## 🏗 Architecture & Tooling
-
-| Category | Tools |
-| :--- | :--- |
-| **DWH** | Postgres |
-| **Transformation** | [dbt Core](https://github.com/dbt-labs/dbt-core) |
-| **AI Engine** | LLM Ready |
-| **Interface** | Vanilla TypeScript |
-| **Orchestration** | Python / Makefile |
-| **Package Manager** | [uv](https://github.com/astral-sh/uv) |
-
----
-
-## 🏗 Folder Structure
-Ravioli follows a strict modular structure where tooling is materialized through the filesystem:
-
-```text
-.
-├── src/ravioli/             # Core logic & applications
-│   ├── apps/                # Interactive analytics & AI agents
-│   ├── ingestion/           # Data connectors (Apple Health, Spotify, etc.)
-│   ├── db/                  # Database session & initialization
-│   └── core/                # Shared configurations & dbt wrappers
-├── docker/                  # Infrastructure (Docker Compose, .env)
-├── docs/                    # Architecture RFCs & diagrams
-├── prompts/                 # AI system prompts & LLM context
-└── pyproject.toml           # Project metadata
-```
-
----
-
 ## 🇮🇹 AI Passione Theme
 Ravioli is part of the **AI Passione** suite—rebranded from the ground up to bring "passione" back into data engineering. It's about craft, quality, and the joy of discovery.
 
