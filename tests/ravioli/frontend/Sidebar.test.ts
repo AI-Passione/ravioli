@@ -21,7 +21,7 @@ describe('Sidebar Component', () => {
 
   it('should render the system labels', () => {
     const sidebar = renderSidebar();
-    expect(sidebar.innerHTML).toContain('System');
+    expect(sidebar.innerHTML).toContain('Vibe Analytics');
     expect(sidebar.innerHTML).toContain('Investigations');
   });
 });
