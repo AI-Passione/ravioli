@@ -2,7 +2,37 @@ import { store } from '../store';
 import { api } from '../services/api';
 import MarkdownIt from 'markdown-it';
 
-const md = new MarkdownIt();
+const md = new MarkdownIt({
+  html: true,
+  linkify: true,
+  typographer: true
+});
+
+function renderMarkdown(content: string) {
+  if (!content) return '';
+  
+  // Transform GitHub style alerts: > [!TYPE]
+  // This regex matches the blockquote with alert marker
+  let transformed = content.replace(/^> \[!(IMPORTANT|NOTE|TIP|WARNING|CAUTION)\]\n((?:>.*\n?)+)/gm, (match, type, body) => {
+    const lowerType = type.toLowerCase();
+    const icon = type === 'IMPORTANT' ? 'priority_high' : 'info';
+    // Remove the leading '>' from each line of the body
+    const cleanBody = body.split('\n').map(line => line.replace(/^>\s?/, '')).join('\n');
+    return `
+<div class="markdown-alert markdown-alert-${lowerType}">
+  <div class="markdown-alert-title">
+    <span class="material-symbols-outlined text-sm" data-icon="${icon}">${icon}</span>
+    <span>${type}</span>
+  </div>
+  <div class="markdown-alert-content">
+    ${md.render(cleanBody.trim())}
+  </div>
+</div>
+`;
+  });
+
+  return md.render(transformed);
+}
 
 export function renderNotebook() {
   const activeId = store.getActiveAnalysisId();
@@ -106,7 +136,7 @@ export function renderNotebook() {
           </div>
           
           <div class="prose prose-invert max-w-none text-on-surface-variant leading-relaxed font-body-lg relative z-10">
-            ${md.render(analysis.result)}
+            ${renderMarkdown(analysis.result)}
           </div>
           
           <div class="flex items-center justify-between pt-6 border-t border-outline-variant/10 relative z-10">
@@ -135,7 +165,7 @@ export function renderNotebook() {
           </div>
           <div class="pl-12">
             <div class="prose prose-invert max-w-none text-on-surface-variant leading-relaxed font-body-lg">
-              ${md.render(log.content)}
+              ${renderMarkdown(log.content)}
             </div>
           </div>
         </div>

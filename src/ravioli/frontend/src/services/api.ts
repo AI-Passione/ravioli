@@ -53,6 +53,16 @@ export const api = {
     return response.json();
   },
 
+  async generateQuickInsightFromExisting(fileId: string): Promise<any> {
+    const response = await fetch(`${API_BASE}/analyses/quick-insight/existing`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_id: fileId }),
+    });
+    if (!response.ok) throw new Error('Failed to generate quick insight');
+    return response.json();
+  },
+
   async listFiles(): Promise<UploadedFile[]> {
     const response = await fetch(`${API_BASE}/data/files`);
     if (!response.ok) throw new Error('Failed to fetch files');
