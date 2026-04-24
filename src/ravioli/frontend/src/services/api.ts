@@ -1,4 +1,4 @@
-import type { Analysis, AnalysisCreate, ExecutionLog } from '../types';
+import type { Analysis, AnalysisCreate, ExecutionLog, UploadedFile } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -50,6 +50,24 @@ export const api = {
       body: formData,
     });
     if (!response.ok) throw new Error('Failed to generate quick insight');
+    return response.json();
+  },
+
+  async listFiles(): Promise<UploadedFile[]> {
+    const response = await fetch(`${API_BASE}/data/files`);
+    if (!response.ok) throw new Error('Failed to fetch files');
+    return response.json();
+  },
+
+  async uploadFile(file: File): Promise<UploadedFile> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_BASE}/data/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) throw new Error('Failed to upload file');
     return response.json();
   }
 };

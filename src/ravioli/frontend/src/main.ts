@@ -5,6 +5,7 @@ import { renderSidebar } from './components/Sidebar';
 import { renderNotebook } from './components/Notebook';
 import { renderCreateAnalysis } from './components/CreateAnalysis';
 import { renderKnowledge } from './components/Knowledge';
+import { renderWarehouse } from './components/Warehouse';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -21,6 +22,8 @@ function updateUI() {
     shell.appendChild(renderCreateAnalysis());
   } else if (currentView === 'knowledge') {
     shell.appendChild(renderKnowledge());
+  } else if (currentView === 'warehouse') {
+    shell.appendChild(renderWarehouse());
   } else {
     shell.appendChild(renderNotebook());
   }
@@ -31,8 +34,14 @@ function updateUI() {
 // Initial Load
 async function init() {
   try {
-    const analyses = await api.listAnalyses();
+    const [analyses, files] = await Promise.all([
+      api.listAnalyses(),
+      api.listFiles()
+    ]);
+    
     store.setAnalyses(analyses);
+    store.setUploadedFiles(files);
+    
     if (analyses.length > 0) {
       store.setActiveAnalysisId(analyses[0].id);
     }

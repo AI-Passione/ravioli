@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     # Local data path
     local_data_path: Path = Path("/local_data")
+    duckdb_path: Path = Path("/local_data/ravioli.duckdb")
 
     # Ollama Configuration
     ollama_model: str = "qwen2.5:3b"

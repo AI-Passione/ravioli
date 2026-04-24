@@ -37,7 +37,7 @@ export function renderSidebar() {
             <span class="material-symbols-outlined" data-icon="local_library">local_library</span>
             <span>Knowledge</span>
           </button>
-          <button class="nav-item w-full" data-nav="warehouse">
+          <button class="nav-item ${store.getCurrentView() === 'warehouse' ? 'active' : ''} w-full" data-nav="warehouse">
             <span class="material-symbols-outlined" data-icon="storage">storage</span>
             <span>Warehouse</span>
           </button>
@@ -103,6 +103,11 @@ export function renderSidebar() {
 
   container.querySelector('[data-nav="knowledge"]')?.addEventListener('click', () => {
     store.setCurrentView('knowledge');
+    store.setActiveAnalysisId(undefined);
+  });
+
+  container.querySelector('[data-nav="warehouse"]')?.addEventListener('click', () => {
+    store.setCurrentView('warehouse');
     store.setActiveAnalysisId(undefined);
   });
 

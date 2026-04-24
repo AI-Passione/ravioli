@@ -60,3 +60,27 @@ class ExecutionLog(Base):
 
     # Relationships
     analysis: Mapped["Analysis"] = relationship("Analysis", back_populates="logs")
+
+class UploadedFile(Base):
+    """
+    Tracks metadata for files uploaded by the user.
+    Stored in the 'app' schema.
+    """
+    __tablename__ = "uploaded_files"
+    __table_args__ = {"schema": "app"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(nullable=False)
+    
+    # Table name in DuckDB
+    table_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    
+    # Ingestion status: pending, completed, failed
+    status: Mapped[str] = mapped_column(String(50), default="pending")
+    error_message: Mapped[Optional[str]] = mapped_column(Text)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))

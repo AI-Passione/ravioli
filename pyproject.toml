@@ -25,6 +25,8 @@ dependencies = [
     "python-multipart>=0.0.7",
     "jupyterlab>=4.3.0",
     "nbformat>=5.10.0",
+    "duckdb>=1.0.0",
+    "duckdb-engine>=0.13.0",
 ]
 
 
