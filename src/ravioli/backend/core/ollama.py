@@ -117,6 +117,48 @@ Description:"""
         except Exception as e:
             raise Exception(f"Ollama generation failed: {str(e)}")
 
+    async def _generate(self, prompt: str, task_name: str, temperature: float = 0.5, num_predict: int = 300) -> str:
+        """Helper method to handle the actual API call to Ollama with logging."""
+        import time
+        start_time = time.time()
+        
+        print(f"OllamaClient: Starting {task_name} generation...")
+        print(f"OllamaClient: Prompt size: {len(prompt)} characters")
+        
+        url = f"{self.base_url.rstrip('/')}/api/generate"
+        headers = {}
+        if self.mode == "cloud" and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": num_predict
+            }
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+                
+                if response.status_code == 401:
+                    raise Exception("Ollama authentication failed.")
+                
+                response.raise_for_status()
+                result = response.json()
+                content = result.get("response", "").strip()
+                
+                duration = time.time() - start_time
+                print(f"OllamaClient: {task_name} completed in {duration:.2f}s")
+                return content
+        except Exception as e:
+            duration = time.time() - start_time
+            print(f"OllamaClient: {task_name} failed after {duration:.2f}s: {str(e)}")
+            raise e
+
     async def generate_quick_insight(self, filename: str, sample_data: str) -> str:
         """
         Generate key insights for a data asset based on its content.
@@ -133,30 +175,9 @@ Data Preview (CSV):
 
 Key Insights:"""
 
-        url = f"{self.base_url.rstrip('/')}/api/generate"
-        headers = {}
-        if self.mode == "cloud" and self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.5,
-                "num_predict": 300
-            }
-        }
-
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(url, json=payload, headers=headers)
-                if response.status_code == 401:
-                    raise Exception("Ollama authentication failed.")
-                response.raise_for_status()
-                result = response.json()
-                return result.get("response", "").strip()
-        except Exception as e:
+            return await self._generate(prompt, "Quick Insight", temperature=0.5, num_predict=500)
+        except Exception:
             # Fallback to a generic message if AI fails
             return f"> [!IMPORTANT]\n> **SIMULATED INSIGHTS**: The AI engine is currently unreachable. These are baseline patterns.\n\n- **Volume Concentration**: Data shows regular patterns across primary dimensions.\n- **Dimensional Depth**: High correlation observed between key indicators.\n- **Velocity Trend**: Stable trajectory in engagement."
 
@@ -175,27 +196,8 @@ Data Preview (CSV):
 
 Assumptions:"""
 
-        url = f"{self.base_url.rstrip('/')}/api/generate"
-        headers = {}
-        if self.mode == "cloud" and self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.4,
-                "num_predict": 200
-            }
-        }
-
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                result = response.json()
-                return result.get("response", "").strip()
+            return await self._generate(prompt, "Assumptions", temperature=0.4, num_predict=300)
         except Exception:
             return "- Data is representative of the period/context specified.\n- Column names are accurately descriptive of their contents."
 
@@ -214,26 +216,7 @@ Data Preview (CSV):
 
 Limitations & Issues:"""
 
-        url = f"{self.base_url.rstrip('/')}/api/generate"
-        headers = {}
-        if self.mode == "cloud" and self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.4,
-                "num_predict": 200
-            }
-        }
-
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                result = response.json()
-                return result.get("response", "").strip()
+            return await self._generate(prompt, "Limitations", temperature=0.4, num_predict=300)
         except Exception:
             return "- Limited context on data collection methodology.\n- Sample size may not capture all edge case variance."
