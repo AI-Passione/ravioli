@@ -120,8 +120,9 @@ def ask_question(analysis_id: UUID, question_in: schemas.QuestionCreate, db: Ses
 
 def create_data_profile(df: pd.DataFrame) -> str:
     """Creates a high-fidelity statistical profile of the dataset using YData Profiling if available."""
-    # Filter out ID columns for statistical analysis to avoid noise
-    id_cols = [col for col in df.columns if col.lower().endswith('_id') or col.lower() == 'id' or col.lower().endswith('id')]
+    # Filter out true ID columns for statistical analysis, but be careful not to catch words like 'paid' or 'valid'
+    # We look for '_id', ' id' (with space), or exact 'id'
+    id_cols = [col for col in df.columns if col.lower().endswith('_id') or col.lower().endswith(' id') or col.lower() == 'id']
     df_stats = df.drop(columns=id_cols)
     
     # 1. Basic Stats (Always available)
@@ -136,8 +137,8 @@ def create_data_profile(df: pd.DataFrame) -> str:
 
     advanced_insights = ""
     try:
-        # Use minimal=True and pass filtered dataframe
-        profile = ProfileReport(df_stats, minimal=True, title="Data Profile")
+        # Pass the FULL dataframe so every column is processed in the log
+        profile = ProfileReport(df, minimal=True, title="Data Profile")
         description = profile.get_description()
         
         # Extract Alerts (The most valuable part for AI)
@@ -147,6 +148,30 @@ def create_data_profile(df: pd.DataFrame) -> str:
             for alert in alerts[:15]: # Limit to top 15 alerts
                 advanced_insights += f"- {str(alert)}\n"
         
+        # Extract Column-Level Details
+        variables = description.get('variables', {})
+        if variables:
+            advanced_insights += "\nDETAILED COLUMN ANALYSIS:\n"
+            for col_name, col_data in variables.items():
+                # Skip ID columns in the detailed report
+                if col_name.lower() in [c.lower() for c in id_cols]:
+                    continue
+                    
+                # Extract interesting metrics depending on type
+                v_type = col_data.get('type', 'Unknown')
+                advanced_insights += f"[{col_name}] ({v_type}): "
+                
+                if v_type == 'Numeric':
+                    mean = col_data.get('mean', 0)
+                    std = col_data.get('std', 0)
+                    advanced_insights += f"Mean: {mean:.2f}, Std: {std:.2f}, Range: [{col_data.get('min')}, {col_data.get('max')}]\n"
+                elif v_type == 'Categorical':
+                    distinct = col_data.get('n_distinct', 0)
+                    top = col_data.get('top', 'N/A')
+                    advanced_insights += f"{distinct} unique values. Top: '{top}'\n"
+                else:
+                    advanced_insights += f"Distinct: {col_data.get('n_distinct', 0)}\n"
+
         # Extract Correlations (High-level summary)
         correlations = description.get('correlations', {})
         if correlations:
