@@ -152,6 +152,8 @@ def prepare_dataframe_for_analysis(df: pd.DataFrame) -> pd.DataFrame:
 
 def create_data_profile(df: pd.DataFrame) -> str:
     """Creates a high-fidelity statistical profile of the prepared dataset."""
+    print(f"OllamaClient: [DEBUG] Profiling {len(df.columns)} columns: {df.columns.tolist()}", flush=True)
+    
     # 1. Basic Stats (Describe respects types: no means for categories)
     stats = df.describe(include='all').transpose().to_string()
     
