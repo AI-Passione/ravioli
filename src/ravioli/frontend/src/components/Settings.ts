@@ -1,15 +1,5 @@
 import { api } from '../services/api';
 
-/** Escape user-supplied strings before injecting into innerHTML. */
-function escapeHtml(unsafe: string): string {
-  return unsafe
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
 export function renderSettings() {
   const container = document.createElement('div');
   container.className = 'flex-1 bg-surface-container-lowest flex flex-col min-h-screen overflow-y-auto text-on-surface';
