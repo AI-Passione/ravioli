@@ -32,6 +32,10 @@ class OllamaClient:
 
     @property
     def base_url(self) -> str:
+        # If cloud mode, use the fixed cloud URL
+        if self.mode == "cloud":
+            return "https://api.ollama.cloud"
+            
         url = self._config.get("base_url", settings.ollama_host)
         # Handle Docker-to-Host communication
         if "localhost" in url or "127.0.0.1" in url:
