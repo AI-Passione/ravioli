@@ -14,7 +14,7 @@ export function renderSidebar() {
         <img src="/ravioli-logo.png" alt="Ravioli Logo" class="w-8 h-8 rounded-lg shadow-lg shadow-primary/20">
         <div class="flex flex-col">
           <div class="text-xl font-medium tracking-tight text-neutral-100">Ravioli</div>
-          <div class="text-[9px] uppercase tracking-[0.2em] text-primary-fixed-dim opacity-70 -mt-0.5">AI Platform</div>
+          <div class="text-[9px] uppercase tracking-[0.2em] text-primary-fixed-dim opacity-70 -mt-0.5">Vibe Analytics</div>
         </div>
       </div>
       <a href="https://github.com/AI-Passione/ravioli" target="_blank" rel="noopener noreferrer" class="text-neutral-500 hover:text-white transition-colors p-1" title="GitHub Repository">
