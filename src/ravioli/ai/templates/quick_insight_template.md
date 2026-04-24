@@ -4,8 +4,10 @@
 {key_insights}
 
 ## Assumptions
-- The data is representative of the period/context specified.
-- Column names are accurately descriptive of their contents.
+{assumptions}
+
+## Known Limitation & Issues
+{limitations_and_issues}
 
 ## Basic Stats of the data
 - **Rows**: {row_count}
