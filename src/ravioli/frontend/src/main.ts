@@ -4,6 +4,7 @@ import { api } from './services/api';
 import { renderSidebar } from './components/Sidebar';
 import { renderNotebook } from './components/Notebook';
 import { renderCreateAnalysis } from './components/CreateAnalysis';
+import { renderKnowledge } from './components/Knowledge';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -18,6 +19,8 @@ function updateUI() {
   const currentView = store.getCurrentView();
   if (currentView === 'create-analysis') {
     shell.appendChild(renderCreateAnalysis());
+  } else if (currentView === 'knowledge') {
+    shell.appendChild(renderKnowledge());
   } else {
     shell.appendChild(renderNotebook());
   }

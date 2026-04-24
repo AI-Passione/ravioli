@@ -47,7 +47,7 @@ def test_list_analyses(client, session):
             self.logs = []
     
     mock_analysis = MockAnalysis(analysis_id, "Test Analysis")
-    session.query().offset().limit().all.return_value = [mock_analysis]
+    session.query().order_by().offset().limit().all.return_value = [mock_analysis]
 
     # Execute request
     response = client.get("/api/v1/analyses/")

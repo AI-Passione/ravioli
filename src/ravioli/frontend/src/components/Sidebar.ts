@@ -33,6 +33,10 @@ export function renderSidebar() {
             <span class="material-symbols-outlined text-primary-fixed-dim" data-icon="dashboard">dashboard</span>
             <span>Start a new analysis</span>
           </button>
+          <button class="nav-item w-full" data-nav="knowledge">
+            <span class="material-symbols-outlined" data-icon="local_library">local_library</span>
+            <span>Knowledge</span>
+          </button>
           <button class="nav-item w-full" data-nav="warehouse">
             <span class="material-symbols-outlined" data-icon="storage">storage</span>
             <span>Warehouse</span>
@@ -91,6 +95,11 @@ export function renderSidebar() {
 
   container.querySelector('[data-nav="home"]')?.addEventListener('click', () => {
     store.setCurrentView('create-analysis');
+    store.setActiveAnalysisId(undefined);
+  });
+
+  container.querySelector('[data-nav="knowledge"]')?.addEventListener('click', () => {
+    store.setCurrentView('knowledge');
     store.setActiveAnalysisId(undefined);
   });
 
