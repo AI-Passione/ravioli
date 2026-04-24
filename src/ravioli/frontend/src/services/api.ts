@@ -1,4 +1,4 @@
-import type { Analysis, AnalysisCreate, ExecutionLog, UploadedFile } from '../types';
+import type { Analysis, AnalysisCreate, ExecutionLog, UploadedFile, QuickInsightResponse } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -41,7 +41,7 @@ export const api = {
     if (!response.ok) throw new Error('Failed to ask question');
   },
 
-  async generateQuickInsight(file: File): Promise<any> {
+  async generateQuickInsight(file: File): Promise<QuickInsightResponse> {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -53,7 +53,7 @@ export const api = {
     return response.json();
   },
 
-  async generateQuickInsightFromExisting(fileId: string): Promise<any> {
+  async generateQuickInsightFromExisting(fileId: string): Promise<QuickInsightResponse> {
     const response = await fetch(`${API_BASE}/analyses/quick-insight/existing`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

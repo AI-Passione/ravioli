@@ -45,3 +45,11 @@ export interface SystemSetting {
   value: Record<string, any>;
   updated_at?: string;
 }
+
+export interface QuickInsightResponse {
+  analysis_id: string;
+  title: string;
+  summary: string;
+  stats: Record<string, number>;
+  followup_questions: string[];
+}

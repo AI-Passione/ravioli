@@ -139,6 +139,23 @@ export function renderNotebook() {
             ${renderMarkdown(analysis.result)}
           </div>
           
+          ${analysis.analysis_metadata?.followup_questions?.length ? `
+            <div class="pt-12 border-t border-outline-variant/10 space-y-6 relative z-10">
+              <div class="flex items-center gap-3 text-tertiary">
+                <span class="material-symbols-outlined text-xl" data-icon="explore">explore</span>
+                <p class="text-[10px] font-label-md uppercase tracking-[0.3em]">Follow-up Sequences</p>
+              </div>
+              <div class="grid grid-cols-1 gap-3">
+                ${analysis.analysis_metadata.followup_questions.map((q: string) => `
+                  <button class="followup-question-btn group" data-question="${q.replace(/"/g, '&quot;')}">
+                    <span class="group-hover:text-white transition-colors">${q}</span>
+                    <span class="material-symbols-outlined icon" data-icon="arrow_forward_ios">arrow_forward_ios</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
           <div class="flex items-center justify-between pt-6 border-t border-outline-variant/10 relative z-10">
             <div class="flex items-center gap-2 opacity-40 hover:opacity-100 transition-opacity">
               <span class="material-symbols-outlined text-sm" data-icon="verified">verified</span>
@@ -219,6 +236,20 @@ export function renderNotebook() {
       btn.removeAttribute('disabled');
       btn.classList.remove('opacity-50');
     }
+  });
+
+  // Follow-up question clicks
+  container.querySelectorAll('.followup-question-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const question = btn.getAttribute('data-question');
+      if (!question || !activeId) return;
+      
+      try {
+        await api.askQuestion(activeId, question);
+      } catch (err) {
+        console.error('Failed to submit follow-up question', err);
+      }
+    });
   });
 
   return container;

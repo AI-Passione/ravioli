@@ -225,13 +225,13 @@ REPRESENTATIVE SAMPLE (FIRST 10 ROWS):
 {sample}
 """
 
-async def generate_summary(db: Session, filename: str, row_count: int, col_count: int, columns: str, sample_data: str) -> str:
+async def generate_summary(db: Session, filename: str, row_count: int, col_count: int, columns: str, sample_data: str) -> tuple[str, list[str]]:
     template_path = Path(__file__).resolve().parents[4] / "ai" / "templates" / "quick_insight_template.md"
     try:
         template = template_path.read_text()
     except Exception:
         # Fallback if template is missing
-        return f"Summary for {filename}: {row_count} rows, {col_count} columns."
+        return f"Summary for {filename}: {row_count} rows, {col_count} columns.", []
 
     # Use Ollama for key insights, assumptions, and limitations
     from ravioli.backend.core.ollama import OllamaClient
@@ -269,10 +269,20 @@ async def generate_summary(db: Session, filename: str, row_count: int, col_count
         limitations_and_issues=limitations
     )
     # Regex to find standalone numbers (including decimals) and wrap them in backticks
-    # We avoid wrapping numbers that are already wrapped in backticks
     summary = re.sub(r'(?<!`)\b(\d+(?:\.\d+)?)\b(?!`)', r'`\1`', summary)
     
-    return summary
+    # Generate follow-up questions
+    try:
+        followup_questions = await client.generate_followup_questions(filename, summary, sample_data)
+    except Exception:
+        followup_questions = [
+            "What are the primary drivers behind the observed volume concentration?",
+            "Are there specific time periods where the anomalies are more prevalent?",
+            "How do these trends compare to historical baseline patterns?",
+            "What is the impact of the identified limitations on the overall analysis?"
+        ]
+    
+    return summary, followup_questions
 
 @router.post("/quick-insight", response_model=schemas.QuickInsightResponse)
 async def create_quick_insight(
@@ -300,7 +310,7 @@ async def create_quick_insight(
 
     # Generate Summary using template and Ollama
     title = f"Quick Insight: {file.filename}"
-    summary = await generate_summary(db, file.filename, row_count, col_count, columns, data_profile)
+    summary, followup_questions = await generate_summary(db, file.filename, row_count, col_count, columns, data_profile)
 
     # Create the analysis record
     db_analysis = models.Analysis(
@@ -308,7 +318,12 @@ async def create_quick_insight(
         description=f"Quick insight generated from {file.filename}",
         status="completed",
         result=summary,
-        analysis_metadata={"type": "quick_insight", "filename": file.filename, "row_count": row_count}
+        analysis_metadata={
+            "type": "quick_insight", 
+            "filename": file.filename, 
+            "row_count": row_count,
+            "followup_questions": followup_questions
+        }
     )
     db.add(db_analysis)
     db.commit()
@@ -318,7 +333,8 @@ async def create_quick_insight(
         analysis_id=db_analysis.id,
         title=title,
         summary=summary,
-        stats={"rows": row_count, "cols": col_count}
+        stats={"rows": row_count, "cols": col_count},
+        followup_questions=followup_questions
     )
 
 @router.post("/quick-insight/existing", response_model=schemas.QuickInsightResponse)
@@ -361,7 +377,7 @@ async def create_quick_insight_existing(
 
     # Generate Summary using template and Ollama
     title = f"Quick Insight: {db_file.original_filename}"
-    summary = await generate_summary(db, db_file.original_filename, row_count, col_count, columns, data_profile)
+    summary, followup_questions = await generate_summary(db, db_file.original_filename, row_count, col_count, columns, data_profile)
 
     # Create the analysis record
     db_analysis = models.Analysis(
@@ -369,7 +385,12 @@ async def create_quick_insight_existing(
         description=f"Quick insight generated from {db_file.original_filename}",
         status="completed",
         result=summary,
-        analysis_metadata={"type": "quick_insight", "file_id": str(db_file.id), "row_count": row_count}
+        analysis_metadata={
+            "type": "quick_insight", 
+            "file_id": str(db_file.id), 
+            "row_count": row_count,
+            "followup_questions": followup_questions
+        }
     )
     db.add(db_analysis)
     db.commit()
@@ -379,5 +400,6 @@ async def create_quick_insight_existing(
         analysis_id=db_analysis.id,
         title=title,
         summary=summary,
-        stats={"rows": row_count, "cols": col_count}
+        stats={"rows": row_count, "cols": col_count},
+        followup_questions=followup_questions
     )

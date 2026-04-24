@@ -246,3 +246,34 @@ Limitations & Issues:"""
             return await self._generate(prompt, "Limitations", temperature=0.4, num_predict=300)
         except Exception:
             return "- Limited context on data collection methodology.\n- Sample size may not capture all edge case variance."
+
+    async def generate_followup_questions(self, filename: str, summary: str, sample_data: str) -> list[str]:
+        """
+        Generate 3-4 insightful follow-up questions based on the summary and data profile.
+        """
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Based on the following Executive Summary and Dataset Profile for "{filename}", generate 3-4 professional and insightful follow-up questions that an analyst would ask to explore this data further.
+Return ONLY the questions, one per line, starting with a dash (-). Do not include any other text or a confirmation line.
+
+Executive Summary:
+{summary}
+
+Dataset Profile Sample:
+{sample_data[:2000]}
+
+Follow-up Questions:"""
+
+        try:
+            content = await self._generate(prompt, "Follow-up Questions", temperature=0.6, num_predict=400)
+            # Parse bullet points into a list
+            questions = [q.strip("- ").strip() for q in content.split('\n') if q.strip().startswith("-")]
+            # Filter out empty or too short questions
+            questions = [q for q in questions if len(q) > 10][:4]
+            return questions
+        except Exception:
+            return [
+                "What are the primary drivers behind the observed volume concentration?",
+                "Are there specific time periods where the anomalies are more prevalent?",
+                "How do these trends compare to historical baseline patterns?",
+                "What is the impact of the identified limitations on the overall analysis?"
+            ]

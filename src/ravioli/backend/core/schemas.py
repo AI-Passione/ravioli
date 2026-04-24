@@ -60,6 +60,7 @@ class QuickInsightResponse(BaseModel):
     title: str
     summary: str
     stats: dict
+    followup_questions: List[str] = []
 
     model_config = ConfigDict(from_attributes=True)
 
