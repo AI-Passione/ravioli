@@ -87,3 +87,14 @@ class UploadedFile(UploadedFileBase):
 
 class UploadedFileUpdate(BaseModel):
     description: Optional[str] = None
+
+# --- Setting Schemas ---
+
+class SystemSettingBase(BaseModel):
+    key: str
+    value: dict
+
+class SystemSetting(SystemSettingBase):
+    updated_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)

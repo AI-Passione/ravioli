@@ -92,5 +92,22 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to update file description');
     return response.json();
+  },
+
+  async getSetting(key: string): Promise<any> {
+    const response = await fetch(`${API_BASE}/settings/${key}`);
+    if (response.status === 404) return { key, value: {} };
+    if (!response.ok) throw new Error('Failed to fetch setting');
+    return response.json();
+  },
+
+  async updateSetting(key: string, value: Record<string, any>): Promise<any> {
+    const response = await fetch(`${API_BASE}/settings/${key}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value }),
+    });
+    if (!response.ok) throw new Error('Failed to update setting');
+    return response.json();
   }
 };

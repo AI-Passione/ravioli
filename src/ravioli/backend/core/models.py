@@ -88,3 +88,16 @@ class UploadedFile(Base):
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+
+class SystemSetting(Base):
+    """
+    Key-value store for application configuration settings.
+    Stored in the 'app' schema.
+    """
+    __tablename__ = "system_settings"
+    __table_args__ = {"schema": "app"}
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON, nullable=False)
+    
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))

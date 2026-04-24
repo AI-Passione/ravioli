@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:3b"
     ollama_host: str = "http://ollama:11434"
 
+    # Secret key for encrypting sensitive settings (Fernet base64-encoded key)
+    secret_key: str = "0_Pqa8zAhcGvQnjj1pIStq98pP3ZK0kr3-sjKsikzIo="
+
     @property
     def database_url(self) -> str:
         return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.db_host}:{self.db_port}/{self.postgres_db}"
