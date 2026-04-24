@@ -30,7 +30,9 @@ class Store {
 
   setActiveAnalysisId(id?: string) {
     this.activeAnalysisId = id;
-    this.currentView = 'dashboard';
+    if (id) {
+      this.currentView = 'dashboard';
+    }
     this.notify();
   }
 
