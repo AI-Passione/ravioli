@@ -1,5 +1,15 @@
 import { api } from '../services/api';
 
+/** Escape user-supplied strings before injecting into innerHTML. */
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export function renderSettings() {
   const container = document.createElement('div');
   container.className = 'flex-1 bg-surface-container-lowest flex flex-col min-h-screen overflow-y-auto text-on-surface';
@@ -61,14 +71,14 @@ export function renderSettings() {
             ${ollamaConfig.mode === 'local' ? `
               <div>
                 <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Base URL</label>
-                <input id="ollama-base-url" type="text" value="${ollamaConfig.base_url}" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="e.g. http://localhost:11434" />
+                <input id="ollama-base-url" type="text" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="e.g. http://localhost:11434" />
               </div>
             ` : ''}
             
             ${ollamaConfig.mode !== 'default' ? `
               <div>
                 <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Default Model</label>
-                <input id="ollama-default-model" type="text" value="${ollamaConfig.default_model}" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="e.g. gemma3:4b" />
+                <input id="ollama-default-model" type="text" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="e.g. gemma3:4b" />
               </div>
             ` : ''}
             
@@ -207,6 +217,13 @@ export function renderSettings() {
 
       </main>
     `;
+
+    // ── Safely populate input values via DOM (prevents XSS from innerHTML interpolation) ──
+    const baseUrlInput = container.querySelector('#ollama-base-url') as HTMLInputElement | null;
+    if (baseUrlInput) baseUrlInput.value = ollamaConfig.base_url;
+
+    const defaultModelInput = container.querySelector('#ollama-default-model') as HTMLInputElement | null;
+    if (defaultModelInput) defaultModelInput.value = ollamaConfig.default_model;
 
     // Attach listeners
     const configureBtn = container.querySelector('#btn-configure-ollama');
