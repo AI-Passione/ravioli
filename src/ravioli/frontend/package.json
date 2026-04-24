@@ -11,6 +11,8 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.4",
+    "@tailwindcss/vite": "^4.2.4",
     "@types/markdown-it": "^14.1.2",
     "autoprefixer": "^10.5.0",
     "happy-dom": "^20.9.0",
