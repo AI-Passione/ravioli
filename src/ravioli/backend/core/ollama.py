@@ -1,8 +1,5 @@
 import httpx
 import os
-import hmac
-import hashlib
-import base64
 from typing import Dict, Any
 from sqlalchemy.orm import Session
 from ravioli.backend.core.models import SystemSetting
