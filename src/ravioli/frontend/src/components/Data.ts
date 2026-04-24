@@ -16,12 +16,18 @@ export function renderData() {
 
       <!-- Upload Zone -->
       <div class="mb-12">
-        <div id="drop-zone" class="border-2 border-dashed border-outline/30 rounded-3xl p-12 flex flex-col items-center justify-center bg-surface-container-low hover:bg-surface-container hover:border-primary/50 transition-all cursor-pointer group">
-          <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-            <span class="material-symbols-outlined text-primary text-3xl">upload_file</span>
+        <div id="drop-zone" class="border-2 border-dashed border-outline/30 rounded-3xl p-12 flex flex-col items-center justify-center bg-surface-container-low hover:bg-surface-container hover:border-primary/50 transition-all cursor-pointer group relative overflow-hidden">
+          <div id="drop-zone-content" class="flex flex-col items-center justify-center transition-opacity duration-300 w-full h-full">
+            <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <span class="material-symbols-outlined text-primary text-3xl">upload_file</span>
+            </div>
+            <h3 class="text-xl font-medium text-neutral-200 mb-2">Drop your CSV here</h3>
+            <p class="text-neutral-500 text-sm">or click to browse your files</p>
           </div>
-          <h3 class="text-xl font-medium text-neutral-200 mb-2">Drop your CSV here</h3>
-          <p class="text-neutral-500 text-sm">or click to browse your files</p>
+          <div id="drop-zone-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-container/90 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 z-10">
+            <span class="material-symbols-outlined animate-spin text-primary text-4xl mb-4">sync</span>
+            <p class="text-neutral-200 font-medium animate-pulse">Uploading and processing...</p>
+          </div>
           <input type="file" id="file-input" class="hidden" accept=".csv">
         </div>
       </div>
@@ -182,6 +188,15 @@ export function renderData() {
   });
 
   async function handleUpload(file: File) {
+    const dropZoneContent = container.querySelector('#drop-zone-content');
+    const dropZoneLoading = container.querySelector('#drop-zone-loading');
+    
+    // Show loading state
+    if (dropZoneContent && dropZoneLoading) {
+      dropZoneContent.classList.add('opacity-0');
+      dropZoneLoading.classList.remove('opacity-0', 'pointer-events-none');
+    }
+
     try {
       const result = await api.uploadFile(file);
       
@@ -194,6 +209,12 @@ export function renderData() {
     } catch (err) {
       console.error('Upload failed', err);
       alert('Upload failed. Please check the console for details.');
+    } finally {
+      // Hide loading state
+      if (dropZoneContent && dropZoneLoading) {
+        dropZoneContent.classList.remove('opacity-0');
+        dropZoneLoading.classList.add('opacity-0', 'pointer-events-none');
+      }
     }
   }
 
