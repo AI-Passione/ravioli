@@ -44,6 +44,7 @@ export function renderData() {
             <thead>
               <tr class="text-[10px] uppercase tracking-[0.2em] text-neutral-500 border-b border-outline/5">
                 <th class="px-8 py-4 font-medium">Asset Name</th>
+                <th class="px-8 py-4 font-medium">Description</th>
                 <th class="px-8 py-4 font-medium">DuckDB Table</th>
                 <th class="px-8 py-4 font-medium">Rows</th>
                 <th class="px-8 py-4 font-medium">Size</th>
@@ -64,6 +65,14 @@ export function renderData() {
                         <span class="material-symbols-outlined text-neutral-400 group-hover:text-primary transition-colors text-lg">description</span>
                       </div>
                       <span class="text-neutral-200 font-medium">${file.original_filename}</span>
+                    </div>
+                  </td>
+                  <td class="px-8 py-5">
+                    <div class="flex items-center gap-2 group/desc max-w-xs">
+                      <span class="text-neutral-400 text-sm truncate" title="${file.description || ''}">${file.description || '<span class="italic opacity-50">No description</span>'}</span>
+                      <button class="btn-edit-desc p-1 rounded-md opacity-0 group-hover/desc:opacity-100 hover:bg-white/10 text-neutral-500 hover:text-primary transition-all flex-shrink-0" data-id="${file.id}" data-desc="${file.description || ''}" title="Edit Description">
+                        <span class="material-symbols-outlined text-[16px]">edit</span>
+                      </button>
                     </div>
                   </td>
                   <td class="px-8 py-5">
@@ -177,6 +186,26 @@ export function renderData() {
         } catch (err) {
           console.error('Delete failed', err);
           alert('Failed to delete file.');
+        }
+      }
+    });
+  });
+
+  container.querySelectorAll('.btn-edit-desc').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const fileId = btn.getAttribute('data-id');
+      const currentDesc = btn.getAttribute('data-desc') || '';
+      if (fileId) {
+        const newDesc = prompt('Enter a description for this data:', currentDesc);
+        if (newDesc !== null && newDesc !== currentDesc) {
+          try {
+            await api.updateFileDescription(fileId, newDesc);
+            const updatedFiles = await api.listFiles();
+            store.setUploadedFiles(updatedFiles);
+          } catch (err) {
+            console.error('Update description failed', err);
+            alert('Failed to update description.');
+          }
         }
       }
     });

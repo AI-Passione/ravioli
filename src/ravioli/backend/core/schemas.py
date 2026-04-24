@@ -72,6 +72,7 @@ class UploadedFileBase(BaseModel):
     size_bytes: int
     table_name: str
     row_count: Optional[int] = None
+    description: Optional[str] = None
     status: str
     error_message: Optional[str] = None
     file_hash: Optional[str] = None
@@ -83,3 +84,6 @@ class UploadedFile(UploadedFileBase):
     is_duplicate: bool = False
 
     model_config = ConfigDict(from_attributes=True)
+
+class UploadedFileUpdate(BaseModel):
+    description: Optional[str] = None

@@ -78,6 +78,7 @@ class UploadedFile(Base):
     # Table name in DuckDB
     table_name: Mapped[str] = mapped_column(String(255), nullable=False)
     row_count: Mapped[Optional[int]] = mapped_column()
+    description: Mapped[Optional[str]] = mapped_column(Text)
     
     # Ingestion status: pending, completed, failed
     status: Mapped[str] = mapped_column(String(50), default="pending")

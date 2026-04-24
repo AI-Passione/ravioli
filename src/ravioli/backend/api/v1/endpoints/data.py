@@ -157,3 +157,24 @@ async def delete_file(file_id: uuid.UUID, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
+
+@router.patch("/files/{file_id}", response_model=schemas.UploadedFile)
+async def update_file(
+    file_id: uuid.UUID,
+    file_update: schemas.UploadedFileUpdate,
+    db: Session = Depends(get_db)
+):
+    db_file = db.execute(select(UploadedFile).where(UploadedFile.id == file_id)).scalar_one_or_none()
+    if not db_file:
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    if file_update.description is not None:
+        db_file.description = file_update.description
+        
+    try:
+        db.commit()
+        db.refresh(db_file)
+        return db_file
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update file: {str(e)}")
