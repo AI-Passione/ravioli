@@ -5,12 +5,94 @@ export function renderSettings() {
   container.className = 'flex-1 bg-surface-container-lowest flex flex-col min-h-screen overflow-y-auto text-on-surface';
 
   let ollamaConfig = {
+    mode: 'default', // 'default', 'local', 'cloud'
     base_url: 'http://localhost:11434',
     default_model: 'gemma3:4b',
     api_key: ''
   };
+  
+  let isConfiguringOllama = false;
 
   const renderContent = () => {
+    
+    // Build Ollama content based on state
+    let ollamaContent = '';
+    
+    if (!isConfiguringOllama) {
+      ollamaContent = `
+        <div class="pt-2">
+          <button id="btn-configure-ollama" class="bg-surface-container-highest border border-outline-variant/50 text-neutral-100 font-bold py-2 px-6 rounded-full text-sm hover:bg-surface-container transition-all shadow-sm">
+            Configure
+          </button>
+        </div>
+      `;
+    } else {
+      ollamaContent = `
+        <div class="space-y-6 mt-4">
+          <div class="space-y-3">
+            <label class="flex items-center gap-3 p-3 rounded-lg border ${ollamaConfig.mode === 'default' ? 'border-primary-fixed-dim bg-primary-fixed-dim/10' : 'border-outline-variant/50 bg-surface-container-highest'} cursor-pointer transition-colors">
+              <input type="radio" name="ollama-mode" value="default" class="text-primary-fixed-dim focus:ring-primary-fixed-dim" ${ollamaConfig.mode === 'default' ? 'checked' : ''}>
+              <div class="flex flex-col">
+                <span class="text-sm font-bold text-neutral-100">Default</span>
+                <span class="text-xs text-on-surface-variant">Use the built-in default model of Gemma3:4b from local Ollama</span>
+              </div>
+            </label>
+            
+            <label class="flex items-center gap-3 p-3 rounded-lg border ${ollamaConfig.mode === 'local' ? 'border-primary-fixed-dim bg-primary-fixed-dim/10' : 'border-outline-variant/50 bg-surface-container-highest'} cursor-pointer transition-colors">
+              <input type="radio" name="ollama-mode" value="local" class="text-primary-fixed-dim focus:ring-primary-fixed-dim" ${ollamaConfig.mode === 'local' ? 'checked' : ''}>
+              <div class="flex flex-col">
+                <span class="text-sm font-bold text-neutral-100">Custom Local Runtime</span>
+                <span class="text-xs text-on-surface-variant">Enter a custom base URL to another Ollama server on your network</span>
+              </div>
+            </label>
+            
+            <label class="flex items-center gap-3 p-3 rounded-lg border ${ollamaConfig.mode === 'cloud' ? 'border-primary-fixed-dim bg-primary-fixed-dim/10' : 'border-outline-variant/50 bg-surface-container-highest'} cursor-pointer transition-colors">
+              <input type="radio" name="ollama-mode" value="cloud" class="text-primary-fixed-dim focus:ring-primary-fixed-dim" ${ollamaConfig.mode === 'cloud' ? 'checked' : ''}>
+              <div class="flex flex-col">
+                <span class="text-sm font-bold text-neutral-100">Ollama Cloud</span>
+                <span class="text-xs text-on-surface-variant">Connect to Ollama Cloud with an API Key</span>
+              </div>
+            </label>
+          </div>
+          
+          <div class="space-y-4 pt-2 border-t border-outline-variant/30">
+            ${ollamaConfig.mode === 'local' || ollamaConfig.mode === 'cloud' ? `
+              <div>
+                <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Base URL</label>
+                <input id="ollama-base-url" type="text" value="${ollamaConfig.base_url}" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="e.g. http://localhost:11434" />
+              </div>
+            ` : ''}
+            
+            ${ollamaConfig.mode !== 'default' ? `
+              <div>
+                <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Default Model</label>
+                <input id="ollama-default-model" type="text" value="${ollamaConfig.default_model}" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="e.g. gemma3:4b" />
+              </div>
+            ` : ''}
+            
+            ${ollamaConfig.mode === 'cloud' ? `
+              <div>
+                <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">API Key</label>
+                <input id="ollama-api-key" type="password" value="${ollamaConfig.api_key}" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="Required for Ollama Cloud (e.g. sk-...)" />
+              </div>
+            ` : ''}
+            
+            <div class="pt-2 flex items-center gap-4">
+              <button id="btn-save-ai" class="bg-primary-fixed-dim text-on-primary-fixed font-bold py-2 px-6 rounded-full text-sm hover:brightness-110 transition-all shadow-md">
+                Save AI Settings
+              </button>
+              <button id="btn-cancel-ollama" class="text-sm font-bold text-on-surface-variant hover:text-neutral-100 transition-colors">
+                Cancel
+              </button>
+              <span id="save-status" class="text-sm text-green-400 opacity-0 transition-opacity duration-300 font-bold flex items-center gap-1 ml-auto">
+                <span class="material-symbols-outlined text-sm">check_circle</span> Saved
+              </span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     container.innerHTML = `
       <header class="px-12 pt-12 pb-8 max-w-4xl mx-auto w-full">
         <div class="flex items-center gap-3 mb-2">
@@ -36,33 +118,10 @@ export function renderSettings() {
                 <span class="material-symbols-outlined text-primary-fixed-dim text-2xl">memory</span>
                 <h3 class="text-xl font-medium text-neutral-100">Ollama</h3>
               </div>
-              <p class="text-sm text-on-surface-variant mb-6">Configure your local or remote Ollama instance for AI model integration.</p>
+              <p class="text-sm text-on-surface-variant mb-2">Configure your local or remote Ollama instance for AI model integration.</p>
               
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Base URL</label>
-                  <input id="ollama-base-url" type="text" value="${ollamaConfig.base_url}" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="e.g. http://localhost:11434" />
-                </div>
-                
-                <div>
-                  <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Default Model</label>
-                  <input id="ollama-default-model" type="text" value="${ollamaConfig.default_model}" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="e.g. gemma3:4b" />
-                </div>
-                
-                <div>
-                  <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">API Key (Optional)</label>
-                  <input id="ollama-api-key" type="password" value="${ollamaConfig.api_key}" class="w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg px-4 py-3 text-sm text-neutral-100 focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors" placeholder="Required for Ollama Cloud (e.g. sk-...)" />
-                </div>
-                
-                <div class="pt-2 flex items-center gap-4">
-                  <button id="btn-save-ai" class="bg-primary-fixed-dim text-on-primary-fixed font-bold py-2 px-6 rounded-full text-sm hover:brightness-110 transition-all shadow-md">
-                    Save AI Settings
-                  </button>
-                  <span id="save-status" class="text-sm text-green-400 opacity-0 transition-opacity duration-300 font-bold flex items-center gap-1">
-                    <span class="material-symbols-outlined text-sm">check_circle</span> Saved
-                  </span>
-                </div>
-              </div>
+              ${ollamaContent}
+              
             </div>
           </div>
 
@@ -137,35 +196,82 @@ export function renderSettings() {
       </main>
     `;
 
-    container.querySelector('#btn-save-ai')?.addEventListener('click', async () => {
-      const baseUrl = (container.querySelector('#ollama-base-url') as HTMLInputElement).value;
-      const defaultModel = (container.querySelector('#ollama-default-model') as HTMLInputElement).value;
-      const apiKey = (container.querySelector('#ollama-api-key') as HTMLInputElement).value;
-      
-      const btn = container.querySelector('#btn-save-ai') as HTMLButtonElement;
-      btn.disabled = true;
-      btn.classList.add('opacity-50');
+    // Attach listeners
+    const configureBtn = container.querySelector('#btn-configure-ollama');
+    if (configureBtn) {
+      configureBtn.addEventListener('click', () => {
+        isConfiguringOllama = true;
+        renderContent();
+      });
+    }
 
-      try {
-        await api.updateSetting('ollama', {
-          base_url: baseUrl,
-          default_model: defaultModel,
-          api_key: apiKey
-        });
-        
-        const status = container.querySelector('#save-status');
-        if (status) {
-          status.classList.remove('opacity-0');
-          setTimeout(() => status.classList.add('opacity-0'), 2000);
-        }
-      } catch (e) {
-        console.error('Failed to save settings', e);
-        // Could show error message here
-      } finally {
-        btn.disabled = false;
-        btn.classList.remove('opacity-50');
-      }
+    const cancelBtn = container.querySelector('#btn-cancel-ollama');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        isConfiguringOllama = false;
+        renderContent();
+      });
+    }
+
+    const modeRadios = container.querySelectorAll('input[name="ollama-mode"]');
+    modeRadios.forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        ollamaConfig.mode = (e.target as HTMLInputElement).value;
+        renderContent(); // re-render to show/hide fields
+      });
     });
+
+    const saveBtn = container.querySelector('#btn-save-ai');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        // Collect current values from inputs if they exist
+        const urlInput = container.querySelector('#ollama-base-url') as HTMLInputElement;
+        if (urlInput) ollamaConfig.base_url = urlInput.value;
+        
+        const modelInput = container.querySelector('#ollama-default-model') as HTMLInputElement;
+        if (modelInput) ollamaConfig.default_model = modelInput.value;
+        
+        const keyInput = container.querySelector('#ollama-api-key') as HTMLInputElement;
+        if (keyInput) ollamaConfig.api_key = keyInput.value;
+        
+        // If mode is default, force the values back to defaults just in case
+        if (ollamaConfig.mode === 'default') {
+          ollamaConfig.base_url = 'http://localhost:11434';
+          ollamaConfig.default_model = 'gemma3:4b';
+          ollamaConfig.api_key = '';
+        }
+
+        const btn = saveBtn as HTMLButtonElement;
+        btn.disabled = true;
+        btn.classList.add('opacity-50');
+
+        try {
+          await api.updateSetting('ollama', {
+            mode: ollamaConfig.mode,
+            base_url: ollamaConfig.base_url,
+            default_model: ollamaConfig.default_model,
+            api_key: ollamaConfig.api_key
+          });
+          
+          const status = container.querySelector('#save-status');
+          if (status) {
+            status.classList.remove('opacity-0');
+            setTimeout(() => {
+              status.classList.add('opacity-0');
+              setTimeout(() => {
+                isConfiguringOllama = false;
+                renderContent();
+              }, 300);
+            }, 1500);
+          }
+        } catch (e) {
+          console.error('Failed to save settings', e);
+        } finally {
+          btn.disabled = false;
+          btn.classList.remove('opacity-50');
+        }
+      });
+    }
   };
 
   renderContent();
