@@ -40,7 +40,7 @@ async function init() {
       console.log(`Fetched ${analyses.length} analyses from API`);
       store.setAnalyses(analyses);
       if (analyses.length > 0 && !store.getActiveAnalysisId()) {
-        store.setActiveAnalysisId(analyses[0].id);
+        // Removed auto-selecting the first analysis to default to the Dashboard tab
       }
     } catch (err) {
       console.error('Failed to fetch analyses', err);
