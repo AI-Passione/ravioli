@@ -144,7 +144,6 @@ def prepare_dataframe_for_analysis(df: pd.DataFrame) -> pd.DataFrame:
                 df[col] = converted
             # Best-effort conversion: leave the original column dtype unchanged
             # if pandas cannot safely coerce this column to numeric.
-            pass
 
         # 3. Handle low-cardinality strings as categories
         if df[col].dtype == 'object' and df[col].nunique() < 30:
