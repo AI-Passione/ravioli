@@ -1,7 +1,6 @@
 import shutil
 import uuid
 from pathlib import Path
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import select
