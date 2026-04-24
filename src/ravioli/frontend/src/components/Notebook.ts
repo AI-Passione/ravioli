@@ -122,7 +122,7 @@ export function renderNotebook() {
       </div>
     </header>
 
-    <div class="flex-1 overflow-y-auto px-12 py-8 space-y-12" id="cell-container">
+    <div class="flex-1 overflow-y-auto px-12 pt-8 pb-32 space-y-12 custom-scrollbar" id="cell-container">
       ${analysis.result ? `
         <div class="glass-panel p-12 rounded-[2rem] space-y-8 border-primary/20 bg-primary/[0.02] animate-in fade-in slide-in-from-bottom-8 duration-1000 relative overflow-hidden group">
           <!-- Subtle glow background -->
@@ -187,24 +187,30 @@ export function renderNotebook() {
           </div>
         </div>
       `).join('')}
+    </div>
 
-      <!-- Interaction Cell -->
-      <div class="pt-12 mt-12 border-t border-outline-variant/10">
-        <div class="glass-panel p-6 rounded-2xl group focus-within:border-primary/30 transition-all duration-500">
-          <div class="flex gap-6 items-start">
+    <!-- Floating Interaction Cell (Perplexity Style) -->
+    <div class="w-full px-12 pb-12 pt-6 bg-gradient-to-t from-background via-background/90 to-transparent relative z-20">
+      <div class="max-w-4xl mx-auto relative">
+        <div class="glass-panel p-2 rounded-[2rem] group focus-within:border-primary/30 transition-all duration-500 shadow-2xl shadow-primary/5">
+          <div class="flex items-center gap-4 px-4">
             <div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0">
-               <span class="material-symbols-outlined text-primary" data-icon="edit_note">edit_note</span>
+               <span class="material-symbols-outlined text-primary text-xl" data-icon="auto_awesome">auto_awesome</span>
             </div>
-            <div class="flex-1 space-y-4">
-              <textarea id="cell-input" class="w-full bg-transparent border-none text-on-surface focus:ring-0 resize-none py-2 text-lg font-body-lg" placeholder="What sequence should we initialize next?" rows="1"></textarea>
-              <div class="flex justify-end">
-                <button id="btn-execute" class="btn-primary flex items-center gap-2 group/btn">
-                  <span>Execute</span>
-                  <span class="material-symbols-outlined text-sm group-hover/btn:translate-x-1 transition-transform" data-icon="send">send</span>
-                </button>
-              </div>
+            <div class="flex-1 min-w-0 py-2">
+              <textarea id="cell-input" class="w-full bg-transparent border-none text-on-surface focus:ring-0 resize-none py-2 text-lg font-body-lg max-h-48 custom-scrollbar" placeholder="Ask Kowalski a follow-up question..." rows="1"></textarea>
+            </div>
+            <div class="flex items-center pr-2">
+              <button id="btn-execute" class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center hover:scale-110 transition-transform disabled:opacity-50 disabled:scale-100 group/btn shadow-lg shadow-primary/20">
+                <span class="material-symbols-outlined text-xl group-hover/btn:translate-x-0.5 transition-transform" data-icon="arrow_forward">arrow_forward</span>
+              </button>
             </div>
           </div>
+        </div>
+        
+        <!-- Subtle Status Hint -->
+        <div class="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none">
+          <span class="text-[10px] uppercase tracking-[0.3em] text-primary/50 font-label-sm">Kowalski Neural Link Active</span>
         </div>
       </div>
     </div>
