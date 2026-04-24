@@ -131,3 +131,29 @@ async def get_table_preview(table_name: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch preview: {str(e)}")
+
+@router.delete("/files/{file_id}")
+async def delete_file(file_id: uuid.UUID, db: Session = Depends(get_db)):
+    # 1. Fetch record
+    db_file = db.execute(select(UploadedFile).where(UploadedFile.id == file_id)).scalar_one_or_none()
+    if not db_file:
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    try:
+        # 2. Drop table from DuckDB
+        if db_file.table_name:
+            duckdb_manager.connection.execute(f"DROP TABLE IF EXISTS {db_file.table_name}")
+            
+        # 3. Delete physical file
+        file_path = UPLOAD_DIR / db_file.filename
+        if file_path.exists():
+            file_path.unlink()
+            
+        # 4. Delete Postgres record
+        db.delete(db_file)
+        db.commit()
+        
+        return {"status": "success", "message": "File and associated data deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")

@@ -78,9 +78,12 @@ export function renderData() {
                       ${file.status}
                     </span>
                   </td>
-                  <td class="px-8 py-5 text-right">
-                    <button class="btn-inspect p-2 rounded-lg hover:bg-primary/10 text-neutral-400 hover:text-primary transition-all" data-table="${file.table_name}" data-filename="${file.original_filename}">
+                  <td class="px-8 py-5 text-right flex justify-end gap-2">
+                    <button class="btn-inspect p-2 rounded-lg hover:bg-primary/10 text-neutral-400 hover:text-primary transition-all" data-table="${file.table_name}" data-filename="${file.original_filename}" title="Preview">
                       <span class="material-symbols-outlined">visibility</span>
+                    </button>
+                    <button class="btn-delete p-2 rounded-lg hover:bg-red-500/10 text-neutral-400 hover:text-red-400 transition-all" data-id="${file.id}" title="Delete">
+                      <span class="material-symbols-outlined">delete</span>
                     </button>
                   </td>
                 </tr>
@@ -157,6 +160,22 @@ export function renderData() {
     });
   });
 
+  container.querySelectorAll('.btn-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const fileId = btn.getAttribute('data-id');
+      if (fileId && confirm('Are you sure you want to delete this data? This will remove it from DuckDB and cannot be undone.')) {
+        try {
+          await api.deleteFile(fileId);
+          const updatedFiles = await api.listFiles();
+          store.setUploadedFiles(updatedFiles);
+        } catch (err) {
+          console.error('Delete failed', err);
+          alert('Failed to delete file.');
+        }
+      }
+    });
+  });
+
   closeModal?.addEventListener('click', () => hideModal());
   modal.addEventListener('click', (e) => {
     if (e.target === modal) hideModal();
@@ -164,7 +183,12 @@ export function renderData() {
 
   async function handleUpload(file: File) {
     try {
-      await api.uploadFile(file);
+      const result = await api.uploadFile(file);
+      
+      if (result.is_duplicate) {
+        alert(`Duplicate Data Detected: "${file.name}" has already been uploaded and processed. We've skipped the duplicate effort for you!`);
+      }
+
       const updatedFiles = await api.listFiles();
       store.setUploadedFiles(updatedFiles);
     } catch (err) {
