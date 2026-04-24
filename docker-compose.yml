@@ -40,6 +40,9 @@ services:
     build:
       context: ./src/ravioli/frontend
     container_name: frontend
+    volumes:
+      - ./src/ravioli/frontend:/app
+      - /app/node_modules
     ports:
       - "5173:5173"
     depends_on:

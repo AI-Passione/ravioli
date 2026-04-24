@@ -147,9 +147,9 @@ export function renderNotebook() {
               </div>
               <div class="grid grid-cols-1 gap-3">
                 ${analysis.analysis_metadata.followup_questions.map((q: string) => `
-                  <button class="followup-question-btn group" data-question="${q.replace(/"/g, '&quot;')}">
+                  <button class="followup-question-btn flex items-center justify-between w-full px-6 py-4 text-left text-sm font-body-md text-on-surface-variant bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/10 rounded-xl transition-all duration-300 group hover:border-primary/30 hover:translate-x-1" data-question="${q.replace(/"/g, '&quot;')}">
                     <span class="group-hover:text-white transition-colors">${q}</span>
-                    <span class="material-symbols-outlined icon" data-icon="arrow_forward_ios">arrow_forward_ios</span>
+                    <span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-lg opacity-0 group-hover:opacity-100" data-icon="arrow_forward_ios">arrow_forward_ios</span>
                   </button>
                 `).join('')}
               </div>

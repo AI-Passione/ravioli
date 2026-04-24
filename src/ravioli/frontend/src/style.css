@@ -104,15 +104,3 @@
   @apply bg-outline-variant/20 rounded-full hover:bg-outline-variant/40 transition-colors;
 }
 
-/* Follow-up Questions Styles (Perplexity Style) */
-.followup-question-btn {
-  @apply flex items-center justify-between w-full px-6 py-4 text-left text-sm font-body-md text-on-surface-variant bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/10 rounded-xl transition-all duration-300 group;
-}
-
-.followup-question-btn:hover {
-  @apply border-primary/30 translate-x-1;
-}
-
-.followup-question-btn .icon {
-  @apply material-symbols-outlined text-outline group-hover:text-primary transition-colors text-lg opacity-0 group-hover:opacity-100;
-}
