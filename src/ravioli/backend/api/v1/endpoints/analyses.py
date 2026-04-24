@@ -183,7 +183,7 @@ async def create_quick_insight(
         row_count = len(df)
         col_count = len(df.columns)
         columns = ", ".join(df.columns.tolist()[:5])
-        sample_data = df.head(5).to_csv(index=False)
+        sample_data = df.to_csv(index=False)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}")
 
@@ -238,9 +238,9 @@ async def create_quick_insight_existing(
         col_count = len(df_cols)
         columns = ", ".join([row['column_name'] for row in df_cols[:5]])
         
-        # Get sample data
-        df_sample = duckdb_manager.connection.execute(f'SELECT * FROM "{db_file.table_name}" LIMIT 5').fetchdf()
-        sample_data = df_sample.to_csv(index=False)
+        # Get full data for AI context
+        df_full = duckdb_manager.connection.execute(f'SELECT * FROM "{db_file.table_name}"').fetchdf()
+        sample_data = df_full.to_csv(index=False)
     except Exception as e:
         print(f"Error fetching columns or sample: {e}")
         col_count = 0
