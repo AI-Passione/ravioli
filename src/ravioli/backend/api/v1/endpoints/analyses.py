@@ -117,7 +117,7 @@ def ask_question(analysis_id: UUID, question_in: schemas.QuestionCreate, db: Ses
     return {"message": "Question received and processing started"}
 
 def generate_summary(filename: str, row_count: int, col_count: int, columns: str) -> str:
-    template_path = Path(__file__).parent.parent.parent.parent / "templates" / "quick_insight_template.md"
+    template_path = Path(__file__).resolve().parents[4] / "ai" / "templates" / "quick_insight_template.md"
     try:
         template = template_path.read_text()
     except Exception:
