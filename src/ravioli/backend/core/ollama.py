@@ -159,3 +159,81 @@ Key Insights:"""
         except Exception as e:
             # Fallback to a generic message if AI fails
             return f"> [!IMPORTANT]\n> **SIMULATED INSIGHTS**: The AI engine is currently unreachable. These are baseline patterns.\n\n- **Volume Concentration**: Data shows regular patterns across primary dimensions.\n- **Dimensional Depth**: High correlation observed between key indicators.\n- **Velocity Trend**: Stable trajectory in engagement."
+
+    async def generate_assumptions(self, filename: str, sample_data: str) -> str:
+        """
+        Generate potential assumptions made during data analysis.
+        """
+        prompt = f"""
+You are a professional data scientist. Analyze the following data sample from "{filename}" and provide 2-3 logical assumptions that would be made during its analysis (e.g. data completeness, representativeness, or column definitions).
+Return ONLY the bullet points, starting each with a dash (-).
+
+Data Preview (CSV):
+---
+{sample_data}
+---
+
+Assumptions:"""
+
+        url = f"{self.base_url.rstrip('/')}/api/generate"
+        headers = {}
+        if self.mode == "cloud" and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.4,
+                "num_predict": 200
+            }
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                result = response.json()
+                return result.get("response", "").strip()
+        except Exception:
+            return "- Data is representative of the period/context specified.\n- Column names are accurately descriptive of their contents."
+
+    async def generate_limitations(self, filename: str, sample_data: str) -> str:
+        """
+        Generate potential limitations and issues for the data.
+        """
+        prompt = f"""
+You are a professional data scientist. Analyze the following data sample from "{filename}" and provide 2-3 concise bullet points regarding potential limitations or data quality issues (e.g. sample size, potential bias, or missing context).
+Return ONLY the bullet points, starting each with a dash (-).
+
+Data Preview (CSV):
+---
+{sample_data}
+---
+
+Limitations & Issues:"""
+
+        url = f"{self.base_url.rstrip('/')}/api/generate"
+        headers = {}
+        if self.mode == "cloud" and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.4,
+                "num_predict": 200
+            }
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                result = response.json()
+                return result.get("response", "").strip()
+        except Exception:
+            return "- Limited context on data collection methodology.\n- Sample size may not capture all edge case variance."

@@ -124,11 +124,16 @@ async def generate_summary(db: Session, filename: str, row_count: int, col_count
         # Fallback if template is missing
         return f"Summary for {filename}: {row_count} rows, {col_count} columns."
 
-    # Use Ollama for key insights
+    # Use Ollama for key insights, assumptions, and limitations
     from ravioli.backend.core.ollama import OllamaClient
     try:
         client = OllamaClient(db)
-        key_insights = await client.generate_quick_insight(filename, sample_data)
+        # Run in parallel for better performance
+        key_insights, assumptions, limitations = await asyncio.gather(
+            client.generate_quick_insight(filename, sample_data),
+            client.generate_assumptions(filename, sample_data),
+            client.generate_limitations(filename, sample_data)
+        )
     except Exception as e:
         print(f"Error generating insights with Ollama: {e}")
         key_insights = f"""
@@ -140,6 +145,8 @@ async def generate_summary(db: Session, filename: str, row_count: int, col_count
 - **Anomaly Detection**: Identified potential outliers that deviate from the 95th percentile norm.
 - **Velocity Trend**: The data suggests a stable trajectory in engagement over the observed period.
 """
+        assumptions = "- Data is representative of the period/context specified.\n- Column names are accurately descriptive of their contents."
+        limitations = "- Limited context on data collection methodology.\n- Sample size may not capture all edge case variance."
 
     # Highlight numbers with backticks for visibility
     import re
@@ -148,7 +155,9 @@ async def generate_summary(db: Session, filename: str, row_count: int, col_count
         row_count=row_count,
         col_count=col_count,
         columns=columns,
-        key_insights=key_insights
+        key_insights=key_insights,
+        assumptions=assumptions,
+        limitations_and_issues=limitations
     )
     # Regex to find standalone numbers (including decimals) and wrap them in backticks
     # We avoid wrapping numbers that are already wrapped in backticks
