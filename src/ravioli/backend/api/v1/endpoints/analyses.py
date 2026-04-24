@@ -118,17 +118,44 @@ def ask_question(analysis_id: UUID, question_in: schemas.QuestionCreate, db: Ses
     db.commit()
     return {"message": "Question received and processing started"}
 
+def prepare_dataframe_for_analysis(df: pd.DataFrame) -> pd.DataFrame:
+    """Intelligently detects and casts column types for better statistical analysis."""
+    df = df.copy()
+    # Patterns for columns that should be treated as strings/categories, never as numeric metrics
+    id_patterns = ['_id', ' id', 'postal', 'zip', 'phone', 'postcode', 'telephone', 'id']
+    
+    for col in df.columns:
+        col_lower = col.lower()
+        
+        # 1. Cast IDs and non-analytical numeric codes to string/category
+        if any(pat in col_lower for pat in id_patterns) or col_lower == 'id':
+            # If cardinality is low, use category; otherwise string
+            if df[col].nunique() < 50:
+                df[col] = df[col].astype('category')
+            else:
+                df[col] = df[col].astype(str)
+            continue
+
+        # 2. Convert potential numeric columns that are currently strings
+        if df[col].dtype == 'object':
+            try:
+                # Try to convert to numeric (Int64 handles nulls better than int)
+                df[col] = pd.to_numeric(df[col], errors='ignore')
+            except:
+                pass
+
+        # 3. Handle low-cardinality strings as categories
+        if df[col].dtype == 'object' and df[col].nunique() < 30:
+            df[col] = df[col].astype('category')
+            
+    return df
+
 def create_data_profile(df: pd.DataFrame) -> str:
-    """Creates a high-fidelity statistical profile of the dataset using YData Profiling if available."""
-    # Filter out true ID columns for statistical analysis, but be careful not to catch words like 'paid' or 'valid'
-    # We look for '_id', ' id' (with space), or exact 'id'
-    id_cols = [col for col in df.columns if col.lower().endswith('_id') or col.lower().endswith(' id') or col.lower() == 'id']
-    df_stats = df.drop(columns=id_cols)
+    """Creates a high-fidelity statistical profile of the prepared dataset."""
+    # 1. Basic Stats (Describe respects types: no means for categories)
+    stats = df.describe(include='all').transpose().to_string()
     
-    # 1. Basic Stats (Always available)
-    stats = df_stats.describe(include='all').transpose().to_string()
-    
-    # 2. Data Quality (Still check all columns for nulls, including IDs)
+    # 2. Data Quality
     quality = pd.DataFrame({
         'dtype': df.dtypes,
         'null_count': df.isnull().sum(),
@@ -153,10 +180,6 @@ def create_data_profile(df: pd.DataFrame) -> str:
         if variables:
             advanced_insights += "\nDETAILED COLUMN ANALYSIS:\n"
             for col_name, col_data in variables.items():
-                # Skip ID columns in the detailed report
-                if col_name.lower() in [c.lower() for c in id_cols]:
-                    continue
-                    
                 # Extract interesting metrics depending on type
                 v_type = col_data.get('type', 'Unknown')
                 advanced_insights += f"[{col_name}] ({v_type}): "
@@ -267,6 +290,7 @@ async def create_quick_insight(
         col_count = len(df.columns)
         columns = ", ".join(df.columns.tolist()[:5])
         # Create a statistical profile of the ENTIRE table
+        df = prepare_dataframe_for_analysis(df)
         data_profile = create_data_profile(df)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}")
@@ -324,6 +348,7 @@ async def create_quick_insight_existing(
         
         # Get full data and create a profile for AI context
         df_full = duckdb_manager.connection.execute(f'SELECT * FROM "{db_file.table_name}"').fetchdf()
+        df_full = prepare_dataframe_for_analysis(df_full)
         data_profile = create_data_profile(df_full)
     except Exception as e:
         print(f"Error fetching columns or sample: {e}")
