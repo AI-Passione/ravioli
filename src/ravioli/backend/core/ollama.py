@@ -132,6 +132,11 @@ Description:"""
         print(f"OllamaClient: [DEBUG] Model: {self.model}", flush=True)
         print(f"OllamaClient: [DEBUG] Data Size: {len(prompt)} chars", flush=True)
 
+        # Final safety truncation: most models can't handle more than ~100k characters in a prompt
+        if len(prompt) > 100000:
+            print(f"OllamaClient: [WARNING] Truncating prompt from {len(prompt)} to 100000 characters", flush=True)
+            prompt = prompt[:100000] + "\n... [TRUNCATED DUE TO SIZE] ..."
+
         payload = {
             "model": self.model,
             "prompt": prompt,
@@ -169,11 +174,12 @@ Description:"""
         Generate key insights for a data asset based on its content.
         """
         prompt = f"""
-You are a professional data scientist. Analyze the following data sample from "{filename}" and provide 4-5 concise bullet points of key insights.
-Focus on identifying potential trends, distributions, or interesting relationships.
+You are a professional data scientist. Analyze the following statistical profile of the dataset "{filename}" and provide 4-5 concise bullet points of key insights.
+The profile contains summary statistics (mean, max, min, distributions), data quality metrics, and a small sample. 
+Focus on identifying potential trends, distributions, or anomalies across the ENTIRE dataset.
 Return ONLY the bullet points, starting each with a dash (-).
 
-Data Preview (CSV):
+Dataset Profile:
 ---
 {sample_data}
 ---
@@ -191,10 +197,11 @@ Key Insights:"""
         Generate potential assumptions made during data analysis.
         """
         prompt = f"""
-You are a professional data scientist. Analyze the following data sample from "{filename}" and provide 2-3 logical assumptions that would be made during its analysis (e.g. data completeness, representativeness, or column definitions).
+You are a professional data scientist. Analyze the following statistical profile of the dataset "{filename}" and provide 2-3 logical assumptions that would be made during its analysis.
+Consider the data types, missing value counts, and statistical distributions provided in the profile.
 Return ONLY the bullet points, starting each with a dash (-).
 
-Data Preview (CSV):
+Dataset Profile:
 ---
 {sample_data}
 ---
@@ -211,10 +218,11 @@ Assumptions:"""
         Generate potential limitations and issues for the data.
         """
         prompt = f"""
-You are a professional data scientist. Analyze the following data sample from "{filename}" and provide 2-3 concise bullet points regarding potential limitations or data quality issues (e.g. sample size, potential bias, or missing context).
+You are a professional data scientist. Analyze the following statistical profile of the dataset "{filename}" and provide 2-3 concise bullet points regarding potential limitations or data quality issues.
+Look specifically at missing value counts, unique value cardinality, and statistical variance in the profile.
 Return ONLY the bullet points, starting each with a dash (-).
 
-Data Preview (CSV):
+Dataset Profile:
 ---
 {sample_data}
 ---

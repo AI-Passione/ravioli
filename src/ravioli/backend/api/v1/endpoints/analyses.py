@@ -116,6 +116,34 @@ def ask_question(analysis_id: UUID, question_in: schemas.QuestionCreate, db: Ses
     db.commit()
     return {"message": "Question received and processing started"}
 
+def create_data_profile(df: pd.DataFrame) -> str:
+    """Creates a compact statistical profile of the entire dataset for AI consumption."""
+    # 1. Basic Stats
+    stats = df.describe(include='all').transpose().to_string()
+    
+    # 2. Data Quality (Nulls and Types)
+    quality = pd.DataFrame({
+        'dtype': df.dtypes,
+        'null_count': df.isnull().sum(),
+        'unique_count': df.nunique()
+    }).to_string()
+    
+    # 3. Micro Sample
+    sample = df.head(10).to_csv(index=False)
+    
+    return f"""
+DATASET PROFILE (Generated from {len(df)} rows)
+==============================================
+SUMMARY STATISTICS:
+{stats}
+
+DATA QUALITY & TYPES:
+{quality}
+
+REPRESENTATIVE SAMPLE (FIRST 10 ROWS):
+{sample}
+"""
+
 async def generate_summary(db: Session, filename: str, row_count: int, col_count: int, columns: str, sample_data: str) -> str:
     template_path = Path(__file__).resolve().parents[4] / "ai" / "templates" / "quick_insight_template.md"
     try:
@@ -183,13 +211,14 @@ async def create_quick_insight(
         row_count = len(df)
         col_count = len(df.columns)
         columns = ", ".join(df.columns.tolist()[:5])
-        sample_data = df.to_csv(index=False)
+        # Create a statistical profile of the ENTIRE table
+        data_profile = create_data_profile(df)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}")
 
     # Generate Summary using template and Ollama
     title = f"Quick Insight: {file.filename}"
-    summary = await generate_summary(db, file.filename, row_count, col_count, columns, sample_data)
+    summary = await generate_summary(db, file.filename, row_count, col_count, columns, data_profile)
 
     # Create the analysis record
     db_analysis = models.Analysis(
@@ -238,18 +267,18 @@ async def create_quick_insight_existing(
         col_count = len(df_cols)
         columns = ", ".join([row['column_name'] for row in df_cols[:5]])
         
-        # Get full data for AI context
+        # Get full data and create a profile for AI context
         df_full = duckdb_manager.connection.execute(f'SELECT * FROM "{db_file.table_name}"').fetchdf()
-        sample_data = df_full.to_csv(index=False)
+        data_profile = create_data_profile(df_full)
     except Exception as e:
         print(f"Error fetching columns or sample: {e}")
         col_count = 0
         columns = "Unknown"
-        sample_data = "No sample available"
+        data_profile = "No statistical profile available"
 
     # Generate Summary using template and Ollama
     title = f"Quick Insight: {db_file.original_filename}"
-    summary = await generate_summary(db, db_file.original_filename, row_count, col_count, columns, sample_data)
+    summary = await generate_summary(db, db_file.original_filename, row_count, col_count, columns, data_profile)
 
     # Create the analysis record
     db_analysis = models.Analysis(
