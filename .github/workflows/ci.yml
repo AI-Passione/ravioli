@@ -27,7 +27,11 @@ jobs:
         run: uv sync
         
       - name: Run backend unit tests
-        run: uv run pytest tests/
+        env:
+          LOCAL_DATA_PATH: ./test_data
+        run: |
+          mkdir -p ./test_data
+          uv run pytest tests/
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -59,7 +63,7 @@ jobs:
         run: docker compose build
         
       - name: Start services
-        run: docker compose up -d postgres app frontend
+        run: docker compose up -d postgres backend frontend
         
       - name: Check container status
         run: |
@@ -68,7 +72,7 @@ jobs:
           docker compose ps
           
           # Verify each critical service is Up
-          services=("postgres" "app" "frontend")
+          services=("postgres" "backend" "frontend")
           for service in "${services[@]}"; do
             if ! docker compose ps | grep "$service" | grep -q "Up"; then
               echo "Error: Service $service is not running!"
