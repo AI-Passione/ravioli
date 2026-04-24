@@ -1,5 +1,4 @@
 import pytest
-import os
 from unittest.mock import MagicMock, AsyncMock
 from ravioli.backend.core.ollama import OllamaClient
 from ravioli.backend.core.models import SystemSetting
