@@ -1,10 +1,29 @@
 import httpx
 import os
+import hmac
+import hashlib
+import base64
 from typing import Dict, Any
 from sqlalchemy.orm import Session
 from ravioli.backend.core.models import SystemSetting
 from ravioli.backend.core.config import settings
 from ravioli.backend.core.encryption import decrypt_value
+from pathlib import Path
+
+def _load_kowalski_persona() -> str:
+    """Loads the Kowalski persona dossier from the AI agents directory."""
+    try:
+        # Resolve path to src/ravioli/ai/agents/Kowalski.md
+        persona_path = Path(__file__).resolve().parents[3] / "ai" / "agents" / "Kowalski.md"
+        if persona_path.exists():
+            return persona_path.read_text()
+    except Exception as e:
+        print(f"OllamaClient: [WARNING] Failed to load Kowalski dossier: {e}")
+    
+    # Minimal fallback if file is missing
+    return "You are Kowalski, Don Jimmy's analytics specialist. Clinical and precise. Confirm with 'Tak, Don Jimmy.'"
+
+KOWALSKI_PERSONA = _load_kowalski_persona()
 
 class OllamaClient:
     def __init__(self, db: Session):
@@ -173,11 +192,10 @@ Description:"""
         """
         Generate key insights for a data asset based on its content.
         """
-        prompt = f"""
-You are a professional data scientist. Analyze the following statistical profile of the dataset "{filename}" and provide 8-10 concise bullet points of key insights.
-The profile contains summary statistics (mean, max, min, distributions), data quality metrics, and a small sample. 
-Focus on identifying potential trends, distributions, or anomalies across the ENTIRE dataset.
-Return ONLY the bullet points, starting each with a dash (-).
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Analyze the statistical profile of the dataset "{filename}" and provide 8-10 concise bullet points of clinical insights.
+Focus on quantifiable trends and anomalies across the ENTIRE dataset.
+Return ONLY the bullet points, followed by a Polish confirmation line.
 
 Dataset Profile:
 ---
@@ -196,10 +214,9 @@ Key Insights:"""
         """
         Generate potential assumptions made during data analysis.
         """
-        prompt = f"""
-You are a professional data scientist. Analyze the following statistical profile of the dataset "{filename}" and provide 2-3 logical assumptions that would be made during its analysis.
-Consider the data types, missing value counts, and statistical distributions provided in the profile.
-Return ONLY the bullet points, starting each with a dash (-).
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Analyze the statistical profile of "{filename}" and provide 2-3 clinical assumptions for analysis.
+Return ONLY the bullet points, followed by a Polish confirmation line.
 
 Dataset Profile:
 ---
@@ -217,10 +234,9 @@ Assumptions:"""
         """
         Generate potential limitations and issues for the data.
         """
-        prompt = f"""
-You are a professional data scientist. Analyze the following statistical profile of the dataset "{filename}" and provide 2-3 concise bullet points regarding potential limitations or data quality issues.
-Look specifically at missing value counts, unique value cardinality, and statistical variance in the profile.
-Return ONLY the bullet points, starting each with a dash (-).
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Analyze the statistical profile of "{filename}" and identify 2-3 clinical limitations or data quality issues.
+Return ONLY the bullet points, followed by a Polish confirmation line.
 
 Dataset Profile:
 ---
