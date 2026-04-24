@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from ravioli.backend.core.database import get_db
 from ravioli.backend.core.models import SystemSetting as SystemSettingModel
 from ravioli.backend.core.schemas import SystemSetting as SystemSettingSchema, SystemSettingBase
-from ravioli.backend.core.encryption import encrypt_value, decrypt_value
+from ravioli.backend.core.encryption import encrypt_value
 
 router = APIRouter()
 
