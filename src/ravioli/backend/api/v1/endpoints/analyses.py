@@ -215,6 +215,7 @@ async def create_quick_insight_existing(
         raise HTTPException(status_code=400, detail="File processing is not completed")
 
     # Get stats and sample data from DuckDB
+    row_count = db_file.row_count or 0
     try:
         from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
         df_cols = duckdb_manager.query(f"DESCRIBE {db_file.table_name}")
