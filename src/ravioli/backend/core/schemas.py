@@ -63,6 +63,9 @@ class QuickInsightResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class QuickInsightExistingRequest(BaseModel):
+    file_id: UUID
+
 # --- Data Schemas ---
 
 class UploadedFileBase(BaseModel):

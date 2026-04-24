@@ -5,6 +5,8 @@ type CreationMode = 'select' | 'quick' | 'deep';
 
 export function renderCreateAnalysis() {
   let mode: CreationMode = 'select';
+  let existingFiles: any[] = [];
+  let isFetchingFiles = false;
   const container = document.createElement('main');
   container.className = 'flex-1 ml-64 relative overflow-hidden bg-background h-screen flex flex-col items-center justify-center';
 
@@ -95,17 +97,52 @@ export function renderCreateAnalysis() {
   }
 
   function renderQuick() {
+    const fileListHtml = isFetchingFiles 
+      ? `
+        <div class="pt-6 text-center space-y-2">
+          <div class="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p class="text-[10px] text-outline uppercase tracking-widest opacity-40">Retrieving local assets...</p>
+        </div>
+      `
+      : existingFiles.length > 0
+        ? `
+          <div class="space-y-3 pt-6 border-t border-outline-variant/20">
+            <p class="text-[10px] font-label-sm text-outline uppercase tracking-widest opacity-60">Or use existing data</p>
+            <div class="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+              ${existingFiles.map(file => `
+                <button class="existing-file-item flex items-center justify-between p-3 rounded-xl bg-surface-container-low hover:bg-surface-container-high transition-all group text-left border border-transparent hover:border-primary/20" data-file-id="${file.id}">
+                  <div class="flex items-center gap-3 overflow-hidden">
+                    <div class="w-8 h-8 rounded-lg bg-surface-container-highest flex items-center justify-center text-outline group-hover:text-primary transition-colors">
+                      <span class="material-symbols-outlined text-lg" data-icon="description">description</span>
+                    </div>
+                    <div class="overflow-hidden">
+                      <p class="text-sm text-white font-medium truncate">${file.original_filename}</p>
+                      <p class="text-[10px] text-outline-variant uppercase tracking-tighter">${(file.size_bytes / 1024).toFixed(1)} KB • ${file.row_count || 0} rows</p>
+                    </div>
+                  </div>
+                  <span class="material-symbols-outlined text-sm text-outline opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" data-icon="arrow_forward">arrow_forward</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `
+        : '';
+
     return `
       <div class="glass-panel p-10 rounded-3xl space-y-8 max-w-xl mx-auto w-full">
-        <div id="drop-zone" class="border-2 border-dashed border-outline-variant/30 rounded-2xl p-12 text-center space-y-4 hover:border-primary-fixed-dim/50 transition-colors cursor-pointer group">
-          <input type="file" id="file-input" class="hidden" accept=".csv" />
-          <div class="w-16 h-16 rounded-full bg-surface-container-highest flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
-            <span class="material-symbols-outlined text-3xl text-outline" data-icon="upload_file">upload_file</span>
+        <div id="quick-main-content" class="space-y-6">
+          <div id="drop-zone" class="border-2 border-dashed border-outline-variant/30 rounded-2xl p-12 text-center space-y-4 hover:border-primary-fixed-dim/50 transition-colors cursor-pointer group">
+            <input type="file" id="file-input" class="hidden" accept=".csv" />
+            <div class="w-16 h-16 rounded-full bg-surface-container-highest flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+              <span class="material-symbols-outlined text-3xl text-outline" data-icon="upload_file">upload_file</span>
+            </div>
+            <div class="space-y-1">
+              <p class="text-white font-medium">Drop your CSV here</p>
+              <p class="text-xs text-on-surface-variant opacity-60">or click to browse local files</p>
+            </div>
           </div>
-          <div class="space-y-1">
-            <p class="text-white font-medium">Drop your CSV here</p>
-            <p class="text-xs text-on-surface-variant opacity-60">or click to browse local files</p>
-          </div>
+
+          ${fileListHtml}
         </div>
 
         <div id="processing-state" class="hidden space-y-6 py-8 text-center">
@@ -177,9 +214,22 @@ export function renderCreateAnalysis() {
       updateUI();
     });
 
-    container.querySelector('#mode-quick')?.addEventListener('click', () => {
+    container.querySelector('#mode-quick')?.addEventListener('click', async () => {
       mode = 'quick';
       updateUI();
+      
+      // Fetch existing files
+      isFetchingFiles = true;
+      updateUI();
+      try {
+        const files = await api.listFiles();
+        existingFiles = files.filter(f => f.status === 'completed');
+      } catch (err) {
+        console.error('Failed to fetch files', err);
+      } finally {
+        isFetchingFiles = false;
+        updateUI();
+      }
     });
 
     container.querySelector('#mode-deep')?.addEventListener('click', () => {
@@ -211,6 +261,14 @@ export function renderCreateAnalysis() {
       e.preventDefault();
       const file = e.dataTransfer.files[0];
       if (file) handleFileUpload(file);
+    });
+
+    // Existing File Selection
+    container.querySelectorAll('.existing-file-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const fileId = item.getAttribute('data-file-id');
+        if (fileId) handleExistingFileSelection(fileId);
+      });
     });
 
     // Deep Dive Confirm
@@ -268,6 +326,29 @@ export function renderCreateAnalysis() {
       console.error('Failed to generate quick insight', err);
       alert('Failed to process data. Please try again.');
       dropZone?.classList.remove('hidden');
+      processingState?.classList.add('hidden');
+      if (backBtn) (backBtn as HTMLButtonElement).disabled = false;
+    }
+  }
+
+  async function handleExistingFileSelection(fileId: string) {
+    const mainContent = container.querySelector('#quick-main-content');
+    const processingState = container.querySelector('#processing-state');
+    const backBtn = container.querySelector('#back-to-select');
+
+    mainContent?.classList.add('hidden');
+    processingState?.classList.remove('hidden');
+    if (backBtn) (backBtn as HTMLButtonElement).disabled = true;
+
+    try {
+      const result = await api.generateQuickInsightFromExisting(fileId);
+      const analyses = await api.listAnalyses();
+      store.setAnalyses(analyses);
+      store.setActiveAnalysisId(result.analysis_id);
+    } catch (err) {
+      console.error('Failed to generate quick insight', err);
+      alert('Failed to process existing data. Please try again.');
+      mainContent?.classList.remove('hidden');
       processingState?.classList.add('hidden');
       if (backBtn) (backBtn as HTMLButtonElement).disabled = false;
     }

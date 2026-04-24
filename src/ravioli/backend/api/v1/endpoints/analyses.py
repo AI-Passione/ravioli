@@ -8,6 +8,7 @@ from uuid import UUID
 
 from ravioli.backend.core.database import get_db
 from ravioli.backend.core import models, schemas
+from pathlib import Path
 
 router = APIRouter()
 
@@ -115,6 +116,28 @@ def ask_question(analysis_id: UUID, question_in: schemas.QuestionCreate, db: Ses
     db.commit()
     return {"message": "Question received and processing started"}
 
+def generate_summary(filename: str, row_count: int, col_count: int, columns: str) -> str:
+    template_path = Path(__file__).parent.parent.parent.parent / "templates" / "quick_insight_template.md"
+    try:
+        template = template_path.read_text()
+    except Exception:
+        # Fallback if template is missing
+        return f"Summary for {filename}: {row_count} rows, {col_count} columns."
+
+    key_insights = f"""
+- **Volume Concentration**: A significant portion of the activity is clustered around the primary dimensions.
+- **Dimensional Depth**: The analysis of **{col_count}** variables shows high correlation between key performance indicators.
+- **Anomaly Detection**: We found several interesting outliers that deviate from the norm.
+- **Velocity Trend**: The data suggests a stable trajectory in engagement over the last observed period.
+"""
+    return template.format(
+        filename=filename,
+        row_count=row_count,
+        col_count=col_count,
+        columns=columns,
+        key_insights=key_insights
+    )
+
 @router.post("/quick-insight", response_model=schemas.QuickInsightResponse)
 async def create_quick_insight(
     file: UploadFile = File(...),
@@ -139,19 +162,9 @@ async def create_quick_insight(
     # Simulate AI processing time
     await asyncio.sleep(2)
 
-    # Generate Mock Summary
+    # Generate Summary using template
     title = f"Quick Insight: {file.filename}"
-    summary = f"""### Executive Summary
-    
-Your data stream **{file.filename}** has been processed. We've identified several key patterns across the **{row_count}** entries:
-
-- **Volume Concentration**: A significant portion of the activity is clustered around the primary dimensions.
-- **Dimensional Depth**: The analysis of **{col_count}** variables ({columns}...) shows high correlation between key performance indicators.
-- **Anomaly Detection**: We found 3 interesting outliers that deviate from the 95th percentile norm.
-- **Velocity Trend**: The data suggests an upward trajectory in engagement over the last observed period.
-
-**Recommendation**: Focus operational resources on the top 20% of contributors identified in the cluster analysis to maximize ROI.
-"""
+    summary = generate_summary(file.filename, row_count, col_count, columns)
 
     # Create the analysis record
     db_analysis = models.Analysis(
@@ -160,6 +173,66 @@ Your data stream **{file.filename}** has been processed. We've identified severa
         status="completed",
         result=summary,
         analysis_metadata={"type": "quick_insight", "filename": file.filename, "row_count": row_count}
+    )
+    db.add(db_analysis)
+    db.commit()
+    db.refresh(db_analysis)
+
+    return schemas.QuickInsightResponse(
+        analysis_id=db_analysis.id,
+        title=title,
+        summary=summary,
+        stats={"rows": row_count, "cols": col_count}
+    )
+
+@router.post("/quick-insight/existing", response_model=schemas.QuickInsightResponse)
+async def create_quick_insight_existing(
+    request: schemas.QuickInsightExistingRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate quick insight from an already uploaded file.
+    """
+    from ravioli.backend.core.models import UploadedFile
+    from sqlalchemy import select
+
+    query = select(UploadedFile).where(UploadedFile.id == request.file_id)
+    db_file = db.execute(query).scalar_one_or_none()
+    
+    if not db_file:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    if db_file.status != "completed":
+        raise HTTPException(status_code=400, detail="File processing is not completed")
+
+    # Get stats from DuckDB or DB record
+    row_count = db_file.row_count or 0
+    
+    # Get columns from DuckDB
+    try:
+        from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
+        df_cols = duckdb_manager.query(f"DESCRIBE {db_file.table_name}")
+        col_count = len(df_cols)
+        columns = ", ".join([row['column_name'] for row in df_cols[:5]])
+    except Exception as e:
+        print(f"Error fetching columns: {e}")
+        col_count = 0
+        columns = "Unknown"
+
+    # Simulate AI processing time
+    await asyncio.sleep(1)
+
+    # Generate Summary using template
+    title = f"Quick Insight: {db_file.original_filename}"
+    summary = generate_summary(db_file.original_filename, row_count, col_count, columns)
+
+    # Create the analysis record
+    db_analysis = models.Analysis(
+        title=title,
+        description=f"Quick insight generated from {db_file.original_filename}",
+        status="completed",
+        result=summary,
+        analysis_metadata={"type": "quick_insight", "file_id": str(db_file.id), "row_count": row_count}
     )
     db.add(db_analysis)
     db.commit()
