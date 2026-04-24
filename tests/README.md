@@ -16,11 +16,6 @@ uv run pytest tests/
 npm --prefix src/ravioli/frontend test
 ```
 
-# Run frontend tests (watch mode)
-```bash
-npm --prefix src/ravioli/frontend run test:watch
-```
-
 ## Directory Structure
 
 ```
