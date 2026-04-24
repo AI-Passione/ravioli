@@ -6,6 +6,7 @@ import { renderNotebook } from './components/Notebook';
 import { renderCreateAnalysis } from './components/CreateAnalysis';
 import { renderKnowledge } from './components/Knowledge';
 import { renderData } from './components/Data';
+import { renderSettings } from './components/Settings';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -24,6 +25,8 @@ function updateUI() {
     shell.appendChild(renderKnowledge());
   } else if (currentView === 'data') {
     shell.appendChild(renderData());
+  } else if (currentView === 'settings') {
+    shell.appendChild(renderSettings());
   } else {
     shell.appendChild(renderNotebook());
   }
