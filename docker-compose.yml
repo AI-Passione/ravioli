@@ -16,9 +16,9 @@ services:
       - ravioli_net
     restart: always
 
-  app:
+  backend:
     build: .
-    container_name: app
+    container_name: backend
     environment:
       - DB_HOST=postgres
     volumes:
@@ -41,14 +41,13 @@ services:
     ports:
       - "5173:5173"
     depends_on:
-      - app
+      - backend
     networks:
       - ravioli_net
     restart: always
 
 volumes:
   postgres_data:
-
 
 networks:
   ravioli_net:
