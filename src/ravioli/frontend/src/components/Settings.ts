@@ -259,19 +259,26 @@ export function renderSettings() {
         statusDiv.classList.remove('hidden');
 
         try {
-          // First save the current values so the test uses what's in the inputs
+          const REDACTED = '••••••••';
           const urlInput = container.querySelector('#ollama-base-url') as HTMLInputElement;
           if (urlInput) ollamaConfig.base_url = urlInput.value;
           const modelInput = container.querySelector('#ollama-default-model') as HTMLInputElement;
           if (modelInput) ollamaConfig.default_model = modelInput.value;
+          
           const keyInput = container.querySelector('#ollama-api-key') as HTMLInputElement;
-          if (keyInput && keyInput.value) ollamaConfig.api_key = keyInput.value;
+          if (keyInput && keyInput.value && keyInput.value !== REDACTED) {
+            ollamaConfig.api_key = keyInput.value;
+          } else if (apiKeyIsSet) {
+            ollamaConfig.api_key = REDACTED;
+          } else {
+            ollamaConfig.api_key = '';
+          }
 
           await api.updateSetting('ollama', {
             mode: ollamaConfig.mode,
             base_url: ollamaConfig.base_url,
             default_model: ollamaConfig.default_model,
-            api_key: ollamaConfig.api_key === '••••••••' ? '••••••••' : ollamaConfig.api_key
+            api_key: ollamaConfig.api_key
           });
 
           const result = await api.testOllamaConnection();
