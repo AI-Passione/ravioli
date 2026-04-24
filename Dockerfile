@@ -18,7 +18,7 @@ COPY . .
 
 # Install the project and its dependencies
 # Install project in editable mode with dev dependencies for testing
-RUN uv pip install --system --extra dev -e .
+RUN uv pip install --system -e ".[dev]"
 
 # Expose the API port
 EXPOSE 8000
