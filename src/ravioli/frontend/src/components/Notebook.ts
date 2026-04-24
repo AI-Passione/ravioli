@@ -171,10 +171,10 @@ export function renderNotebook() {
       ${logs.map(log => `
         <div class="group animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div class="flex items-center gap-4 mb-4">
-             <div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center">
-                <span class="material-symbols-outlined text-sm ${log.log_type === 'user_query' ? 'text-primary' : 'text-tertiary'}" data-icon="${log.log_type === 'user_query' ? 'person' : 'smart_toy'}">
-                   ${log.log_type === 'user_query' ? 'person' : 'smart_toy'}
-                </span>
+             <div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 overflow-hidden border border-outline-variant/20">
+                ${log.log_type === 'user_query' 
+                  ? `<span class="material-symbols-outlined text-outline text-sm" data-icon="person">person</span>` 
+                  : `<img src="/src/assets/kowalski.png" class="w-full h-full object-cover" alt="Kowalski">`}
              </div>
              <span class="text-[10px] uppercase tracking-[0.2em] text-outline font-label-sm">
                 ${log.log_type === 'user_query' ? 'Operator' : 'Kowalski'}
