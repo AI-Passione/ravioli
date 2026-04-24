@@ -56,7 +56,8 @@ async def upload_file(
         
         # Ingest into DuckDB
         try:
-            duckdb_manager.ingest_csv(file_path, table_name)
+            row_count = duckdb_manager.ingest_csv(file_path, table_name)
+            db_file.row_count = row_count
             db_file.status = "completed"
         except Exception as e:
             db_file.status = "failed"
@@ -84,3 +85,18 @@ async def list_duckdb_tables():
         return duckdb_manager.list_tables()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list tables: {str(e)}")
+
+@router.get("/preview/{table_name}")
+async def get_table_preview(table_name: str):
+    try:
+        # Validate table name to prevent SQL injection
+        tables = duckdb_manager.list_tables()
+        if table_name not in tables:
+            raise HTTPException(status_code=404, detail="Table not found")
+            
+        data = duckdb_manager.query(f"SELECT * FROM {table_name} LIMIT 10")
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch preview: {str(e)}")

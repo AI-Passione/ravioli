@@ -69,5 +69,11 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to upload file');
     return response.json();
+  },
+
+  async getPreview(tableName: string): Promise<any[]> {
+    const response = await fetch(`${API_BASE}/data/preview/${tableName}`);
+    if (!response.ok) throw new Error('Failed to fetch preview');
+    return response.json();
   }
 };

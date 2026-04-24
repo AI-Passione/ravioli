@@ -20,15 +20,20 @@ class DuckDBManager:
             self._connection = duckdb.connect(str(settings.duckdb_path))
         return self._connection
 
-    def ingest_csv(self, file_path: Path, table_name: str):
+    def ingest_csv(self, file_path: Path, table_name: str) -> int:
         """
         Ingest a CSV file into a DuckDB table.
         If the table exists, it will be replaced.
+        Returns the row count.
         """
         conn = self.connection
         # Using DuckDB's native CSV reader for high performance
         query = f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM read_csv_auto('{file_path}')"
         conn.execute(query)
+        
+        # Get row count
+        count = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+        return count
         
     def query(self, sql: str):
         """

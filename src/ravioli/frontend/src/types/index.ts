@@ -30,6 +30,7 @@ export interface UploadedFile {
   content_type: string;
   size_bytes: number;
   table_name: string;
+  row_count?: number;
   status: string;
   error_message?: string;
   created_at: string;
