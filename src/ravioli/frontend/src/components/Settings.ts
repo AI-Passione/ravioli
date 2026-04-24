@@ -93,6 +93,9 @@ export function renderSettings() {
               <button id="btn-save-ai" class="bg-primary-fixed-dim text-on-primary-fixed font-bold py-2 px-6 rounded-full text-sm hover:brightness-110 transition-all shadow-md">
                 Save AI Settings
               </button>
+              <button id="btn-test-ollama" class="bg-surface-container-highest border border-outline-variant/50 text-neutral-100 font-bold py-2 px-6 rounded-full text-sm hover:bg-surface-container transition-all shadow-sm flex items-center gap-2">
+                <span class="material-symbols-outlined text-sm">network_check</span> Test Connection
+              </button>
               <button id="btn-cancel-ollama" class="text-sm font-bold text-on-surface-variant hover:text-neutral-100 transition-colors">
                 Cancel
               </button>
@@ -100,6 +103,7 @@ export function renderSettings() {
                 <span class="material-symbols-outlined text-sm">check_circle</span> Saved
               </span>
             </div>
+            <div id="test-status" class="text-xs mt-2 hidden p-3 rounded-lg border"></div>
           </div>
         </div>
       `;
@@ -239,6 +243,54 @@ export function renderSettings() {
         renderContent(); // re-render to show/hide fields
       });
     });
+
+    const testBtn = container.querySelector('#btn-test-ollama');
+    if (testBtn) {
+      testBtn.addEventListener('click', async () => {
+        const btn = testBtn as HTMLButtonElement;
+        const statusDiv = container.querySelector('#test-status') as HTMLDivElement;
+        const originalText = btn.innerHTML;
+        
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">refresh</span> Testing...';
+        statusDiv.classList.remove('hidden', 'bg-green-400/10', 'border-green-400/30', 'text-green-400', 'bg-red-400/10', 'border-red-400/30', 'text-red-400');
+        statusDiv.classList.add('bg-surface-container-highest', 'border-outline-variant/30', 'text-on-surface-variant');
+        statusDiv.textContent = 'Contacting server...';
+        statusDiv.classList.remove('hidden');
+
+        try {
+          // First save the current values so the test uses what's in the inputs
+          const urlInput = container.querySelector('#ollama-base-url') as HTMLInputElement;
+          if (urlInput) ollamaConfig.base_url = urlInput.value;
+          const modelInput = container.querySelector('#ollama-default-model') as HTMLInputElement;
+          if (modelInput) ollamaConfig.default_model = modelInput.value;
+          const keyInput = container.querySelector('#ollama-api-key') as HTMLInputElement;
+          if (keyInput && keyInput.value) ollamaConfig.api_key = keyInput.value;
+
+          await api.updateSetting('ollama', {
+            mode: ollamaConfig.mode,
+            base_url: ollamaConfig.base_url,
+            default_model: ollamaConfig.default_model,
+            api_key: ollamaConfig.api_key === '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : ollamaConfig.api_key
+          });
+
+          const result = await api.testOllamaConnection();
+          statusDiv.classList.remove('bg-surface-container-highest', 'border-outline-variant/30', 'text-on-surface-variant');
+          statusDiv.classList.add('bg-green-400/10', 'border-green-400/30', 'text-green-400');
+          statusDiv.innerHTML = `<div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm">check_circle</span> ${result.message}</div>`;
+          if (result.models && result.models.length > 0) {
+            statusDiv.innerHTML += `<div class="mt-1 opacity-80">Available models: ${result.models.join(', ')}</div>`;
+          }
+        } catch (e: any) {
+          statusDiv.classList.remove('bg-surface-container-highest', 'border-outline-variant/30', 'text-on-surface-variant');
+          statusDiv.classList.add('bg-red-400/10', 'border-red-400/30', 'text-red-400');
+          statusDiv.innerHTML = `<div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm">error</span> ${e.message}</div>`;
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        }
+      });
+    }
 
     const saveBtn = container.querySelector('#btn-save-ai');
     if (saveBtn) {

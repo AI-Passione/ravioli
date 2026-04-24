@@ -126,5 +126,14 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to update setting');
     return response.json();
+  },
+
+  async testOllamaConnection(): Promise<{status: string, message: string, models?: string[]}> {
+    const response = await fetch(`${API_BASE}/settings/ollama/test`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Connection test failed');
+    }
+    return response.json();
   }
 };
