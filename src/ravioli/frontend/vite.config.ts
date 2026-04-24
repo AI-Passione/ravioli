@@ -9,6 +9,12 @@ export default defineConfig({
   plugins: [
     tailwindcss(),
   ],
+  resolve: {
+    alias: {
+      'postcss': path.resolve(__dirname, 'node_modules/postcss'),
+      '@tailwindcss/postcss': path.resolve(__dirname, 'node_modules/@tailwindcss/postcss')
+    }
+  },
   server: {
     proxy: {
       '/api': {

@@ -34,6 +34,8 @@ export interface UploadedFile {
   row_count?: number;
   status: string;
   error_message?: string;
+  file_hash?: string;
+  is_duplicate?: boolean;
   created_at: string;
   updated_at: string;
 }

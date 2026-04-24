@@ -1,5 +1,6 @@
 import { store } from '../store';
 import { api } from '../services/api';
+import { formatBytes } from '../utils/formatters';
 
 export function renderData() {
   const container = document.createElement('main');
@@ -16,12 +17,18 @@ export function renderData() {
 
       <!-- Upload Zone -->
       <div class="mb-12">
-        <div id="drop-zone" class="border-2 border-dashed border-outline/30 rounded-3xl p-12 flex flex-col items-center justify-center bg-surface-container-low hover:bg-surface-container hover:border-primary/50 transition-all cursor-pointer group">
-          <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-            <span class="material-symbols-outlined text-primary text-3xl">upload_file</span>
+        <div id="drop-zone" class="border-2 border-dashed border-outline/30 rounded-3xl p-12 flex flex-col items-center justify-center bg-surface-container-low hover:bg-surface-container hover:border-primary/50 transition-all cursor-pointer group relative overflow-hidden">
+          <div id="drop-zone-content" class="flex flex-col items-center justify-center transition-opacity duration-300 w-full h-full">
+            <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <span class="material-symbols-outlined text-primary text-3xl">upload_file</span>
+            </div>
+            <h3 class="text-xl font-medium text-neutral-200 mb-2">Drop your CSV here</h3>
+            <p class="text-neutral-500 text-sm">or click to browse your files</p>
           </div>
-          <h3 class="text-xl font-medium text-neutral-200 mb-2">Drop your CSV here</h3>
-          <p class="text-neutral-500 text-sm">or click to browse your files</p>
+          <div id="drop-zone-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-container/90 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 z-10">
+            <span class="material-symbols-outlined animate-spin text-primary text-4xl mb-4">sync</span>
+            <p class="text-neutral-200 font-medium animate-pulse">Uploading and processing...</p>
+          </div>
           <input type="file" id="file-input" class="hidden" accept=".csv">
         </div>
       </div>
@@ -38,6 +45,7 @@ export function renderData() {
             <thead>
               <tr class="text-[10px] uppercase tracking-[0.2em] text-neutral-500 border-b border-outline/5">
                 <th class="px-8 py-4 font-medium">Asset Name</th>
+                <th class="px-8 py-4 font-medium">Description</th>
                 <th class="px-8 py-4 font-medium">DuckDB Table</th>
                 <th class="px-8 py-4 font-medium">Rows</th>
                 <th class="px-8 py-4 font-medium">Size</th>
@@ -61,13 +69,22 @@ export function renderData() {
                     </div>
                   </td>
                   <td class="px-8 py-5">
+                    <div class="desc-container flex items-center gap-2 group/desc max-w-xs w-full" data-id="${file.id}">
+                      <span class="desc-text text-neutral-400 text-sm truncate cursor-pointer hover:text-neutral-200 transition-colors flex-1" title="${file.description || ''}" data-desc="${file.description || ''}">${file.description || '<span class="italic opacity-50">Add description...</span>'}</span>
+                      <input type="text" class="desc-input hidden w-full bg-surface-container-highest border border-primary/30 rounded px-2 py-1 text-sm text-neutral-200 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all" value="${file.description || ''}" placeholder="Enter description..." />
+                      <button class="btn-edit-desc p-1 rounded-md opacity-0 group-hover/desc:opacity-100 hover:bg-white/10 text-neutral-500 hover:text-primary transition-all flex-shrink-0" title="Edit Description">
+                        <span class="material-symbols-outlined text-[16px]">edit</span>
+                      </button>
+                    </div>
+                  </td>
+                  <td class="px-8 py-5">
                     <code class="px-2 py-1 rounded bg-surface-container-highest text-primary-fixed-dim text-xs font-mono">${file.table_name}</code>
                   </td>
                   <td class="px-8 py-5 text-neutral-300 font-medium">
                     ${file.row_count ? file.row_count.toLocaleString() : '--'}
                   </td>
                   <td class="px-8 py-5 text-neutral-400 text-sm">
-                    ${(file.size_bytes / 1024).toFixed(1)} KB
+                    ${formatBytes(file.size_bytes)}
                   </td>
                   <td class="px-8 py-5">
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold ${
@@ -78,9 +95,12 @@ export function renderData() {
                       ${file.status}
                     </span>
                   </td>
-                  <td class="px-8 py-5 text-right">
-                    <button class="btn-inspect p-2 rounded-lg hover:bg-primary/10 text-neutral-400 hover:text-primary transition-all" data-table="${file.table_name}" data-filename="${file.original_filename}">
+                  <td class="px-8 py-5 text-right flex justify-end gap-2">
+                    <button class="btn-inspect p-2 rounded-lg hover:bg-primary/10 text-neutral-400 hover:text-primary transition-all" data-table="${file.table_name}" data-filename="${file.original_filename}" title="Preview">
                       <span class="material-symbols-outlined">visibility</span>
+                    </button>
+                    <button class="btn-delete p-2 rounded-lg hover:bg-red-500/10 text-neutral-400 hover:text-red-400 transition-all" data-id="${file.id}" title="Delete">
+                      <span class="material-symbols-outlined">delete</span>
                     </button>
                   </td>
                 </tr>
@@ -157,19 +177,124 @@ export function renderData() {
     });
   });
 
+  container.querySelectorAll('.btn-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const fileId = btn.getAttribute('data-id');
+      if (fileId && confirm('Are you sure you want to delete this data? This will remove it from DuckDB and cannot be undone.')) {
+        try {
+          await api.deleteFile(fileId);
+          const updatedFiles = await api.listFiles();
+          store.setUploadedFiles(updatedFiles);
+        } catch (err) {
+          console.error('Delete failed', err);
+          alert('Failed to delete file.');
+        }
+      }
+    });
+  });
+
+  container.querySelectorAll('.desc-container').forEach(descContainer => {
+    const textSpan = descContainer.querySelector('.desc-text') as HTMLSpanElement;
+    const inputEl = descContainer.querySelector('.desc-input') as HTMLInputElement;
+    const editBtn = descContainer.querySelector('.btn-edit-desc') as HTMLButtonElement;
+    const fileId = descContainer.getAttribute('data-id');
+
+    const startEditing = () => {
+      textSpan.classList.add('hidden');
+      editBtn.classList.add('hidden');
+      inputEl.classList.remove('hidden');
+      inputEl.focus();
+      // Move cursor to end
+      inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
+    };
+
+    const stopEditing = async (save: boolean) => {
+      // Prevent double-saving if blur is triggered after Enter
+      if (inputEl.classList.contains('hidden')) return; 
+
+      inputEl.classList.add('hidden');
+      textSpan.classList.remove('hidden');
+      editBtn.classList.remove('hidden');
+      
+      if (save && fileId) {
+        const newDesc = inputEl.value.trim();
+        const currentDesc = textSpan.getAttribute('data-desc') || '';
+        
+        if (newDesc !== currentDesc) {
+          try {
+            // Optimistic UI update
+            textSpan.textContent = newDesc;
+            if (!newDesc) textSpan.innerHTML = '<span class="italic opacity-50">Add description...</span>';
+            textSpan.setAttribute('title', newDesc);
+            textSpan.setAttribute('data-desc', newDesc);
+            
+            await api.updateFileDescription(fileId, newDesc);
+            // Optionally sync store in background
+            const updatedFiles = await api.listFiles();
+            store.setUploadedFiles(updatedFiles);
+          } catch (err) {
+            console.error('Update description failed', err);
+            // Revert UI on failure
+            inputEl.value = currentDesc;
+            textSpan.textContent = currentDesc;
+            if (!currentDesc) textSpan.innerHTML = '<span class="italic opacity-50">Add description...</span>';
+            textSpan.setAttribute('title', currentDesc);
+            textSpan.setAttribute('data-desc', currentDesc);
+            alert('Failed to update description.');
+          }
+        }
+      } else {
+        // Revert input value if cancelled
+        inputEl.value = textSpan.getAttribute('data-desc') || '';
+      }
+    };
+
+    textSpan.addEventListener('click', startEditing);
+    editBtn.addEventListener('click', startEditing);
+    
+    inputEl.addEventListener('blur', () => stopEditing(true));
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        stopEditing(true);
+      } else if (e.key === 'Escape') {
+        stopEditing(false);
+      }
+    });
+  });
+
   closeModal?.addEventListener('click', () => hideModal());
   modal.addEventListener('click', (e) => {
     if (e.target === modal) hideModal();
   });
 
   async function handleUpload(file: File) {
+    const dropZoneContent = container.querySelector('#drop-zone-content');
+    const dropZoneLoading = container.querySelector('#drop-zone-loading');
+    
+    // Show loading state
+    if (dropZoneContent && dropZoneLoading) {
+      dropZoneContent.classList.add('opacity-0');
+      dropZoneLoading.classList.remove('opacity-0', 'pointer-events-none');
+    }
+
     try {
-      await api.uploadFile(file);
+      const result = await api.uploadFile(file);
+      
+      if (result.is_duplicate) {
+        alert(`Duplicate Data Detected: "${file.name}" has already been uploaded and processed. We've skipped the duplicate effort for you!`);
+      }
+
       const updatedFiles = await api.listFiles();
       store.setUploadedFiles(updatedFiles);
     } catch (err) {
       console.error('Upload failed', err);
       alert('Upload failed. Please check the console for details.');
+    } finally {
+      // Hide loading state
+      if (dropZoneContent && dropZoneLoading) {
+        dropZoneContent.classList.remove('opacity-0');
+        dropZoneLoading.classList.add('opacity-0', 'pointer-events-none');
+      }
     }
   }
 

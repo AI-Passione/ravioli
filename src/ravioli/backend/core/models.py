@@ -78,10 +78,13 @@ class UploadedFile(Base):
     # Table name in DuckDB
     table_name: Mapped[str] = mapped_column(String(255), nullable=False)
     row_count: Mapped[Optional[int]] = mapped_column()
+    description: Mapped[Optional[str]] = mapped_column(Text)
     
     # Ingestion status: pending, completed, failed
     status: Mapped[str] = mapped_column(String(50), default="pending")
     error_message: Mapped[Optional[str]] = mapped_column(Text)
+    
+    file_hash: Mapped[Optional[str]] = mapped_column(String(64), index=True)
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))

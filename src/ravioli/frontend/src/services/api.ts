@@ -75,5 +75,22 @@ export const api = {
     const response = await fetch(`${API_BASE}/data/preview/${tableName}`);
     if (!response.ok) throw new Error('Failed to fetch preview');
     return response.json();
+  },
+
+  async deleteFile(fileId: string): Promise<void> {
+    const response = await fetch(`${API_BASE}/data/files/${fileId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete file');
+  },
+
+  async updateFileDescription(fileId: string, description: string): Promise<UploadedFile> {
+    const response = await fetch(`${API_BASE}/data/files/${fileId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description }),
+    });
+    if (!response.ok) throw new Error('Failed to update file description');
+    return response.json();
   }
 };
