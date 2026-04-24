@@ -6,7 +6,7 @@ class Store {
   private analyses: Analysis[] = [];
   private activeAnalysisId?: string;
   private logs: ExecutionLog[] = [];
-  private currentView: 'dashboard' | 'create-analysis' = 'dashboard';
+  private currentView: 'dashboard' | 'create-analysis' | 'knowledge' = 'dashboard';
   private listeners: Listener[] = [];
 
   subscribe(listener: Listener) {
@@ -35,7 +35,7 @@ class Store {
 
   getActiveAnalysisId() { return this.activeAnalysisId; }
 
-  setCurrentView(view: 'dashboard' | 'create-analysis') {
+  setCurrentView(view: 'dashboard' | 'create-analysis' | 'knowledge') {
     this.currentView = view;
     if (view === 'create-analysis') {
       this.activeAnalysisId = undefined;

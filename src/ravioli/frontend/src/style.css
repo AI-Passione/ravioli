@@ -40,3 +40,26 @@
 .cell-input {
   @apply w-full bg-transparent border-none text-on-surface focus:ring-0 resize-none py-2;
 }
+
+/* Typography & Lists */
+.prose ul {
+  @apply space-y-3 list-none pl-0 mt-6;
+}
+
+.prose li {
+  @apply relative pl-8 text-on-surface-variant;
+}
+
+.prose li::before {
+  content: '';
+  @apply absolute left-0 top-[0.7em] w-1.5 h-1.5 rounded-full bg-primary;
+  box-shadow: 0 0 12px #ffdada, 0 0 4px #ffdada;
+}
+
+.prose h3 {
+  @apply text-xl font-headline-sm text-white mb-4 mt-8 first:mt-0;
+}
+
+.prose p {
+  @apply mb-4 leading-relaxed;
+}

@@ -39,5 +39,17 @@ export const api = {
       body: JSON.stringify({ question }),
     });
     if (!response.ok) throw new Error('Failed to ask question');
+  },
+
+  async generateQuickInsight(file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_BASE}/analyses/quick-insight`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) throw new Error('Failed to generate quick insight');
+    return response.json();
   }
 };

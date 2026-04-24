@@ -93,6 +93,34 @@ export function renderNotebook() {
     </header>
 
     <div class="flex-1 overflow-y-auto px-12 py-8 space-y-12" id="cell-container">
+      ${analysis.result ? `
+        <div class="glass-panel p-12 rounded-[2rem] space-y-8 border-primary/20 bg-primary/[0.02] animate-in fade-in slide-in-from-bottom-8 duration-1000 relative overflow-hidden group">
+          <!-- Subtle glow background -->
+          <div class="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-[80px] group-hover:bg-primary/20 transition-colors duration-1000"></div>
+          
+          <div class="flex items-center gap-4 text-primary relative z-10">
+            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <span class="material-symbols-outlined text-2xl" data-icon="auto_awesome">auto_awesome</span>
+            </div>
+            <h3 class="text-xl font-headline-sm uppercase tracking-[0.2em]">Executive Insights</h3>
+          </div>
+          
+          <div class="prose prose-invert max-w-none text-on-surface-variant leading-relaxed font-body-lg relative z-10">
+            ${md.render(analysis.result)}
+          </div>
+          
+          <div class="flex items-center justify-between pt-6 border-t border-outline-variant/10 relative z-10">
+            <div class="flex items-center gap-2 opacity-40 hover:opacity-100 transition-opacity">
+              <span class="material-symbols-outlined text-sm" data-icon="verified">verified</span>
+              <span class="text-[10px] uppercase tracking-widest font-label-sm">Validated by Local LLM Node</span>
+            </div>
+            <div class="flex gap-4">
+               <span class="text-[10px] text-outline uppercase tracking-widest opacity-40">System: Studio Noir</span>
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
       ${logs.map(log => `
         <div class="group animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div class="flex items-center gap-4 mb-4">

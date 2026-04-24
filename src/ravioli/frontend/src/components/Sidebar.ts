@@ -31,7 +31,11 @@ export function renderSidebar() {
         <div class="space-y-1">
           <button class="nav-item ${store.getCurrentView() === 'dashboard' && !activeId ? 'active' : ''} w-full" data-nav="home">
             <span class="material-symbols-outlined text-primary-fixed-dim" data-icon="dashboard">dashboard</span>
-            <span>Analyses</span>
+            <span>Dashboard</span>
+          </button>
+          <button class="nav-item w-full" data-nav="knowledge">
+            <span class="material-symbols-outlined" data-icon="local_library">local_library</span>
+            <span>Knowledge</span>
           </button>
           <button class="nav-item w-full" data-nav="warehouse">
             <span class="material-symbols-outlined" data-icon="storage">storage</span>
@@ -42,20 +46,23 @@ export function renderSidebar() {
 
       <section>
         <div class="flex items-center justify-between px-8 mb-4">
-          <p class="text-[10px] uppercase tracking-[0.2em] text-outline opacity-50 text-label-sm">Investigations</p>
+          <p class="text-[10px] uppercase tracking-[0.2em] text-outline opacity-50 text-label-sm">Analyses</p>
           <button class="text-primary-fixed-dim hover:text-white transition-colors" id="btn-new-analysis">
             <span class="material-symbols-outlined text-sm" data-icon="add">add</span>
           </button>
         </div>
         <ul class="space-y-1 overflow-y-auto max-h-[40vh]" id="analysis-list">
-          ${analyses.map(a => `
+          ${analyses.map(a => {
+            const isQuick = a.analysis_metadata?.type === 'quick_insight';
+            const icon = isQuick ? 'bolt' : 'terminal';
+            return `
             <li>
               <button class="nav-item w-full ${a.id === activeId ? 'active' : ''}" data-analysis-id="${a.id}">
-                <span class="material-symbols-outlined ${a.id === activeId ? 'text-primary-fixed-dim' : ''}" data-icon="analytics">analytics</span>
+                <span class="material-symbols-outlined ${a.id === activeId ? 'text-primary-fixed-dim' : ''}" data-icon="${icon}">${icon}</span>
                 <span class="truncate">${a.title}</span>
               </button>
             </li>
-          `).join('')}
+          `}).join('')}
         </ul>
       </section>
     </nav>
@@ -91,6 +98,11 @@ export function renderSidebar() {
 
   container.querySelector('[data-nav="home"]')?.addEventListener('click', () => {
     store.setCurrentView('dashboard');
+    store.setActiveAnalysisId(undefined);
+  });
+
+  container.querySelector('[data-nav="knowledge"]')?.addEventListener('click', () => {
+    store.setCurrentView('knowledge');
     store.setActiveAnalysisId(undefined);
   });
 
