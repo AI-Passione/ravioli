@@ -32,7 +32,13 @@ class OllamaClient:
 
     @property
     def base_url(self) -> str:
-        return self._config.get("base_url", settings.ollama_host)
+        url = self._config.get("base_url", settings.ollama_host)
+        # Handle Docker-to-Host communication
+        if "localhost" in url or "127.0.0.1" in url:
+            # Check if running inside a container
+            if os.path.exists("/.dockerenv"):
+                return url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal")
+        return url
 
     @property
     def model(self) -> str:
@@ -41,6 +47,10 @@ class OllamaClient:
     @property
     def api_key(self) -> str:
         return self._config.get("api_key", "")
+
+    @property
+    def mode(self) -> str:
+        return self._config.get("mode", "default")
 
     async def generate_description(self, filename: str, sample_data: str) -> str:
         """
@@ -59,7 +69,8 @@ Description:"""
 
         url = f"{self.base_url.rstrip('/')}/api/generate"
         headers = {}
-        if self.api_key:
+        # Only send API key in cloud mode
+        if self.mode == "cloud" and self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
         payload = {
@@ -75,6 +86,10 @@ Description:"""
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(url, json=payload, headers=headers)
+                
+                if response.status_code == 401:
+                    raise Exception("Ollama authentication failed. Please check your API key in Settings.")
+                
                 response.raise_for_status()
                 result = response.json()
                 description = result.get("response", "").strip()
@@ -84,5 +99,7 @@ Description:"""
                     description = description[1:-1]
                 
                 return description
+        except httpx.ConnectError:
+            raise Exception(f"Could not connect to Ollama at {self.base_url}. Make sure it's running.")
         except Exception as e:
             raise Exception(f"Ollama generation failed: {str(e)}")
