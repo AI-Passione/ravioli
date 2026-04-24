@@ -62,3 +62,22 @@ class QuickInsightResponse(BaseModel):
     stats: dict
 
     model_config = ConfigDict(from_attributes=True)
+
+# --- Data Schemas ---
+
+class UploadedFileBase(BaseModel):
+    filename: str
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    table_name: str
+    row_count: Optional[int] = None
+    status: str
+    error_message: Optional[str] = None
+
+class UploadedFile(UploadedFileBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

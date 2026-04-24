@@ -208,3 +208,9 @@ __marimo__/
 
 logs/
 .vscode/settings.json
+
+# Local Data
+ravioli_local_data/
+~/Documents/
+*.duckdb
+*.duckdb.*

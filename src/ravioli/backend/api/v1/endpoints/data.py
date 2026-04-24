@@ -16,7 +16,7 @@ router = APIRouter()
 UPLOAD_DIR = settings.local_data_path / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-@router.post("/upload")
+@router.post("/upload", response_model=schemas.UploadedFile)
 async def upload_file(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
@@ -72,7 +72,7 @@ async def upload_file(
             file_path.unlink()
         raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
 
-@router.get("/files")
+@router.get("/files", response_model=List[schemas.UploadedFile])
 async def list_files(db: Session = Depends(get_db)):
     query = select(UploadedFile).order_by(UploadedFile.created_at.desc())
     result = db.execute(query)

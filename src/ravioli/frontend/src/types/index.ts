@@ -3,6 +3,7 @@ export interface Analysis {
   title: string;
   description?: string;
   status: string;
+  analysis_metadata?: any;
   created_at: string;
   updated_at: string;
 }

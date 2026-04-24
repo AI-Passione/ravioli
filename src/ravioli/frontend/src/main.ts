@@ -34,16 +34,23 @@ function updateUI() {
 // Initial Load
 async function init() {
   try {
-    const [analyses, files] = await Promise.all([
-      api.listAnalyses(),
-      api.listFiles()
-    ]);
-    
-    store.setAnalyses(analyses);
-    store.setUploadedFiles(files);
-    
-    if (analyses.length > 0) {
-      store.setActiveAnalysisId(analyses[0].id);
+    // Fetch analyses
+    try {
+      const analyses = await api.listAnalyses();
+      store.setAnalyses(analyses);
+      if (analyses.length > 0 && !store.getActiveAnalysisId()) {
+        store.setActiveAnalysisId(analyses[0].id);
+      }
+    } catch (err) {
+      console.error('Failed to fetch analyses', err);
+    }
+
+    // Fetch files
+    try {
+      const files = await api.listFiles();
+      store.setUploadedFiles(files);
+    } catch (err) {
+      console.error('Failed to fetch files', err);
     }
   } catch (err) {
     console.error('Initialization failed', err);

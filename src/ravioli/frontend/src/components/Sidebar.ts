@@ -1,12 +1,31 @@
 import { store } from '../store';
 
 export function renderSidebar() {
-  const analyses = store.getAnalyses();
+  const analyses = store.getAnalyses() || [];
   const activeId = store.getActiveAnalysisId();
   const currentView = store.getCurrentView();
 
   const container = document.createElement('aside');
   container.className = 'fixed left-0 top-0 flex flex-col h-full py-8 w-64 bg-surface-container-low font-display-lg text-sm tracking-tight z-50';
+
+  let analysesListHtml = '';
+  if (analyses.length === 0) {
+    analysesListHtml = '<li class="px-8 py-4 text-neutral-600 italic text-[10px] uppercase tracking-widest">No Analyses found</li>';
+  } else {
+    analysesListHtml = analyses.map(a => {
+      const isQuick = (a as any).analysis_metadata?.type === 'quick_insight';
+      const icon = isQuick ? 'bolt' : 'terminal';
+      const isActive = a.id === activeId;
+      return `
+        <li>
+          <button class="nav-item w-full ${isActive ? 'active' : ''}" data-analysis-id="${a.id}">
+            <span class="material-symbols-outlined ${isActive ? 'text-primary-fixed-dim' : ''}" data-icon="${icon}">${icon}</span>
+            <span class="truncate">${a.title}</span>
+          </button>
+        </li>
+      `;
+    }).join('');
+  }
 
   container.innerHTML = `
     <!-- Brand Header -->
@@ -21,9 +40,9 @@ export function renderSidebar() {
     </div>
 
     <!-- Navigation Links -->
-    <nav class="flex-1 space-y-2">
+    <nav class="flex-1 space-y-2 overflow-y-auto">
       <section class="mb-8">
-        <p class="text-[10px] uppercase tracking-[0.2em] text-outline px-8 mb-4 opacity-50">Vibe Analytics</p>
+        <p class="text-[10px] uppercase tracking-[0.2em] text-outline px-8 mb-4 opacity-50 font-medium">Vibe Analytics</p>
         <div class="space-y-1">
           <button class="nav-item ${currentView === 'dashboard' && !activeId ? 'active' : ''} w-full" data-nav="dashboard">
             <span class="material-symbols-outlined text-primary-fixed-dim" data-icon="dashboard">dashboard</span>
@@ -42,23 +61,13 @@ export function renderSidebar() {
 
       <section>
         <div class="flex items-center justify-between px-8 mb-4">
-          <p class="text-[10px] uppercase tracking-[0.2em] text-outline opacity-50 text-label-sm">Analyses</p>
+          <p class="text-[10px] uppercase tracking-[0.2em] text-outline opacity-50 font-medium">Analyses</p>
           <button class="text-primary-fixed-dim hover:text-white transition-colors" id="btn-new-analysis">
             <span class="material-symbols-outlined text-sm" data-icon="add">add</span>
           </button>
         </div>
-        <ul class="space-y-1 overflow-y-auto max-h-[40vh]" id="analysis-list">
-          ${analyses.map(a => {
-            const isQuick = a.analysis_metadata?.type === 'quick_insight';
-            const icon = isQuick ? 'bolt' : 'terminal';
-            return `
-            <li>
-              <button class="nav-item w-full ${a.id === activeId ? 'active' : ''}" data-analysis-id="${a.id}">
-                <span class="material-symbols-outlined ${a.id === activeId ? 'text-primary-fixed-dim' : ''}" data-icon="${icon}">${icon}</span>
-                <span class="truncate">${a.title}</span>
-              </button>
-            </li>
-          `}).join('')}
+        <ul class="space-y-1" id="analysis-list">
+          ${analysesListHtml}
         </ul>
       </section>
     </nav>
@@ -69,22 +78,19 @@ export function renderSidebar() {
         <img alt="User profile" class="w-full h-full object-cover grayscale opacity-80" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBm9rkjsFpTTuHvUhgdWXqOVy5TEU6WU0Zmn9L54MAL7rqO9xlW28xICQZTib_IPC3Vni4JRBxl4-Gppy19CJdOHiEcBlPQbvt0gCCA-6kf_AKQm6zQKwMOCZ3IKPJEhInarqydnCUGYEs1zu15jSFIpuA23IZYc2x9_iPo_nEmpEwwPJrLucmJKE2TBrQmAWUvQcXay_vsZJuJE1ijeaMEisbmWS_uXDIJ1QCYQnlPXn6CEQazi2-HIVXCt8NqmI9sueKY83dOles"/>
       </div>
       <div class="flex flex-col">
-        <span class="text-[10px] font-label-sm text-on-surface-variant uppercase tracking-widest">OPERATOR</span>
+        <span class="text-[10px] font-label-sm text-on-surface-variant uppercase tracking-widest font-bold">OPERATOR</span>
         <span class="text-[12px] font-medium text-neutral-100">Studio Noir</span>
       </div>
     </div>
   `;
 
-  // Event Listeners
+  // Brand header listener
   container.querySelector('#brand-header')?.addEventListener('click', () => {
     store.setCurrentView('dashboard');
     store.setActiveAnalysisId(undefined);
   });
 
-  container.querySelector('#btn-new-analysis')?.addEventListener('click', () => {
-    store.setCurrentView('create-analysis');
-  });
-
+  // Navigation listeners
   container.querySelectorAll('[data-nav]').forEach(btn => {
     btn.addEventListener('click', () => {
       const nav = btn.getAttribute('data-nav') as any;
@@ -95,6 +101,7 @@ export function renderSidebar() {
     });
   });
 
+  // Analysis item listeners
   container.querySelectorAll('[data-analysis-id]').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-analysis-id');
@@ -102,6 +109,11 @@ export function renderSidebar() {
         store.setActiveAnalysisId(id);
       }
     });
+  });
+
+  // New analysis listener
+  container.querySelector('#btn-new-analysis')?.addEventListener('click', () => {
+    store.setCurrentView('create-analysis');
   });
 
   return container;
