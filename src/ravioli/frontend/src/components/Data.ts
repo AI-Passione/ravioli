@@ -1,5 +1,6 @@
 import { store } from '../store';
 import { api } from '../services/api';
+import { formatBytes } from '../utils/formatters';
 
 export function renderData() {
   const container = document.createElement('main');
@@ -68,9 +69,10 @@ export function renderData() {
                     </div>
                   </td>
                   <td class="px-8 py-5">
-                    <div class="flex items-center gap-2 group/desc max-w-xs">
-                      <span class="text-neutral-400 text-sm truncate" title="${file.description || ''}">${file.description || '<span class="italic opacity-50">No description</span>'}</span>
-                      <button class="btn-edit-desc p-1 rounded-md opacity-0 group-hover/desc:opacity-100 hover:bg-white/10 text-neutral-500 hover:text-primary transition-all flex-shrink-0" data-id="${file.id}" data-desc="${file.description || ''}" title="Edit Description">
+                    <div class="desc-container flex items-center gap-2 group/desc max-w-xs w-full" data-id="${file.id}">
+                      <span class="desc-text text-neutral-400 text-sm truncate cursor-pointer hover:text-neutral-200 transition-colors flex-1" title="${file.description || ''}" data-desc="${file.description || ''}">${file.description || '<span class="italic opacity-50">Add description...</span>'}</span>
+                      <input type="text" class="desc-input hidden w-full bg-surface-container-highest border border-primary/30 rounded px-2 py-1 text-sm text-neutral-200 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all" value="${file.description || ''}" placeholder="Enter description..." />
+                      <button class="btn-edit-desc p-1 rounded-md opacity-0 group-hover/desc:opacity-100 hover:bg-white/10 text-neutral-500 hover:text-primary transition-all flex-shrink-0" title="Edit Description">
                         <span class="material-symbols-outlined text-[16px]">edit</span>
                       </button>
                     </div>
@@ -82,7 +84,7 @@ export function renderData() {
                     ${file.row_count ? file.row_count.toLocaleString() : '--'}
                   </td>
                   <td class="px-8 py-5 text-neutral-400 text-sm">
-                    ${(file.size_bytes / 1024).toFixed(1)} KB
+                    ${formatBytes(file.size_bytes)}
                   </td>
                   <td class="px-8 py-5">
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold ${
@@ -191,22 +193,71 @@ export function renderData() {
     });
   });
 
-  container.querySelectorAll('.btn-edit-desc').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const fileId = btn.getAttribute('data-id');
-      const currentDesc = btn.getAttribute('data-desc') || '';
-      if (fileId) {
-        const newDesc = prompt('Enter a description for this data:', currentDesc);
-        if (newDesc !== null && newDesc !== currentDesc) {
+  container.querySelectorAll('.desc-container').forEach(descContainer => {
+    const textSpan = descContainer.querySelector('.desc-text') as HTMLSpanElement;
+    const inputEl = descContainer.querySelector('.desc-input') as HTMLInputElement;
+    const editBtn = descContainer.querySelector('.btn-edit-desc') as HTMLButtonElement;
+    const fileId = descContainer.getAttribute('data-id');
+
+    const startEditing = () => {
+      textSpan.classList.add('hidden');
+      editBtn.classList.add('hidden');
+      inputEl.classList.remove('hidden');
+      inputEl.focus();
+      // Move cursor to end
+      inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
+    };
+
+    const stopEditing = async (save: boolean) => {
+      // Prevent double-saving if blur is triggered after Enter
+      if (inputEl.classList.contains('hidden')) return; 
+
+      inputEl.classList.add('hidden');
+      textSpan.classList.remove('hidden');
+      editBtn.classList.remove('hidden');
+      
+      if (save && fileId) {
+        const newDesc = inputEl.value.trim();
+        const currentDesc = textSpan.getAttribute('data-desc') || '';
+        
+        if (newDesc !== currentDesc) {
           try {
+            // Optimistic UI update
+            textSpan.textContent = newDesc;
+            if (!newDesc) textSpan.innerHTML = '<span class="italic opacity-50">Add description...</span>';
+            textSpan.setAttribute('title', newDesc);
+            textSpan.setAttribute('data-desc', newDesc);
+            
             await api.updateFileDescription(fileId, newDesc);
+            // Optionally sync store in background
             const updatedFiles = await api.listFiles();
             store.setUploadedFiles(updatedFiles);
           } catch (err) {
             console.error('Update description failed', err);
+            // Revert UI on failure
+            inputEl.value = currentDesc;
+            textSpan.textContent = currentDesc;
+            if (!currentDesc) textSpan.innerHTML = '<span class="italic opacity-50">Add description...</span>';
+            textSpan.setAttribute('title', currentDesc);
+            textSpan.setAttribute('data-desc', currentDesc);
             alert('Failed to update description.');
           }
         }
+      } else {
+        // Revert input value if cancelled
+        inputEl.value = textSpan.getAttribute('data-desc') || '';
+      }
+    };
+
+    textSpan.addEventListener('click', startEditing);
+    editBtn.addEventListener('click', startEditing);
+    
+    inputEl.addEventListener('blur', () => stopEditing(true));
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        stopEditing(true);
+      } else if (e.key === 'Escape') {
+        stopEditing(false);
       }
     });
   });
