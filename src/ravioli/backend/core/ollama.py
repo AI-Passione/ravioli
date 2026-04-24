@@ -122,13 +122,15 @@ Description:"""
         import time
         start_time = time.time()
         
-        print(f"OllamaClient: Starting {task_name} generation...")
-        print(f"OllamaClient: Prompt size: {len(prompt)} characters")
-        
         url = f"{self.base_url.rstrip('/')}/api/generate"
         headers = {}
         if self.mode == "cloud" and self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+
+        print(f"OllamaClient: [DEBUG] URL: {url}", flush=True)
+        print(f"OllamaClient: [DEBUG] Task: {task_name}", flush=True)
+        print(f"OllamaClient: [DEBUG] Model: {self.model}", flush=True)
+        print(f"OllamaClient: [DEBUG] Data Size: {len(prompt)} chars", flush=True)
 
         payload = {
             "model": self.model,
@@ -144,19 +146,22 @@ Description:"""
             async with httpx.AsyncClient(timeout=120.0) as client:
                 response = await client.post(url, json=payload, headers=headers)
                 
-                if response.status_code == 401:
-                    raise Exception("Ollama authentication failed.")
+                if response.status_code != 200:
+                    print(f"OllamaClient: [ERROR] API returned {response.status_code}", flush=True)
+                    print(f"OllamaClient: [ERROR] Response: {response.text[:500]}", flush=True)
+                    if response.status_code == 401:
+                        raise Exception("Ollama authentication failed. Check your API Key.")
+                    response.raise_for_status()
                 
-                response.raise_for_status()
                 result = response.json()
                 content = result.get("response", "").strip()
                 
                 duration = time.time() - start_time
-                print(f"OllamaClient: {task_name} completed in {duration:.2f}s")
+                print(f"OllamaClient: [SUCCESS] {task_name} completed in {duration:.2f}s", flush=True)
                 return content
         except Exception as e:
             duration = time.time() - start_time
-            print(f"OllamaClient: {task_name} failed after {duration:.2f}s: {str(e)}")
+            print(f"OllamaClient: [EXCEPTION] {task_name} failed after {duration:.2f}s: {str(e)}", flush=True)
             raise e
 
     async def generate_quick_insight(self, filename: str, sample_data: str) -> str:
