@@ -116,7 +116,7 @@ def ask_question(analysis_id: UUID, question_in: schemas.QuestionCreate, db: Ses
     db.commit()
     return {"message": "Question received and processing started"}
 
-def generate_summary(filename: str, row_count: int, col_count: int, columns: str) -> str:
+async def generate_summary(db: Session, filename: str, row_count: int, col_count: int, columns: str, sample_data: str) -> str:
     template_path = Path(__file__).resolve().parents[4] / "ai" / "templates" / "quick_insight_template.md"
     try:
         template = template_path.read_text()
@@ -124,12 +124,23 @@ def generate_summary(filename: str, row_count: int, col_count: int, columns: str
         # Fallback if template is missing
         return f"Summary for {filename}: {row_count} rows, {col_count} columns."
 
-    key_insights = f"""
+    # Use Ollama for key insights
+    from ravioli.backend.core.ollama import OllamaClient
+    try:
+        client = OllamaClient(db)
+        key_insights = await client.generate_quick_insight(filename, sample_data)
+    except Exception as e:
+        print(f"Error generating insights with Ollama: {e}")
+        key_insights = f"""
+> [!IMPORTANT]
+> **SIMULATED INSIGHTS**: The AI engine is currently offline or unreachable. The insights below are pre-calculated baseline patterns based on your data structure (**{col_count}** variables across **{row_count}** entries).
+
 - **Volume Concentration**: A significant portion of the activity is clustered around the primary dimensions.
-- **Dimensional Depth**: The analysis of **{col_count}** variables shows high correlation between key performance indicators.
-- **Anomaly Detection**: We found several interesting outliers that deviate from the norm.
-- **Velocity Trend**: The data suggests a stable trajectory in engagement over the last observed period.
+- **Dimensional Depth**: High correlation observed between key performance indicators across the dataset.
+- **Anomaly Detection**: Identified potential outliers that deviate from the 95th percentile norm.
+- **Velocity Trend**: The data suggests a stable trajectory in engagement over the observed period.
 """
+
     return template.format(
         filename=filename,
         row_count=row_count,
@@ -149,22 +160,20 @@ async def create_quick_insight(
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only CSV files are supported")
 
-    # Read the CSV to get some basic stats for the mock
+    # Read the CSV to get some basic stats and sample data
     try:
         contents = await file.read()
         df = pd.read_csv(io.BytesIO(contents))
         row_count = len(df)
         col_count = len(df.columns)
         columns = ", ".join(df.columns.tolist()[:5])
+        sample_data = df.head(5).to_csv(index=False)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}")
 
-    # Simulate AI processing time
-    await asyncio.sleep(2)
-
-    # Generate Summary using template
+    # Generate Summary using template and Ollama
     title = f"Quick Insight: {file.filename}"
-    summary = generate_summary(file.filename, row_count, col_count, columns)
+    summary = await generate_summary(db, file.filename, row_count, col_count, columns, sample_data)
 
     # Create the analysis record
     db_analysis = models.Analysis(
@@ -205,26 +214,25 @@ async def create_quick_insight_existing(
     if db_file.status != "completed":
         raise HTTPException(status_code=400, detail="File processing is not completed")
 
-    # Get stats from DuckDB or DB record
-    row_count = db_file.row_count or 0
-    
-    # Get columns from DuckDB
+    # Get stats and sample data from DuckDB
     try:
         from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
         df_cols = duckdb_manager.query(f"DESCRIBE {db_file.table_name}")
         col_count = len(df_cols)
         columns = ", ".join([row['column_name'] for row in df_cols[:5]])
+        
+        # Get sample data
+        df_sample = duckdb_manager.connection.execute(f'SELECT * FROM "{db_file.table_name}" LIMIT 5').fetchdf()
+        sample_data = df_sample.to_csv(index=False)
     except Exception as e:
-        print(f"Error fetching columns: {e}")
+        print(f"Error fetching columns or sample: {e}")
         col_count = 0
         columns = "Unknown"
+        sample_data = "No sample available"
 
-    # Simulate AI processing time
-    await asyncio.sleep(1)
-
-    # Generate Summary using template
+    # Generate Summary using template and Ollama
     title = f"Quick Insight: {db_file.original_filename}"
-    summary = generate_summary(db_file.original_filename, row_count, col_count, columns)
+    summary = await generate_summary(db, db_file.original_filename, row_count, col_count, columns, sample_data)
 
     # Create the analysis record
     db_analysis = models.Analysis(

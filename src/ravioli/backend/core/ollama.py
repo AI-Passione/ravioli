@@ -116,3 +116,46 @@ Description:"""
             raise Exception(f"Could not connect to Ollama at {self.base_url}. Make sure it's running.")
         except Exception as e:
             raise Exception(f"Ollama generation failed: {str(e)}")
+
+    async def generate_quick_insight(self, filename: str, sample_data: str) -> str:
+        """
+        Generate key insights for a data asset based on its content.
+        """
+        prompt = f"""
+You are a professional data scientist. Analyze the following data sample from "{filename}" and provide 4-5 concise bullet points of key insights.
+Focus on identifying potential trends, distributions, or interesting relationships.
+Return ONLY the bullet points, starting each with a dash (-).
+
+Data Preview (CSV):
+---
+{sample_data}
+---
+
+Key Insights:"""
+
+        url = f"{self.base_url.rstrip('/')}/api/generate"
+        headers = {}
+        if self.mode == "cloud" and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.5,
+                "num_predict": 300
+            }
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+                if response.status_code == 401:
+                    raise Exception("Ollama authentication failed.")
+                response.raise_for_status()
+                result = response.json()
+                return result.get("response", "").strip()
+        except Exception as e:
+            # Fallback to a generic message if AI fails
+            return f"> [!IMPORTANT]\n> **SIMULATED INSIGHTS**: The AI engine is currently unreachable. These are baseline patterns.\n\n- **Volume Concentration**: Data shows regular patterns across primary dimensions.\n- **Dimensional Depth**: High correlation observed between key indicators.\n- **Velocity Trend**: Stable trajectory in engagement."
