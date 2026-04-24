@@ -9,11 +9,6 @@ export default defineConfig({
   plugins: [
     tailwindcss(),
   ],
-  resolve: {
-    alias: {
-      '@tailwindcss/postcss': path.resolve(__dirname, 'node_modules/@tailwindcss/postcss'),
-    },
-  },
   server: {
     proxy: {
       '/api': {
@@ -28,6 +23,9 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
-    include: ['../../../tests/ravioli/frontend/**/*.{test,spec}.ts']
+    include: [
+      '../../../tests/ravioli/frontend/**/*.{test,spec}.ts',
+      './tests/**/*.{test,spec}.ts'
+    ]
   }
 })
