@@ -9,7 +9,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./src/ravioli/backend/data/oltp/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ${LOCAL_DATA_PATH:-~/Documents/ravioli_local_data}:/local_data:rw
+      - ${LOCAL_DATA_PATH:-./.duckdb}:/local_data:rw
     ports:
       - "5432:5432"
     networks:
@@ -23,7 +23,7 @@ services:
       - DB_HOST=postgres
     volumes:
       - .:/app
-      - ${LOCAL_DATA_PATH:-~/Documents/ravioli_local_data}:/local_data:rw
+      - ${LOCAL_DATA_PATH:-./.duckdb}:/local_data:rw
     ports:
       - "8000:8000"
     depends_on:
