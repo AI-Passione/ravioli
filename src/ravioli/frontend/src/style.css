@@ -56,10 +56,50 @@
   box-shadow: 0 0 12px #ffdada, 0 0 4px #ffdada;
 }
 
-.prose h3 {
-  @apply text-xl font-headline-sm text-white mb-4 mt-8 first:mt-0;
+.prose h1 { @apply text-3xl font-display-md text-white mb-8 mt-12 first:mt-0; }
+.prose h2 { @apply text-2xl font-headline-lg text-white mb-6 mt-10 first:mt-0; }
+.prose h3 { @apply text-xl font-headline-sm text-white mb-4 mt-8 first:mt-0; }
+.prose p { @apply mb-4 leading-relaxed; }
+
+/* GitHub Alerts Support */
+.markdown-alert {
+  @apply p-6 my-8 rounded-2xl border-l-4 relative overflow-hidden;
 }
 
-.prose p {
-  @apply mb-4 leading-relaxed;
+.markdown-alert::before {
+  content: '';
+  @apply absolute inset-0 opacity-[0.03] pointer-events-none;
+}
+
+.markdown-alert-title {
+  @apply flex items-center gap-2 text-xs font-label-md uppercase tracking-[0.2em] mb-4;
+}
+
+.markdown-alert-important {
+  @apply border-l-primary bg-primary/[0.05] text-primary;
+}
+
+.markdown-alert-important .markdown-alert-title { @apply text-primary; }
+
+.markdown-alert-note {
+  @apply border-l-tertiary bg-tertiary/[0.05] text-tertiary;
+}
+
+.markdown-alert-note .markdown-alert-title { @apply text-tertiary; }
+
+.markdown-alert p:last-child {
+  @apply mb-0;
+}
+
+/* Scrollbar refinement */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-outline-variant/20 rounded-full hover:bg-outline-variant/40 transition-colors;
 }
