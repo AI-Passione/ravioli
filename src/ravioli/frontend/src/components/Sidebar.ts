@@ -31,7 +31,7 @@ export function renderSidebar() {
         <div class="space-y-1">
           <button class="nav-item ${store.getCurrentView() === 'dashboard' && !activeId ? 'active' : ''} w-full" data-nav="home">
             <span class="material-symbols-outlined text-primary-fixed-dim" data-icon="dashboard">dashboard</span>
-            <span>Analyses</span>
+            <span>Start a new analysis</span>
           </button>
           <button class="nav-item w-full" data-nav="warehouse">
             <span class="material-symbols-outlined" data-icon="storage">storage</span>
@@ -42,7 +42,7 @@ export function renderSidebar() {
 
       <section>
         <div class="flex items-center justify-between px-8 mb-4">
-          <p class="text-[10px] uppercase tracking-[0.2em] text-outline opacity-50 text-label-sm">Investigations</p>
+          <p class="text-[10px] uppercase tracking-[0.2em] text-outline opacity-50 text-label-sm">Analyses</p>
           <button class="text-primary-fixed-dim hover:text-white transition-colors" id="btn-new-analysis">
             <span class="material-symbols-outlined text-sm" data-icon="add">add</span>
           </button>
@@ -90,7 +90,7 @@ export function renderSidebar() {
   });
 
   container.querySelector('[data-nav="home"]')?.addEventListener('click', () => {
-    store.setCurrentView('dashboard');
+    store.setCurrentView('create-analysis');
     store.setActiveAnalysisId(undefined);
   });
 

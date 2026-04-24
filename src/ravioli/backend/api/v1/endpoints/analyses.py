@@ -41,7 +41,7 @@ def list_analyses(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     """
     List all analyses.
     """
-    analyses = db.query(models.Analysis).offset(skip).limit(limit).all()
+    analyses = db.query(models.Analysis).order_by(models.Analysis.created_at.desc()).offset(skip).limit(limit).all()
     return analyses
 
 @router.get("/{analysis_id}", response_model=schemas.Analysis)
