@@ -39,3 +39,9 @@ export interface UploadedFile {
   created_at: string;
   updated_at: string;
 }
+
+export interface SystemSetting {
+  key: string;
+  value: Record<string, any>;
+  updated_at?: string;
+}
