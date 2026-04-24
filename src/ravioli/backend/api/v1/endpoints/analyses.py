@@ -9,6 +9,8 @@ from uuid import UUID
 from ravioli.backend.core.database import get_db
 from ravioli.backend.core import models, schemas
 from pathlib import Path
+from ydata_profiling import ProfileReport
+
 
 router = APIRouter()
 
@@ -118,10 +120,14 @@ def ask_question(analysis_id: UUID, question_in: schemas.QuestionCreate, db: Ses
 
 def create_data_profile(df: pd.DataFrame) -> str:
     """Creates a high-fidelity statistical profile of the dataset using YData Profiling if available."""
-    # 1. Basic Stats (Always available)
-    stats = df.describe(include='all').transpose().to_string()
+    # Filter out ID columns for statistical analysis to avoid noise
+    id_cols = [col for col in df.columns if col.lower().endswith('_id') or col.lower() == 'id' or col.lower().endswith('id')]
+    df_stats = df.drop(columns=id_cols)
     
-    # 2. Data Quality (Always available)
+    # 1. Basic Stats (Always available)
+    stats = df_stats.describe(include='all').transpose().to_string()
+    
+    # 2. Data Quality (Still check all columns for nulls, including IDs)
     quality = pd.DataFrame({
         'dtype': df.dtypes,
         'null_count': df.isnull().sum(),
@@ -130,15 +136,14 @@ def create_data_profile(df: pd.DataFrame) -> str:
 
     advanced_insights = ""
     try:
-        from ydata_profiling import ProfileReport
-        # Use minimal=True to keep it fast for 111MB+ datasets
-        profile = ProfileReport(df, minimal=True, title="Data Profile")
+        # Use minimal=True and pass filtered dataframe
+        profile = ProfileReport(df_stats, minimal=True, title="Data Profile")
         description = profile.get_description()
         
         # Extract Alerts (The most valuable part for AI)
         alerts = description.get('alerts', [])
         if alerts:
-            advanced_insights += "\nADVANCED DATA ALERTS:\n"
+            advanced_insights += "\nADVANCED DATA ALERTS (Excluding ID columns):\n"
             for alert in alerts[:15]: # Limit to top 15 alerts
                 advanced_insights += f"- {str(alert)}\n"
         
