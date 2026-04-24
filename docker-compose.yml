@@ -21,6 +21,7 @@ services:
     container_name: backend
     environment:
       - DB_HOST=postgres
+      - LOCAL_DATA_PATH=/local_data
     volumes:
       - .:/app
       - ${LOCAL_DATA_PATH:-./.duckdb}:/local_data:rw

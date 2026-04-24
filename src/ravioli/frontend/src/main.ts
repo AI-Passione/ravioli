@@ -37,6 +37,7 @@ async function init() {
     // Fetch analyses
     try {
       const analyses = await api.listAnalyses();
+      console.log(`Fetched ${analyses.length} analyses from API`);
       store.setAnalyses(analyses);
       if (analyses.length > 0 && !store.getActiveAnalysisId()) {
         store.setActiveAnalysisId(analyses[0].id);
