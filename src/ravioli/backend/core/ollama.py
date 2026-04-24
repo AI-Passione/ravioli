@@ -174,7 +174,7 @@ Description:"""
         Generate key insights for a data asset based on its content.
         """
         prompt = f"""
-You are a professional data scientist. Analyze the following statistical profile of the dataset "{filename}" and provide 4-5 concise bullet points of key insights.
+You are a professional data scientist. Analyze the following statistical profile of the dataset "{filename}" and provide 8-10 concise bullet points of key insights.
 The profile contains summary statistics (mean, max, min, distributions), data quality metrics, and a small sample. 
 Focus on identifying potential trends, distributions, or anomalies across the ENTIRE dataset.
 Return ONLY the bullet points, starting each with a dash (-).
