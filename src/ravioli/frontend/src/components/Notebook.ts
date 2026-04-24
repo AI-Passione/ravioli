@@ -93,6 +93,22 @@ export function renderNotebook() {
     </header>
 
     <div class="flex-1 overflow-y-auto px-12 py-8 space-y-12" id="cell-container">
+      ${analysis.result ? `
+        <div class="glass-panel p-10 rounded-3xl space-y-6 border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+          <div class="flex items-center gap-4 text-primary">
+            <span class="material-symbols-outlined text-3xl" data-icon="auto_awesome">auto_awesome</span>
+            <h3 class="text-xl font-headline-sm uppercase tracking-widest">Executive Insights</h3>
+          </div>
+          <div class="prose prose-invert max-w-none text-on-surface-variant leading-relaxed font-body-lg">
+            ${md.render(analysis.result)}
+          </div>
+          <div class="flex items-center gap-2 pt-4 opacity-40">
+            <span class="material-symbols-outlined text-sm" data-icon="verified">verified</span>
+            <span class="text-[10px] uppercase tracking-widest font-label-sm">Validated by Local LLM Node</span>
+          </div>
+        </div>
+      ` : ''}
+
       ${logs.map(log => `
         <div class="group animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div class="flex items-center gap-4 mb-4">

@@ -54,3 +54,11 @@ class Analysis(AnalysisBase):
     logs: List[ExecutionLog] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+class QuickInsightResponse(BaseModel):
+    analysis_id: UUID
+    title: str
+    summary: str
+    stats: dict
+
+    model_config = ConfigDict(from_attributes=True)

@@ -1,0 +1,13 @@
+.git
+.venv
+node_modules
+dist
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.coverage
+htmlcov
+.env
+uv.lock
