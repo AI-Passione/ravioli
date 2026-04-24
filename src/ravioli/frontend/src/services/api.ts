@@ -39,7 +39,7 @@ export const api = {
       body: JSON.stringify({ question }),
     });
     if (!response.ok) throw new Error('Failed to ask question');
-  }
+  },
 
   async generateQuickInsight(file: File): Promise<any> {
     const formData = new FormData();
