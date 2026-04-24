@@ -74,10 +74,12 @@ class UploadedFileBase(BaseModel):
     row_count: Optional[int] = None
     status: str
     error_message: Optional[str] = None
+    file_hash: Optional[str] = None
 
 class UploadedFile(UploadedFileBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    is_duplicate: bool = False
 
     model_config = ConfigDict(from_attributes=True)

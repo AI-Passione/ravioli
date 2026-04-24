@@ -1,6 +1,7 @@
 import re
 import shutil
 import uuid
+import hashlib
 from pathlib import Path
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -19,6 +20,14 @@ router = APIRouter()
 UPLOAD_DIR = settings.local_data_path / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+async def calculate_hash(file: UploadFile) -> str:
+    sha256_hash = hashlib.sha256()
+    # Read in chunks to avoid memory issues
+    while content := await file.read(8192):
+        sha256_hash.update(content)
+    await file.seek(0)  # Important: reset pointer for subsequent reads
+    return sha256_hash.hexdigest()
+
 @router.post("/upload", response_model=schemas.UploadedFile)
 async def upload_file(
     file: UploadFile = File(...),
@@ -26,6 +35,23 @@ async def upload_file(
 ):
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only CSV files are supported at this moment.")
+
+    # Generate hash to check for duplicates
+    file_hash = await calculate_hash(file)
+    
+    # Check if file with same hash already exists
+    query = select(UploadedFile).where(UploadedFile.file_hash == file_hash)
+    existing_file = db.execute(query).scalar_one_or_none()
+    
+    if existing_file:
+        # If it exists and was successful, we can just return it
+        if existing_file.status == "completed":
+            # Inform the user it was a duplicate
+            existing_file.is_duplicate = True
+            return existing_file
+        else:
+            # If it failed or is pending, we proceed to retry
+            pass
 
     file_id = uuid.uuid4()
     extension = Path(file.filename).suffix
@@ -35,7 +61,6 @@ async def upload_file(
     # Generate a clean table name from the filename
     base_name = Path(file.filename).stem
     table_name = "".join(c if c.isalnum() else "_" for c in base_name).lower()
-    # Add a suffix to ensure uniqueness if needed, but for now we'll overwrite
     
     try:
         # Save file to disk
@@ -50,6 +75,7 @@ async def upload_file(
             content_type=file.content_type,
             size_bytes=file_path.stat().st_size,
             table_name=table_name,
+            file_hash=file_hash,
             status="pending"
         )
         db.add(db_file)

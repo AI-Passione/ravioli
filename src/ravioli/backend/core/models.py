@@ -83,5 +83,7 @@ class UploadedFile(Base):
     status: Mapped[str] = mapped_column(String(50), default="pending")
     error_message: Mapped[Optional[str]] = mapped_column(Text)
     
+    file_hash: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
