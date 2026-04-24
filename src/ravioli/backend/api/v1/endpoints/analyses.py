@@ -138,13 +138,13 @@ def prepare_dataframe_for_analysis(df: pd.DataFrame) -> pd.DataFrame:
 
         # 2. Convert potential numeric columns that are currently strings
         if df[col].dtype == 'object':
-            try:
-                # Try to convert to numeric (Int64 handles nulls better than int)
-                df[col] = pd.to_numeric(df[col], errors='ignore')
-            except Exception:
-                # Best-effort conversion: leave the original column dtype unchanged
-                # if pandas cannot safely coerce this column to numeric.
-                pass
+            # Try to convert to numeric (Int64 handles nulls better than int)
+            converted = pd.to_numeric(df[col], errors='coerce')
+            if not converted.isna().all():
+                df[col] = converted
+            # Best-effort conversion: leave the original column dtype unchanged
+            # if pandas cannot safely coerce this column to numeric.
+            pass
 
         # 3. Handle low-cardinality strings as categories
         if df[col].dtype == 'object' and df[col].nunique() < 30:
