@@ -186,6 +186,7 @@ async def generate_file_description(
     file_id: uuid.UUID,
     db: Session = Depends(get_db)
 ):
+    print(f"!!! DEBUG: generate_file_description called for {file_id}")
     db_file = db.execute(select(UploadedFile).where(UploadedFile.id == file_id)).scalar_one_or_none()
     if not db_file:
         raise HTTPException(status_code=404, detail="File not found")
@@ -194,20 +195,31 @@ async def generate_file_description(
         raise HTTPException(status_code=400, detail="File has no associated table")
 
     try:
-        # 1. Get sample data from DuckDB as CSV
-        df_sample = duckdb_manager.connection.execute(f"SELECT * FROM {db_file.table_name} LIMIT 5").fetchdf()
-        csv_sample = df_sample.to_csv(index=False)
-        
-        # 2. Generate description with Ollama
-        ollama = OllamaClient(db)
-        description = await ollama.generate_description(db_file.original_filename, csv_sample)
-        
-        # 3. Update database
+        # Get sample data from DuckDB
+        print(f"Generating description for file {file_id}, table {db_file.table_name}")
+        from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
+        query = f'SELECT * FROM "{db_file.table_name}" LIMIT 5'
+        print(f"Executing DuckDB query: {query}")
+        df = duckdb_manager.connection.execute(query).fetchdf()
+        print(f"Fetched {len(df)} rows from DuckDB")
+        sample_data = df.to_csv(index=False)
+
+        # Generate description using Ollama
+        print("Initializing OllamaClient")
+        client = OllamaClient(db)
+        print("Calling generate_description")
+        description = await client.generate_description(db_file.original_filename, sample_data)
+        print(f"Generated description: {description}")
+
+        # Update the database
         db_file.description = description
         db.commit()
         db.refresh(db_file)
         
         return db_file
     except Exception as e:
+        print(f"Error in generate_file_description: {str(e)}")
+        import traceback
+        traceback.print_exc()
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to generate description: {str(e)}")

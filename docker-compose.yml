@@ -22,6 +22,7 @@ services:
     environment:
       - DB_HOST=postgres
       - LOCAL_DATA_PATH=/local_data
+      - PYTHONUNBUFFERED=1
     volumes:
       - .:/app
       - ${LOCAL_DATA_PATH:-./.duckdb}:/local_data:rw

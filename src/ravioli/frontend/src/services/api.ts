@@ -98,7 +98,16 @@ export const api = {
     const response = await fetch(`${API_BASE}/data/files/${fileId}/generate-description`, {
       method: 'POST',
     });
-    if (!response.ok) throw new Error('Failed to generate file description');
+    if (!response.ok) {
+      let detail = 'Unknown error';
+      try {
+        const errorData = await response.json();
+        detail = errorData.detail || response.statusText;
+      } catch (e) {
+        detail = response.statusText;
+      }
+      throw new Error(detail);
+    }
     return response.json();
   },
 

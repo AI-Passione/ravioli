@@ -274,9 +274,10 @@ export function renderData() {
         // Sync store
         const updatedFiles = await api.listFiles();
         store.setUploadedFiles(updatedFiles);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Generation failed', err);
-        alert('Failed to generate description. Make sure Ollama is running and configured.');
+        const errorMsg = err.message || 'Unknown error';
+        alert(`Failed to generate description: ${errorMsg}. Make sure Ollama is running and configured.`);
       } finally {
         generateBtn.innerHTML = originalContent;
         generateBtn.disabled = false;
