@@ -95,6 +95,6 @@ class SystemSettingBase(BaseModel):
     value: dict
 
 class SystemSetting(SystemSettingBase):
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)

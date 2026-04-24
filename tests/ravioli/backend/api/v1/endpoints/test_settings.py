@@ -86,11 +86,12 @@ def test_get_setting_empty_api_key_not_redacted(client, session):
 def test_put_setting_creates_new(client, session, mocker):
     mocker.patch("ravioli.backend.core.encryption.settings", secret_key=_TEST_KEY)
     session.query.return_value.filter.return_value.first.return_value = None
-    # refresh after commit should return the saved model
-    saved = _make_mock_setting(value={"mode": "default", "api_key": ""})
-    session.refresh.side_effect = lambda obj: None
-    # simulate the object being returned after add+commit
-    session.query.return_value.filter.return_value.first.side_effect = [None, saved]
+
+    def set_updated_at(obj):
+        from datetime import datetime, UTC
+        obj.updated_at = datetime.now(UTC)
+
+    session.refresh.side_effect = set_updated_at
 
     response = client.put("/api/v1/settings/ollama", json={
         "key": "ollama",
@@ -107,21 +108,15 @@ def test_put_setting_encrypts_api_key(client, session, mocker):
     captured_value = {}
 
     def capture_add(obj):
+        # Capture the value that will be stored
         captured_value.update(obj.value)
 
-    session.add.side_effect = capture_add
-    saved = _make_mock_setting(value={"mode": "cloud", "api_key": "ENCRYPTED"})
-    session.refresh.side_effect = lambda obj: None
+    def set_updated_at(obj):
+        from datetime import datetime, UTC
+        obj.updated_at = datetime.now(UTC)
 
-    # Simulate: first query finds nothing (create path), refresh returns saved
-    first_call = True
-    def first_or_none():
-        nonlocal first_call
-        if first_call:
-            first_call = False
-            return None
-        return saved
-    session.query.return_value.filter.return_value.first.side_effect = first_or_none
+    session.add.side_effect = capture_add
+    session.refresh.side_effect = set_updated_at
 
     client.put("/api/v1/settings/ollama", json={
         "key": "ollama",
