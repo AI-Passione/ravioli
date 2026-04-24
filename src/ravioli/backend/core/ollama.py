@@ -143,10 +143,10 @@ Description:"""
         if self.mode == "cloud" and self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
-        print(f"OllamaClient: [DEBUG] URL: {url}", flush=True)
-        print(f"OllamaClient: [DEBUG] Task: {task_name}", flush=True)
-        print(f"OllamaClient: [DEBUG] Model: {self.model}", flush=True)
-        print(f"OllamaClient: [DEBUG] Data Size: {len(prompt)} chars", flush=True)
+        print(f"OllamaClient: [INFO] URL: {url}", flush=True)
+        print(f"OllamaClient: [INFO] Task: {task_name}", flush=True)
+        print(f"OllamaClient: [INFO] Model: {self.model}", flush=True)
+        print(f"OllamaClient: [INFO] Data Size: {len(prompt)} chars", flush=True)
 
         # Final safety truncation: most models can't handle more than ~100k characters in a prompt
         if len(prompt) > 100000:
