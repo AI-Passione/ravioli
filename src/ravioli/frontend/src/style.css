@@ -56,7 +56,7 @@
   box-shadow: 0 0 12px #ffdada, 0 0 4px #ffdada;
 }
 
-.prose h1 { @apply text-3xl font-display-md text-white mb-8 mt-12 first:mt-0; }
+.prose h1 { @apply text-4xl font-display-lg text-white mb-8 mt-12 first:mt-0; }
 .prose h2 { @apply text-2xl font-headline-lg text-white mb-6 mt-10 first:mt-0; }
 .prose h3 { @apply text-xl font-headline-sm text-white mb-4 mt-8 first:mt-0; }
 .prose p { @apply mb-4 leading-relaxed; }
