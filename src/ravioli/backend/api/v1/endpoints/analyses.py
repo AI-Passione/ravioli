@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, BackgroundTasks
 import pandas as pd
 import asyncio
 import io
@@ -88,7 +88,12 @@ def delete_analysis(analysis_id: UUID, db: Session = Depends(get_db)):
     return None
 
 @router.post("/{analysis_id}/ask", status_code=status.HTTP_202_ACCEPTED)
-def ask_question(analysis_id: UUID, question_in: schemas.QuestionCreate, db: Session = Depends(get_db)):
+async def ask_question(
+    analysis_id: UUID, 
+    question_in: schemas.QuestionCreate, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
     """
     Submit a question to an analysis.
     """
@@ -106,17 +111,63 @@ def ask_question(analysis_id: UUID, question_in: schemas.QuestionCreate, db: Ses
     
     # 2. Update analysis status
     analysis.status = "running"
-    
-    # 3. Create mock agent response (for UI testing)
-    agent_log = models.ExecutionLog(
-        analysis_id=analysis_id,
-        log_type="thought",
-        content=f"Analyzing your question: '{question_in.question}'..."
-    )
-    db.add(agent_log)
-    
     db.commit()
+    
+    # 3. Queue background processing
+    background_tasks.add_task(process_analysis_question, str(analysis_id), question_in.question)
+    
     return {"message": "Question received and processing started"}
+
+async def process_analysis_question(analysis_id: str, question: str):
+    """
+    Background task to generate AI response for a question.
+    """
+    from ravioli.backend.core.database import SessionLocal
+    from ravioli.backend.core.ollama import OllamaClient
+    import uuid
+    
+    db = SessionLocal()
+    try:
+        analysis_uuid = uuid.UUID(analysis_id)
+        analysis = db.query(models.Analysis).filter(models.Analysis.id == analysis_uuid).first()
+        if not analysis:
+            return
+
+        # Prepare context
+        filename = analysis.analysis_metadata.get("filename", "Unknown Dataset")
+        summary = analysis.result or "No summary available."
+        
+        # Get last 5 logs for context
+        previous_logs = db.query(models.ExecutionLog)\
+            .filter(models.ExecutionLog.analysis_id == analysis_uuid)\
+            .order_by(models.ExecutionLog.timestamp.desc())\
+            .limit(6).all() # 6 because we just added the current question
+        
+        context_str = ""
+        for log in reversed(previous_logs[1:]): # Skip the latest question for context
+            role = "Operator" if log.log_type == "user_query" else "Kowalski"
+            context_str += f"{role}: {log.content}\n"
+
+        # Generate answer
+        client = OllamaClient(db)
+        answer = await client.generate_answer(filename, summary, context_str, question)
+        
+        # Save answer
+        agent_log = models.ExecutionLog(
+            analysis_id=analysis_id,
+            log_type="thought",
+            content=answer
+        )
+        db.add(agent_log)
+        
+        # Update status
+        analysis.status = "completed"
+        db.commit()
+    except Exception as e:
+        print(f"Error in background task process_analysis_question: {e}")
+        # Optionally add an error log to the analysis
+    finally:
+        db.close()
 
 def prepare_dataframe_for_analysis(df: pd.DataFrame) -> pd.DataFrame:
     """Intelligently detects and casts column types for better statistical analysis."""

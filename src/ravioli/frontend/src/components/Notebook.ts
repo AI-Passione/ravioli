@@ -177,7 +177,7 @@ export function renderNotebook() {
                 </span>
              </div>
              <span class="text-[10px] uppercase tracking-[0.2em] text-outline font-label-sm">
-                ${log.log_type === 'user_query' ? 'Operator' : 'Agent Core'}
+                ${log.log_type === 'user_query' ? 'Operator' : 'Kowalski'}
              </span>
           </div>
           <div class="pl-12">

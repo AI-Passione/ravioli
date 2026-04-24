@@ -277,3 +277,26 @@ Follow-up Questions:"""
                 "How do these trends compare to historical baseline patterns?",
                 "What is the impact of the identified limitations on the overall analysis?"
             ]
+
+    async def generate_answer(self, filename: str, summary: str, context: str, question: str) -> str:
+        """
+        Generate a clinical, precise answer to a user question based on data context.
+        """
+        prompt = f"""{KOWALSKI_PERSONA}
+Context: You are analyzing the dataset "{filename}".
+Executive Summary of Data:
+{summary}
+
+Recent Investigation Steps:
+{context}
+
+Question: {question}
+
+Task: Provide a clinical, precise, and data-driven answer. If the data provided in the summary is insufficient, state what additional analysis might be needed.
+Return your answer in Markdown format.
+Answer:"""
+
+        try:
+            return await self._generate(prompt, "Agent Answer", temperature=0.4, num_predict=1000)
+        except Exception as e:
+            return f"> [!WARNING]\n> **Neural Link Interrupted**: {str(e)}\n\nKowalski is currently unable to process this request. Please check your AI node connection."
