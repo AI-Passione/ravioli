@@ -17,7 +17,8 @@ RUN apt-get update && apt-get install -y \
 COPY . .
 
 # Install the project and its dependencies
-RUN uv pip install --system -e .
+# Install project in editable mode with dev dependencies for testing
+RUN uv pip install --system --extra dev -e .
 
 # Expose the API port
 EXPOSE 8000

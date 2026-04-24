@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, UTC
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 from cryptography.fernet import Fernet
 
 # Generate a deterministic test key
@@ -149,4 +149,26 @@ def test_put_setting_key_mismatch_returns_400(client, session):
         "key": "different_key",
         "value": {"mode": "default"}
     })
-    assert response.status_code == 400
+@pytest.mark.anyio
+async def test_test_ollama_connection_success(client, session, mocker):
+    # Mock OllamaClient and its base_url
+    mock_ollama = mocker.patch("ravioli.backend.api.v1.endpoints.settings.OllamaClient")
+    mock_instance = mock_ollama.return_value
+    mock_instance.base_url = "http://test-ollama"
+    mock_instance.mode = "default"
+    
+    # Mock httpx
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "models": [{"name": "gemma3:4b"}, {"name": "llama3"}]
+    }
+    
+    mock_httpx = mocker.patch("httpx.AsyncClient.get", new_callable=AsyncMock)
+    mock_httpx.return_value = mock_response
+    
+    response = client.get("/api/v1/settings/ollama/test")
+    
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert "gemma3:4b" in response.json()["models"]

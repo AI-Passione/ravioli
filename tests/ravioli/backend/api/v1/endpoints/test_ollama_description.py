@@ -28,10 +28,10 @@ async def test_generate_file_description(client, session, mocker):
     mock_result.scalar_one_or_none.return_value = db_file
     session.execute.return_value = mock_result
     
-    # Mock DuckDB interaction
-    mock_duckdb = mocker.patch("ravioli.backend.api.v1.endpoints.data.duckdb_manager")
+    # Mock DuckDB interaction by patching the class property
     mock_conn = MagicMock()
-    mock_duckdb.connection = mock_conn
+    mocker.patch("ravioli.backend.data.olap.duckdb_manager.DuckDBManager.connection", new_callable=lambda: mock_conn)
+    
     mock_df = MagicMock()
     mock_conn.execute.return_value.fetchdf.return_value = mock_df
     mock_df.to_csv.return_value = "col1,col2\nval1,val2"
