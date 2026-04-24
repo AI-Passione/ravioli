@@ -117,16 +117,40 @@ def ask_question(analysis_id: UUID, question_in: schemas.QuestionCreate, db: Ses
     return {"message": "Question received and processing started"}
 
 def create_data_profile(df: pd.DataFrame) -> str:
-    """Creates a compact statistical profile of the entire dataset for AI consumption."""
-    # 1. Basic Stats
+    """Creates a high-fidelity statistical profile of the dataset using YData Profiling if available."""
+    # 1. Basic Stats (Always available)
     stats = df.describe(include='all').transpose().to_string()
     
-    # 2. Data Quality (Nulls and Types)
+    # 2. Data Quality (Always available)
     quality = pd.DataFrame({
         'dtype': df.dtypes,
         'null_count': df.isnull().sum(),
         'unique_count': df.nunique()
     }).to_string()
+
+    advanced_insights = ""
+    try:
+        from ydata_profiling import ProfileReport
+        # Use minimal=True to keep it fast for 111MB+ datasets
+        profile = ProfileReport(df, minimal=True, title="Data Profile")
+        description = profile.get_description()
+        
+        # Extract Alerts (The most valuable part for AI)
+        alerts = description.get('alerts', [])
+        if alerts:
+            advanced_insights += "\nADVANCED DATA ALERTS:\n"
+            for alert in alerts[:15]: # Limit to top 15 alerts
+                advanced_insights += f"- {str(alert)}\n"
+        
+        # Extract Correlations (High-level summary)
+        correlations = description.get('correlations', {})
+        if correlations:
+            advanced_insights += "\nCOLUMN CORRELATIONS IDENTIFIED.\n"
+            
+    except ImportError:
+        advanced_insights = "\n[NOTE: ydata-profiling not installed. Falling back to basic stats.]"
+    except Exception as e:
+        advanced_insights = f"\n[NOTE: Advanced profiling failed: {str(e)}]"
     
     # 3. Micro Sample
     sample = df.head(10).to_csv(index=False)
@@ -139,6 +163,7 @@ SUMMARY STATISTICS:
 
 DATA QUALITY & TYPES:
 {quality}
+{advanced_insights}
 
 REPRESENTATIVE SAMPLE (FIRST 10 ROWS):
 {sample}

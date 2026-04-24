@@ -29,6 +29,7 @@ dependencies = [
     "duckdb-engine>=0.13.0",
     "cryptography>=43.0.0",
     "httpx>=0.28.1",
+    "ydata-profiling>=4.12.0",
 ]
 
 
