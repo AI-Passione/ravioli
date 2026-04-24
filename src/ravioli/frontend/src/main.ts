@@ -5,7 +5,7 @@ import { renderSidebar } from './components/Sidebar';
 import { renderNotebook } from './components/Notebook';
 import { renderCreateAnalysis } from './components/CreateAnalysis';
 import { renderKnowledge } from './components/Knowledge';
-import { renderWarehouse } from './components/Warehouse';
+import { renderData } from './components/Data';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -22,8 +22,8 @@ function updateUI() {
     shell.appendChild(renderCreateAnalysis());
   } else if (currentView === 'knowledge') {
     shell.appendChild(renderKnowledge());
-  } else if (currentView === 'warehouse') {
-    shell.appendChild(renderWarehouse());
+  } else if (currentView === 'data') {
+    shell.appendChild(renderData());
   } else {
     shell.appendChild(renderNotebook());
   }

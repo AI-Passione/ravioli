@@ -7,7 +7,7 @@ class Store {
   private activeAnalysisId?: string;
   private logs: ExecutionLog[] = [];
   private uploadedFiles: UploadedFile[] = [];
-  private currentView: 'dashboard' | 'create-analysis' | 'knowledge' | 'warehouse' = 'dashboard';
+  private currentView: 'dashboard' | 'create-analysis' | 'knowledge' | 'data' = 'dashboard';
   private listeners: Listener[] = [];
 
   subscribe(listener: Listener) {
@@ -36,9 +36,9 @@ class Store {
 
   getActiveAnalysisId() { return this.activeAnalysisId; }
 
-  setCurrentView(view: 'dashboard' | 'create-analysis' | 'knowledge' | 'warehouse') {
+  setCurrentView(view: 'dashboard' | 'create-analysis' | 'knowledge' | 'data') {
     this.currentView = view;
-    if (view === 'create-analysis' || view === 'warehouse' || view === 'knowledge') {
+    if (view === 'create-analysis' || view === 'data' || view === 'knowledge') {
       this.activeAnalysisId = undefined;
     }
     this.notify();

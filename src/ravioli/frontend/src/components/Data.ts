@@ -1,7 +1,7 @@
 import { store } from '../store';
 import { api } from '../services/api';
 
-export function renderWarehouse() {
+export function renderData() {
   const container = document.createElement('main');
   container.className = 'flex-1 h-full overflow-hidden bg-surface flex flex-col p-8 pt-12';
 
@@ -10,7 +10,7 @@ export function renderWarehouse() {
   container.innerHTML = `
     <div class="max-w-6xl mx-auto w-full">
       <header class="mb-12">
-        <h1 class="text-4xl font-medium tracking-tight text-neutral-100 mb-2">Warehouse</h1>
+        <h1 class="text-4xl font-medium tracking-tight text-neutral-100 mb-2">Data</h1>
         <p class="text-neutral-500 max-w-2xl">Manage your data assets. Ingest CSV files into DuckDB for high-performance analytics.</p>
       </header>
 
