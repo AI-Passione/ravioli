@@ -3,7 +3,7 @@ import { api } from '../services/api';
 
 export function renderData() {
   const container = document.createElement('main');
-  container.className = 'flex-1 h-full overflow-hidden bg-surface flex flex-col p-8 pt-12 relative';
+  container.className = 'flex-1 ml-64 h-full overflow-hidden bg-surface flex flex-col p-8 pt-12 relative';
 
   const files = store.getUploadedFiles();
 

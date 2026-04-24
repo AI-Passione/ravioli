@@ -1,6 +1,6 @@
 export function renderKnowledge() {
   const container = document.createElement('main');
-  container.className = 'flex-1 h-full overflow-hidden bg-surface relative flex items-center justify-center';
+  container.className = 'flex-1 ml-64 h-full overflow-hidden bg-surface relative flex items-center justify-center';
 
   container.innerHTML = `
     <div class="cinematic-vignette absolute inset-0 z-0"></div>
