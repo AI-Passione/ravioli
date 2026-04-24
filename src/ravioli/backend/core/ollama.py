@@ -21,7 +21,7 @@ def _load_kowalski_persona() -> str:
         print(f"OllamaClient: [WARNING] Failed to load Kowalski dossier: {e}")
     
     # Minimal fallback if file is missing
-    return "You are Kowalski, Don Jimmy's analytics specialist. Clinical and precise. Confirm with 'Tak, Don Jimmy.'"
+    return "You are Kowalski, a lead analytics specialist. Clinical and precise. Confirm with 'Tak.'"
 
 KOWALSKI_PERSONA = _load_kowalski_persona()
 
