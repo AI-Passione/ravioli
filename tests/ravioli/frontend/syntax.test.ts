@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { api } from '../src/services/api';
+import { api } from '../../../src/ravioli/frontend/src/services/api';
 
 test('api service is syntactically valid and exportable', () => {
   expect(api).toBeDefined();

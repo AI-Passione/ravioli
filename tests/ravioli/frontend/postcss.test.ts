@@ -24,7 +24,7 @@ describe('PostCSS Configuration', () => {
 
   it('should be able to load the actual postcss.config.js', async () => {
     // This is a more direct test of the configuration file itself
-    const configPath = '../postcss.config.js';
+    const configPath = '../../../src/ravioli/frontend/postcss.config.js';
     const config = await import(configPath);
     
     expect(config.default).toBeDefined();

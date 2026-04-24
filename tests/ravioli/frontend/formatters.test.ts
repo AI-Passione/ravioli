@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatBytes } from '../src/utils/formatters';
+import { formatBytes } from '../../../src/ravioli/frontend/src/utils/formatters';
 
 describe('formatBytes', () => {
   it('formats zero bytes correctly', () => {
