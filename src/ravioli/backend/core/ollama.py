@@ -86,14 +86,14 @@ class OllamaClient:
         Generate a professional, concise description for a data asset based on its name and content.
         """
         prompt = f"""
-You are a professional data engineer. Generate a concise, one-sentence description for a data asset.
+You are a professional data engineer. Generate an extremely concise, single-sentence description for a data asset.
 The asset is named "{filename}".
 Here is a preview of the data (CSV format):
 ---
 {sample_data}
 ---
-The description should focus on what the data represents and its primary utility.
-Be professional, objective, and avoid filler words.
+The description should focus on what the data represents.
+Be clinical, objective, and avoid ALL filler words. Max 15 words.
 Description:"""
 
         url = f"{self.base_url.rstrip('/')}/api/generate"
@@ -190,8 +190,9 @@ Description:"""
         Generate key insights for a data asset based on its content.
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Task: Analyze the statistical profile of the dataset "{filename}" and provide 8-10 concise bullet points of clinical insights.
-Focus on quantifiable trends and anomalies across the ENTIRE dataset.
+Task: Analyze the statistical profile of "{filename}" and provide 3-5 high-impact, extremely concise clinical insights.
+Prioritize the most significant quantifiable trends and anomalies.
+Minimize "Speed to Insights": be direct, precise, and brief.
 Return ONLY the bullet points, followed by a Polish confirmation line.
 
 Dataset Profile:
@@ -212,7 +213,7 @@ Key Insights:"""
         Generate potential assumptions made during data analysis.
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Task: Analyze the statistical profile of "{filename}" and provide 2-3 clinical assumptions for analysis.
+Task: Analyze the statistical profile of "{filename}" and provide 2 extremely concise clinical assumptions.
 Return ONLY the bullet points, followed by a Polish confirmation line.
 
 Dataset Profile:
@@ -232,8 +233,8 @@ Assumptions:"""
         Generate potential limitations and issues for the data.
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Task: Analyze the statistical profile of "{filename}" and identify 2-3 clinical limitations or data quality issues.
-Return ONLY the bullet points, followed by a Polish confirmation line.
+Task: Analyze the statistical profile of "{filename}" and identify 1-2 critical clinical limitations.
+Be extremely brief. Return ONLY the bullet points, followed by a Polish confirmation line.
 
 Dataset Profile:
 ---
@@ -252,8 +253,9 @@ Limitations & Issues:"""
         Generate 3-4 insightful follow-up questions based on the summary and data profile.
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Task: Based on the following Executive Summary and Dataset Profile for "{filename}", generate 3-4 professional and insightful follow-up questions that an analyst would ask to explore this data further.
-Return ONLY the questions, one per line, starting with a dash (-). Do not include any other text or a confirmation line.
+Task: Based on the Summary and Profile for "{filename}", generate 3 extremely concise, professional follow-up questions.
+The goal is to minimize "Speed to Insights". Be direct and analytical.
+Return ONLY the questions, one per line, starting with a dash (-). No confirmation line.
 
 Executive Summary:
 {summary}
@@ -283,17 +285,15 @@ Follow-up Questions:"""
         Generate a clinical, precise answer to a user question based on data context.
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Context: You are analyzing the dataset "{filename}".
-Executive Summary of Data:
-{summary}
-
-Recent Investigation Steps:
-{context}
+Context: Analyzing dataset "{filename}".
+Summary: {summary}
+Context: {context}
 
 Question: {question}
 
-Task: Provide a clinical, precise, and data-driven answer. If the data provided in the summary is insufficient, state what additional analysis might be needed.
-Return your answer in Markdown format.
+Task: Provide a clinical, extremely precise, and data-driven answer. 
+Brevity is mandatory. Minimize "Speed to Insights". Max 3 sentences.
+Return in Markdown format.
 Answer:"""
 
         try:
@@ -307,17 +307,15 @@ Answer:"""
         Yields tokens as they are generated.
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Context: You are analyzing the dataset "{filename}".
-Executive Summary of Data:
-{summary}
-
-Recent Investigation Steps:
-{context}
+Context: Analyzing dataset "{filename}".
+Summary: {summary}
+Context: {context}
 
 Question: {question}
 
-Task: Provide a clinical, precise, and data-driven answer. If the data provided in the summary is insufficient, state what additional analysis might be needed.
-Return your answer in Markdown format.
+Task: Provide a clinical, extremely precise, and data-driven answer. 
+Brevity is mandatory. Minimize "Speed to Insights". Max 3 sentences.
+Return in Markdown format.
 Answer:"""
 
         url = f"{self.base_url}/api/generate"
