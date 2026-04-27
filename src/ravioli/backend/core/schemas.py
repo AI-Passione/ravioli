@@ -109,7 +109,7 @@ class WFSLayer(BaseModel):
 class WFSInjestRequest(BaseModel):
     url: str
     layer: str
-    count: int = 100
+
 
 # --- Setting Schemas ---
 

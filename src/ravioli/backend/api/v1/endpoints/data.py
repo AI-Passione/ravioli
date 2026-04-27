@@ -310,7 +310,7 @@ async def ingest_wfs_layer(
         duckdb_manager.connection.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
         
         client = WFSClient(request.url)
-        data_generator = client.get_features_generator(request.layer, count=request.count)
+        data_generator = client.get_features_generator(request.layer)
         
         # dlt pipeline - isolate by schema and use a unique ID to avoid state collisions
         pipeline = create_ravioli_pipeline(

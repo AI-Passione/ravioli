@@ -176,8 +176,7 @@ async def test_ingest_wfs_layer(client, session, mocker):
     
     payload = {
         "url": "https://test-wfs.com/geoserver",
-        "layer": "test:layer",
-        "count": 10
+        "layer": "test:layer"
     }
 
     response = client.post("/api/v1/data/wfs/ingest", json=payload)
