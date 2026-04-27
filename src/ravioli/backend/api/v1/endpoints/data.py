@@ -261,7 +261,7 @@ async def ingest_wfs_layer(
         # dlt pipeline
         pipeline = create_ravioli_pipeline(
             pipeline_name=f"wfs_{table_name}",
-            dataset_name=None  # Use default schema to match existing ingestion
+            dataset_name="main"  # Explicitly use 'main' to match existing ingestion
         )
         
         # Run the pipeline
