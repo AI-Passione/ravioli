@@ -143,20 +143,10 @@ async def test_list_wfs_layers(client, mocker):
 
 @pytest.mark.anyio
 async def test_ingest_wfs_layer(client, session, mocker):
-    mock_client_cls = mocker.patch("ravioli.backend.api.v1.endpoints.data.WFSClient")
-    mock_client = mock_client_cls.return_value
-    mock_client.get_features_generator = MagicMock()
-    
-    mock_pipeline_run = mocker.patch("ravioli.backend.data.olap.ingestion.dlt_utils.dlt.pipeline")
-    mock_instance = mock_pipeline_run.return_value
-    mock_instance.run.return_value = MagicMock()
-    
-    mock_duckdb = mocker.patch("ravioli.backend.api.v1.endpoints.data.duckdb_manager")
-    mock_duckdb.connection.execute.return_value.fetchone.return_value = [10]
-    
-    # We need to mock the PII scanner too since it's called
-    mocker.patch("ravioli.backend.api.v1.endpoints.data.pii_scanner.scan_dataframe", return_value=False)
-    
+    # Prevent the background task from running — this test only verifies
+    # that the endpoint creates and returns the pending record immediately.
+    mocker.patch("ravioli.backend.api.v1.endpoints.data._run_wfs_ingestion")
+
     # Mock UploadedFile to ensure Pydantic validation passes since we don't have a real DB filling in the defaults
     mock_file = UploadedFile(
         id=uuid.uuid4(),
@@ -173,7 +163,7 @@ async def test_ingest_wfs_layer(client, session, mocker):
         updated_at=datetime.now(UTC)
     )
     mocker.patch("ravioli.backend.api.v1.endpoints.data.UploadedFile", return_value=mock_file)
-    
+
     payload = {
         "url": "https://test-wfs.com/geoserver",
         "layer": "test:layer"
@@ -183,7 +173,6 @@ async def test_ingest_wfs_layer(client, session, mocker):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "completed"
-    assert data["row_count"] == 10
+    assert data["status"] == "pending"
     assert data["schema_name"] == "s_geoserver"
     assert data["source_type"] == "wfs"
