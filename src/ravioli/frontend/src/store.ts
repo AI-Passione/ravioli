@@ -1,12 +1,12 @@
-import type { Analysis, ExecutionLog, UploadedFile } from './types';
+import type { Analysis, AnalysisLog, DataSource } from './types';
 
 type Listener = () => void;
 
 class Store {
   private analyses: Analysis[] = [];
   private activeAnalysisId?: string;
-  private logs: ExecutionLog[] = [];
-  private uploadedFiles: UploadedFile[] = [];
+  private logs: AnalysisLog[] = [];
+  private dataSources: DataSource[] = [];
   private currentView: 'insights' | 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings' = 'insights';
   private listeners: Listener[] = [];
 
@@ -53,19 +53,19 @@ class Store {
 
   getCurrentView() { return this.currentView; }
 
-  setLogs(logs: ExecutionLog[]) {
+  setLogs(logs: AnalysisLog[]) {
     this.logs = logs;
     this.notify();
   }
 
   getLogs() { return this.logs; }
 
-  setUploadedFiles(files: UploadedFile[]) {
-    this.uploadedFiles = files;
+  setDataSources(sources: DataSource[]) {
+    this.dataSources = sources;
     this.notify();
   }
 
-  getUploadedFiles() { return this.uploadedFiles; }
+  getDataSources() { return this.dataSources; }
 }
 
 export const store = new Store();
