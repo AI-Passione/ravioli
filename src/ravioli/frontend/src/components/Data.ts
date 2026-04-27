@@ -314,19 +314,20 @@ export function renderData() {
       // 2. Fire ingestion — backend returns immediately with 'pending' status
       const result = await api.ingestWFSLayer(url, primaryLayer);
       
-      // 3. Close modal right away — user can do other things
+      // 3. Close modal and immediately show the pending row in the table
       hideAddModal();
-      refreshFiles();
+      await refreshFiles();
 
-      // 4. Poll in the background until completed or failed
+      // 4. Poll every 3s: refresh the table on every tick so live row count
+      //    updates are visible. Stop once the status leaves 'pending'.
       if (result.status === 'pending') {
         const pollInterval = setInterval(async () => {
           try {
+            await refreshFiles();
             const files = await api.listFiles();
             const updated = files.find(f => f.id === result.id);
             if (updated && updated.status !== 'pending') {
               clearInterval(pollInterval);
-              refreshFiles();
             }
           } catch {
             clearInterval(pollInterval);
