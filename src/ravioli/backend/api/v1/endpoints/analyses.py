@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 import pandas as pd
 import asyncio
 import io
+import logging
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
@@ -14,6 +15,7 @@ from ydata_profiling import ProfileReport
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post("/", response_model=schemas.Analysis, status_code=status.HTTP_201_CREATED)
 def create_analysis(analysis_in: schemas.AnalysisCreate, db: Session = Depends(get_db)):
@@ -241,7 +243,8 @@ async def stream_question(
             yield "data: [DONE]\n\n"
                 
         except Exception as e:
-            yield f"data: [ERROR] Stream interrupted: {str(e)}\n\n"
+            logger.exception("Stream interrupted for analysis_id=%s", analysis_id)
+            yield "data: [ERROR] Stream interrupted due to an internal error.\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
