@@ -75,6 +75,7 @@ class UploadedFileBase(BaseModel):
     content_type: str
     size_bytes: int
     table_name: str
+    schema_name: str = "main"
     row_count: Optional[int] = None
     description: Optional[str] = None
     status: str

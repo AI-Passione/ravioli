@@ -93,7 +93,7 @@ export function renderData() {
                     </div>
                   </td>
                   <td class="px-8 py-5">
-                    <code class="px-2 py-1 rounded bg-surface-container-highest text-primary-fixed-dim text-xs font-mono border border-outline/5">${file.table_name}</code>
+                    <code class="px-2 py-1 rounded bg-surface-container-highest text-primary-fixed-dim text-xs font-mono border border-outline/5">${file.schema_name}.${file.table_name}</code>
                   </td>
                   <td class="px-8 py-5 text-neutral-300 font-medium">
                     ${file.row_count ? file.row_count.toLocaleString() : '--'}
@@ -108,7 +108,7 @@ export function renderData() {
                     </span>
                   </td>
                   <td class="px-8 py-5 text-right flex justify-end gap-2">
-                    <button class="btn-inspect p-2 rounded-lg hover:bg-primary/10 text-neutral-400 hover:text-primary transition-all" data-table="${file.table_name}" data-filename="${file.original_filename}" title="Preview">
+                    <button class="btn-inspect p-2 rounded-lg hover:bg-primary/10 text-neutral-400 hover:text-primary transition-all" data-table="${file.schema_name}.${file.table_name}" data-filename="${file.original_filename}" title="Preview">
                       <span class="material-symbols-outlined">visibility</span>
                     </button>
                     <button class="btn-delete p-2 rounded-lg hover:bg-red-500/10 text-neutral-400 hover:text-red-400 transition-all" data-id="${file.id}" title="Delete">

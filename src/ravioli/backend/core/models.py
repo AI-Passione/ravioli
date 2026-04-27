@@ -77,6 +77,7 @@ class UploadedFile(Base):
     
     # Table name in DuckDB
     table_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    schema_name: Mapped[str] = mapped_column(String(100), default="main")
     row_count: Mapped[Optional[int]] = mapped_column()
     description: Mapped[Optional[str]] = mapped_column(Text)
     

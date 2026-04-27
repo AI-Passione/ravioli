@@ -20,19 +20,25 @@ class DuckDBManager:
             self._connection = duckdb.connect(str(settings.duckdb_path))
         return self._connection
 
-    def ingest_csv(self, file_path: Path, table_name: str) -> int:
+    def ingest_csv(self, file_path: Path, table_name: str, schema: str = "main") -> int:
         """
         Ingest a CSV file into a DuckDB table.
         If the table exists, it will be replaced.
         Returns the row count.
         """
         conn = self.connection
+        
+        # Create schema if it doesn't exist
+        conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+        
+        full_table_name = f'"{schema}"."{table_name}"'
+        
         # Using DuckDB's native CSV reader for high performance
-        query = f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM read_csv_auto('{file_path}')"
+        query = f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM read_csv_auto('{file_path}')"
         conn.execute(query)
         
         # Get row count
-        count = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+        count = conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
         return count
         
     def query(self, sql: str):
@@ -45,9 +51,15 @@ class DuckDBManager:
 
     def list_tables(self):
         """
-        List all tables in the DuckDB database.
+        List all user tables across all schemas in the DuckDB database.
         """
         conn = self.connection
-        return [row[0] for row in conn.execute("SHOW TABLES").fetchall()]
+        # Using information_schema to see all tables
+        query = """
+            SELECT table_schema || '.' || table_name 
+            FROM information_schema.tables 
+            WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+        """
+        return [row[0] for row in conn.execute(query).fetchall()]
 
 duckdb_manager = DuckDBManager()
