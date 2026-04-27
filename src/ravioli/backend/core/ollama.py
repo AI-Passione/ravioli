@@ -318,7 +318,11 @@ Brevity is mandatory. Minimize "Speed to Insights". Max 3 sentences.
 Return in Markdown format.
 Answer:"""
 
-        url = f"{self.base_url}/api/generate"
+        url = f"{self.base_url.rstrip('/')}/api/generate"
+        headers = {}
+        if self.mode == "cloud" and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
         payload = {
             "model": self.model,
             "prompt": prompt,
@@ -334,15 +338,27 @@ Answer:"""
         
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
-                async with client.stream("POST", url, json=payload) as response:
+                async with client.stream("POST", url, json=payload, headers=headers) as response:
+                    if response.status_code != 200:
+                        error_body = await response.aread()
+                        error_msg = error_body.decode()
+                        print(f"OllamaClient: [ERROR] Stream failed with {response.status_code}: {error_msg}")
+                        yield f"\n\n> [!ERROR]\n> **Stream Error ({response.status_code})**: {error_msg}"
+                        return
+
                     async for line in response.aiter_lines():
-                        if not line:
+                        if not line or not line.strip():
                             continue
-                        data = json.loads(line)
-                        token = data.get("response", "")
-                        if token:
-                            yield token
-                        if data.get("done", False):
-                            break
+                        try:
+                            data = json.loads(line)
+                            token = data.get("response", "")
+                            if token:
+                                yield token
+                            if data.get("done", False):
+                                break
+                        except json.JSONDecodeError as e:
+                            print(f"OllamaClient: [ERROR] Failed to parse JSON line: {line} - {str(e)}")
+                            continue
         except Exception as e:
+            print(f"OllamaClient: [EXCEPTION] Stream interrupted: {str(e)}")
             yield f"\n\n> [!ERROR]\n> **Stream Interrupted**: {str(e)}"
