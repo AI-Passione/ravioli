@@ -100,11 +100,21 @@ export function renderData() {
                   </td>
                   <td class="px-8 py-5">
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold ${
-                      file.status === 'completed' ? 'bg-green-500/10 text-green-400' : 
-                      file.status === 'failed' ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-400'
+                      file.status === 'completed' ? 'bg-green-500/10 text-green-400' :
+                      file.status === 'failed'    ? 'bg-red-500/10 text-red-400' :
+                      file.status === 'pending'   ? 'bg-blue-500/10 text-blue-400' :
+                                                    'bg-yellow-500/10 text-yellow-400'
                     }">
-                      <span class="w-1.5 h-1.5 rounded-full ${file.status === 'completed' ? 'bg-green-400' : file.status === 'failed' ? 'bg-red-400' : 'bg-yellow-400'} ${file.status !== 'completed' ? 'animate-pulse' : ''}"></span>
-                      ${file.status}
+                      ${file.status === 'pending'
+                        ? `<span class="material-symbols-outlined text-[10px] animate-spin">sync</span>`
+                        : `<span class="w-1.5 h-1.5 rounded-full ${
+                            file.status === 'completed' ? 'bg-green-400' :
+                            file.status === 'failed'    ? 'bg-red-400'   : 'bg-yellow-400'
+                          }"></span>`
+                      }
+                      ${file.status === 'pending'   ? 'In Progress' :
+                        file.status === 'completed' ? 'Completed'   :
+                        file.status === 'failed'    ? 'Failed'      : file.status}
                     </span>
                   </td>
                   <td class="px-8 py-5 text-right flex justify-end gap-2">
