@@ -1,7 +1,7 @@
 import re
 import pandas as pd
 import logging
-from typing import List, Dict
+from typing import List
 
 logger = logging.getLogger(__name__)
 
