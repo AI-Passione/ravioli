@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import AsyncMock
 from datetime import datetime, UTC
 
 def test_create_analysis(client, session):
@@ -108,3 +109,40 @@ def test_create_analysis_with_notebook(client, session):
     assert data["title"] == "Notebook Analysis"
     assert data["notebook"] == notebook_content
     assert data["notebook"]["cells"][0]["source"] == ["# Test Notebook"]
+
+def test_get_suggested_prompts(client, session, mocker):
+    analysis_id = uuid.uuid4()
+    
+    # Mock analysis and logs
+    class MockAnalysis:
+        def __init__(self):
+            self.id = analysis_id
+            self.result = "Sample summary"
+            self.analysis_metadata = {"filename": "test.csv"}
+            
+    session.query().filter().first.return_value = MockAnalysis()
+    session.query().filter().order_by().limit().all.return_value = []
+    
+    # Mock OllamaClient
+    mock_ollama = mocker.patch("ravioli.backend.core.ollama.OllamaClient.generate_suggested_prompts", new_callable=AsyncMock)
+    mock_ollama.return_value = ["Prompt 1", "Prompt 2", "Prompt 3"]
+    
+    # Execute request
+    response = client.get(f"/api/v1/analyses/{analysis_id}/suggested-prompts")
+    
+    # Assertions
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 3
+    assert data[0] == "Prompt 1"
+    assert mock_ollama.called
+
+def test_get_suggested_prompts_not_found(client, session):
+    # Mock session to return None
+    session.query().filter().first.return_value = None
+    
+    # Execute request
+    response = client.get(f"/api/v1/analyses/{uuid.uuid4()}/suggested-prompts")
+    
+    # Assertions
+    assert response.status_code == 404

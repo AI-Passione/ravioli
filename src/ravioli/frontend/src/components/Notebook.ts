@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import MarkdownIt from 'markdown-it';
 
 const md = new MarkdownIt({
-  html: true,
+  html: false,
   linkify: true,
   typographer: true
 });
@@ -122,7 +122,7 @@ export function renderNotebook() {
       </div>
     </header>
 
-    <div class="flex-1 overflow-y-auto px-12 py-8 space-y-12" id="cell-container">
+    <div class="flex-1 overflow-y-auto px-12 pt-8 pb-32 space-y-12 custom-scrollbar" id="cell-container">
       ${analysis.result ? `
         <div class="glass-panel p-12 rounded-[2rem] space-y-8 border-primary/20 bg-primary/[0.02] animate-in fade-in slide-in-from-bottom-8 duration-1000 relative overflow-hidden group">
           <!-- Subtle glow background -->
@@ -139,6 +139,23 @@ export function renderNotebook() {
             ${renderMarkdown(analysis.result)}
           </div>
           
+          ${analysis.analysis_metadata?.followup_questions?.length ? `
+            <div class="pt-12 border-t border-outline-variant/10 space-y-6 relative z-10">
+              <div class="flex items-center gap-3 text-tertiary">
+                <span class="material-symbols-outlined text-xl" data-icon="explore">explore</span>
+                <p class="text-[10px] font-label-md uppercase tracking-[0.3em]">Follow-up Sequences</p>
+              </div>
+              <div class="grid grid-cols-1 gap-3">
+                ${analysis.analysis_metadata.followup_questions.map((q: string) => `
+                  <button class="followup-question-btn flex items-center justify-between w-full px-6 py-4 text-left text-sm font-body-md text-on-surface-variant bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/10 rounded-xl transition-all duration-300 group hover:border-primary/30 hover:translate-x-1" data-question="${q.replace(/"/g, '&quot;')}">
+                    <span class="group-hover:text-white transition-colors">${q}</span>
+                    <span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-lg opacity-0 group-hover:opacity-100" data-icon="arrow_forward_ios">arrow_forward_ios</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
           <div class="flex items-center justify-between pt-6 border-t border-outline-variant/10 relative z-10">
             <div class="flex items-center gap-2 opacity-40 hover:opacity-100 transition-opacity">
               <span class="material-symbols-outlined text-sm" data-icon="verified">verified</span>
@@ -154,13 +171,13 @@ export function renderNotebook() {
       ${logs.map(log => `
         <div class="group animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div class="flex items-center gap-4 mb-4">
-             <div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center">
-                <span class="material-symbols-outlined text-sm ${log.log_type === 'user_query' ? 'text-primary' : 'text-tertiary'}" data-icon="${log.log_type === 'user_query' ? 'person' : 'smart_toy'}">
-                   ${log.log_type === 'user_query' ? 'person' : 'smart_toy'}
-                </span>
+             <div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 overflow-hidden border border-outline-variant/20">
+                ${log.log_type === 'user_query' 
+                  ? `<span class="material-symbols-outlined text-outline text-sm" data-icon="person">person</span>` 
+                  : `<img src="/src/assets/kowalski.png" class="w-full h-full object-cover" alt="Kowalski">`}
              </div>
              <span class="text-[10px] uppercase tracking-[0.2em] text-outline font-label-sm">
-                ${log.log_type === 'user_query' ? 'Operator' : 'Agent Core'}
+                ${log.log_type === 'user_query' ? 'Operator' : 'Kowalski'}
              </span>
           </div>
           <div class="pl-12">
@@ -170,36 +187,124 @@ export function renderNotebook() {
           </div>
         </div>
       `).join('')}
+    </div>
 
-      <!-- Interaction Cell -->
-      <div class="pt-12 mt-12 border-t border-outline-variant/10">
-        <div class="glass-panel p-6 rounded-2xl group focus-within:border-primary/30 transition-all duration-500">
-          <div class="flex gap-6 items-start">
-            <div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0">
-               <span class="material-symbols-outlined text-primary" data-icon="edit_note">edit_note</span>
+    <!-- Floating Interaction Cell (Perplexity Style) -->
+    <div class="w-full px-12 pb-12 pt-6 bg-gradient-to-t from-background via-background/90 to-transparent relative z-20">
+      <div class="max-w-4xl mx-auto relative">
+        <div class="glass-panel p-2 rounded-[2rem] group focus-within:border-primary/30 transition-all duration-500 shadow-2xl shadow-primary/5">
+          <div class="flex items-center gap-4 px-4">
+            <button id="btn-magic" class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 hover:bg-primary/20 transition-colors relative group/magic" title="Magic Suggestions">
+               <span class="material-symbols-outlined text-primary text-xl group-hover/magic:rotate-12 transition-transform" data-icon="auto_awesome">auto_awesome</span>
+               
+               <!-- Suggestions Popover -->
+               <div id="magic-popover" class="absolute bottom-full left-0 mb-4 w-80 glass-panel p-4 rounded-2xl hidden animate-in fade-in slide-in-from-bottom-2 duration-300 z-50">
+                  <div class="flex items-center gap-2 mb-3 text-tertiary">
+                    <span class="material-symbols-outlined text-sm" data-icon="lightbulb">lightbulb</span>
+                    <span class="text-[10px] font-label-md uppercase tracking-[0.2em]">Neural Suggestions</span>
+                  </div>
+                  <div id="magic-suggestions-list" class="space-y-2">
+                    <!-- Dynamic suggestions here -->
+                  </div>
+               </div>
+            </button>
+            <div class="flex-1 min-w-0 py-2">
+              <textarea id="cell-input" class="w-full bg-transparent border-none text-on-surface focus:ring-0 resize-none py-2 text-lg font-body-lg max-h-48 custom-scrollbar" placeholder="Ask Kowalski a follow-up question..." rows="1"></textarea>
             </div>
-            <div class="flex-1 space-y-4">
-              <textarea id="cell-input" class="w-full bg-transparent border-none text-on-surface focus:ring-0 resize-none py-2 text-lg font-body-lg" placeholder="What sequence should we initialize next?" rows="1"></textarea>
-              <div class="flex justify-end">
-                <button id="btn-execute" class="btn-primary flex items-center gap-2 group/btn">
-                  <span>Execute</span>
-                  <span class="material-symbols-outlined text-sm group-hover/btn:translate-x-1 transition-transform" data-icon="send">send</span>
-                </button>
-              </div>
+            <div class="flex items-center pr-2">
+              <button id="btn-execute" class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center hover:scale-110 transition-transform disabled:opacity-50 disabled:scale-100 group/btn shadow-lg shadow-primary/20">
+                <span class="material-symbols-outlined text-xl group-hover/btn:translate-x-0.5 transition-transform" data-icon="arrow_forward">arrow_forward</span>
+              </button>
             </div>
           </div>
+        </div>
+        
+        <!-- Subtle Status Hint -->
+        <div class="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none">
+          <span class="text-[10px] uppercase tracking-[0.3em] text-primary/50 font-label-sm">Kowalski Neural Link Active</span>
         </div>
       </div>
     </div>
   `;
 
+  // Auto-scroll to bottom for latest convo
+  setTimeout(() => {
+    const scrollContainer = container.querySelector('#cell-container');
+    if (scrollContainer) {
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    }
+  }, 100);
+
   const input = container.querySelector('#cell-input') as HTMLTextAreaElement;
   const btn = container.querySelector('#btn-execute');
+  const btnMagic = container.querySelector('#btn-magic');
+  const magicPopover = container.querySelector('#magic-popover');
+  const suggestionsList = container.querySelector('#magic-suggestions-list');
+
+  // Magic Suggestions
+  btnMagic?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!activeId) return;
+
+    if (magicPopover?.classList.contains('hidden')) {
+      // Show and Load
+      magicPopover.classList.remove('hidden');
+      if (suggestionsList) {
+        suggestionsList.innerHTML = `
+          <div class="py-4 flex flex-col items-center gap-2 opacity-50">
+            <span class="material-symbols-outlined animate-spin text-lg" data-icon="progress_activity">progress_activity</span>
+            <span class="text-[9px] uppercase tracking-widest font-label-sm">Analyzing context...</span>
+          </div>
+        `;
+
+        try {
+          const prompts = await api.getSuggestedPrompts(activeId);
+          suggestionsList.innerHTML = prompts.map(p => `
+            <button class="magic-suggestion-item w-full text-left px-3 py-2 text-xs font-body-sm text-on-surface-variant hover:bg-primary/10 hover:text-primary rounded-lg border border-transparent hover:border-primary/20 transition-all duration-200" data-prompt="${p.replace(/"/g, '&quot;')}">
+              ${p}
+            </button>
+          `).join('');
+
+          // Bind items
+          suggestionsList.querySelectorAll('.magic-suggestion-item').forEach(item => {
+            item.addEventListener('click', () => {
+              const prompt = item.getAttribute('data-prompt');
+              if (prompt && input) {
+                input.value = prompt;
+                input.dispatchEvent(new Event('input'));
+                magicPopover.classList.add('hidden');
+                input.focus();
+              }
+            });
+          });
+        } catch (err) {
+          suggestionsList.innerHTML = `<div class="text-[10px] text-error p-2">Neural Link Interrupted</div>`;
+        }
+      }
+    } else {
+      magicPopover?.classList.add('hidden');
+    }
+  });
+
+  // Close popover on outside click
+  document.addEventListener('click', () => {
+    magicPopover?.classList.add('hidden');
+  });
+  
+  magicPopover?.addEventListener('click', (e) => e.stopPropagation());
 
   // Auto-resize textarea
   input?.addEventListener('input', () => {
     input.style.height = 'auto';
     input.style.height = input.scrollHeight + 'px';
+  });
+
+  // Enter to send (Shift+Enter for newline)
+  input?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      btn?.dispatchEvent(new Event('click'));
+    }
   });
 
   btn?.addEventListener('click', async () => {
@@ -211,14 +316,89 @@ export function renderNotebook() {
     btn.setAttribute('disabled', 'true');
     btn.classList.add('opacity-50');
 
-    try {
-      await api.askQuestion(activeId, question);
-    } catch (err) {
-      console.error('Failed to submit question', err);
-    } finally {
-      btn.removeAttribute('disabled');
-      btn.classList.remove('opacity-50');
-    }
+    // Create a temporary streaming bubble
+    const cellContainer = container.querySelector('#cell-container');
+    if (!cellContainer) return;
+
+    // 1. Add user query bubble immediately
+    const userBubble = document.createElement('div');
+    userBubble.className = 'group animate-in fade-in slide-in-from-bottom-4 duration-500';
+    userBubble.innerHTML = `
+      <div class="flex items-center gap-4 mb-4">
+         <div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 overflow-hidden border border-outline-variant/20">
+            <span class="material-symbols-outlined text-outline text-sm" data-icon="person">person</span>
+         </div>
+         <span class="text-[10px] uppercase tracking-[0.2em] text-outline font-label-sm">Operator</span>
+      </div>
+      <div class="pl-12">
+        <div class="prose prose-invert max-w-none text-on-surface-variant leading-relaxed font-body-lg">
+          ${renderMarkdown(question)}
+        </div>
+      </div>
+    `;
+    cellContainer.appendChild(userBubble);
+
+    // 2. Add Kowalski streaming bubble
+    const agentBubble = document.createElement('div');
+    agentBubble.className = 'group animate-in fade-in slide-in-from-bottom-4 duration-500 mt-12';
+    agentBubble.innerHTML = `
+      <div class="flex items-center gap-4 mb-4">
+         <div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 overflow-hidden border border-outline-variant/20">
+            <img src="/src/assets/kowalski.png" class="w-full h-full object-cover" alt="Kowalski">
+         </div>
+         <span class="text-[10px] uppercase tracking-[0.2em] text-outline font-label-sm">Kowalski</span>
+      </div>
+      <div class="pl-12">
+        <div class="prose prose-invert max-w-none text-on-surface-variant leading-relaxed font-body-lg" id="streaming-content">
+          <span class="inline-block w-1 h-4 bg-primary animate-pulse"></span>
+        </div>
+      </div>
+    `;
+    cellContainer.appendChild(agentBubble);
+    cellContainer.scrollTop = cellContainer.scrollHeight;
+
+    let fullText = "";
+    const streamingContent = agentBubble.querySelector('#streaming-content');
+
+    api.streamQuestion(activeId, question, 
+      (token) => {
+        fullText += token;
+        if (streamingContent) {
+          streamingContent.innerHTML = renderMarkdown(fullText) + '<span class="inline-block w-1 h-4 bg-primary animate-pulse ml-1"></span>';
+          cellContainer.scrollTop = cellContainer.scrollHeight;
+        }
+      },
+      async () => {
+        // Complete
+        if (streamingContent) {
+          streamingContent.innerHTML = renderMarkdown(fullText);
+        }
+        btn.removeAttribute('disabled');
+        btn.classList.remove('opacity-50');
+        // Refresh to get official logs and IDs
+        const newLogs = await api.listLogs(activeId);
+        store.setLogs(newLogs);
+      },
+      (err) => {
+        console.error('Streaming error', err);
+        btn.removeAttribute('disabled');
+        btn.classList.remove('opacity-50');
+      }
+    );
+  });
+
+  // Follow-up question clicks
+  container.querySelectorAll('.followup-question-btn').forEach(fBtn => {
+    fBtn.addEventListener('click', () => {
+      const question = fBtn.getAttribute('data-question');
+      if (!question) return;
+      if (input) {
+        input.value = question;
+        input.style.height = 'auto';
+        input.style.height = input.scrollHeight + 'px';
+        btn?.dispatchEvent(new Event('click'));
+      }
+    });
   });
 
   return container;

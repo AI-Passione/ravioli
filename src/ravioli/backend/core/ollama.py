@@ -18,7 +18,7 @@ def _load_kowalski_persona() -> str:
         print(f"OllamaClient: [WARNING] Failed to load Kowalski dossier: {e}")
     
     # Minimal fallback if file is missing
-    return "You are Kowalski, a lead analytics specialist. Clinical and precise. Confirm with 'Tak.'"
+    return "You are Kowalski, a lead analytics specialist. Clinical and precise. Punctuate with varied Polish analytical confirmations (Tak, Zrozumiałem, Oczywiście, etc.) to signal clinical status."
 
 KOWALSKI_PERSONA = _load_kowalski_persona()
 
@@ -86,14 +86,14 @@ class OllamaClient:
         Generate a professional, concise description for a data asset based on its name and content.
         """
         prompt = f"""
-You are a professional data engineer. Generate a concise, one-sentence description for a data asset.
+You are a professional data engineer. Generate an extremely concise, single-sentence description for a data asset.
 The asset is named "{filename}".
 Here is a preview of the data (CSV format):
 ---
 {sample_data}
 ---
-The description should focus on what the data represents and its primary utility.
-Be professional, objective, and avoid filler words.
+The description should focus on what the data represents.
+Be clinical, objective, and avoid ALL filler words. Max 15 words.
 Description:"""
 
         url = f"{self.base_url.rstrip('/')}/api/generate"
@@ -190,8 +190,9 @@ Description:"""
         Generate key insights for a data asset based on its content.
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Task: Analyze the statistical profile of the dataset "{filename}" and provide 8-10 concise bullet points of clinical insights.
-Focus on quantifiable trends and anomalies across the ENTIRE dataset.
+Task: Analyze the statistical profile of "{filename}" and provide 3-5 high-impact, extremely concise clinical insights.
+Prioritize the most significant quantifiable trends and anomalies.
+Minimize "Speed to Insights": be direct, precise, and brief.
 Return ONLY the bullet points, followed by a Polish confirmation line.
 
 Dataset Profile:
@@ -212,7 +213,7 @@ Key Insights:"""
         Generate potential assumptions made during data analysis.
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Task: Analyze the statistical profile of "{filename}" and provide 2-3 clinical assumptions for analysis.
+Task: Analyze the statistical profile of "{filename}" and provide 2 extremely concise clinical assumptions.
 Return ONLY the bullet points, followed by a Polish confirmation line.
 
 Dataset Profile:
@@ -232,8 +233,8 @@ Assumptions:"""
         Generate potential limitations and issues for the data.
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Task: Analyze the statistical profile of "{filename}" and identify 2-3 clinical limitations or data quality issues.
-Return ONLY the bullet points, followed by a Polish confirmation line.
+Task: Analyze the statistical profile of "{filename}" and identify 1-2 critical clinical limitations.
+Be extremely brief. Return ONLY the bullet points, followed by a Polish confirmation line.
 
 Dataset Profile:
 ---
@@ -246,3 +247,146 @@ Limitations & Issues:"""
             return await self._generate(prompt, "Limitations", temperature=0.4, num_predict=300)
         except Exception:
             return "- Limited context on data collection methodology.\n- Sample size may not capture all edge case variance."
+
+    async def generate_followup_questions(self, filename: str, summary: str, sample_data: str) -> list[str]:
+        """
+        Generate 3-4 insightful follow-up questions based on the summary and data profile.
+        """
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Based on the Summary and Profile for "{filename}", generate 3 extremely concise, professional follow-up questions.
+The goal is to minimize "Speed to Insights". Be direct and analytical.
+Return ONLY the questions, one per line, starting with a dash (-). No confirmation line.
+
+Executive Summary:
+{summary}
+
+Dataset Profile Sample:
+{sample_data[:2000]}
+
+Follow-up Questions:"""
+
+        try:
+            content = await self._generate(prompt, "Follow-up Questions", temperature=0.6, num_predict=400)
+            # Parse bullet points into a list
+            questions = [q.strip("- ").strip() for q in content.split('\n') if q.strip().startswith("-")]
+            # Filter out empty or too short questions
+            questions = [q for q in questions if len(q) > 10][:4]
+            return questions
+        except Exception:
+            return [
+                "What are the primary drivers behind the observed volume concentration?",
+                "Are there specific time periods where the anomalies are more prevalent?",
+                "How do these trends compare to historical baseline patterns?",
+                "What is the impact of the identified limitations on the overall analysis?"
+            ]
+
+    async def generate_suggested_prompts(self, filename: str, summary: str, context: str) -> list[str]:
+        """
+        Generate 3 high-impact analytical prompts based on the summary and conversation history.
+        """
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Based on the Summary and Conversation History for dataset "{filename}", generate 3 high-impact analytical prompts that the user can click to deep dive into specific trends or anomalies.
+Be extremely concise. Each prompt should be a clear, actionable instruction for Kowalski.
+Return ONLY the prompts, one per line, starting with a dash (-). No confirmation line.
+
+Summary:
+{summary}
+
+Conversation History:
+{context}
+
+Suggested Prompts:"""
+
+        try:
+            content = await self._generate(prompt, "Suggested Prompts", temperature=0.7, num_predict=400)
+            prompts = [p.strip("- ").strip() for p in content.split('\n') if p.strip().startswith("-")]
+            return [p for p in prompts if len(p) > 5][:3]
+        except Exception:
+            return [
+                "Perform a deep dive into the primary volume drivers.",
+                "Analyze the temporal distribution of identified anomalies.",
+                "Quantify the statistical impact of the data limitations."
+            ]
+
+    async def generate_answer(self, filename: str, summary: str, context: str, question: str) -> str:
+        """
+        Generate a clinical, precise answer to a user question based on data context.
+        """
+        prompt = f"""{KOWALSKI_PERSONA}
+Context: Analyzing dataset "{filename}".
+Summary: {summary}
+Context: {context}
+
+Question: {question}
+
+Task: Provide a clinical, extremely precise, and data-driven answer. 
+Brevity is mandatory. Minimize "Speed to Insights". Max 3 sentences.
+Return in Markdown format.
+Answer:"""
+
+        try:
+            return await self._generate(prompt, "Agent Answer", temperature=0.4, num_predict=1000)
+        except Exception as e:
+            return f"> [!WARNING]\n> **Neural Link Interrupted**: {str(e)}\n\nKowalski is currently unable to process this request. Please check your AI node connection."
+
+    async def stream_answer(self, filename: str, summary: str, context: str, question: str):
+        """
+        Stream a clinical, precise answer to a user question.
+        Yields tokens as they are generated.
+        """
+        prompt = f"""{KOWALSKI_PERSONA}
+Context: Analyzing dataset "{filename}".
+Summary: {summary}
+Context: {context}
+
+Question: {question}
+
+Task: Provide a clinical, extremely precise, and data-driven answer. 
+Brevity is mandatory. Minimize "Speed to Insights". Max 3 sentences.
+Return in Markdown format.
+Answer:"""
+
+        url = f"{self.base_url.rstrip('/')}/api/generate"
+        headers = {}
+        if self.mode == "cloud" and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": True,
+            "options": {
+                "temperature": 0.4,
+                "num_predict": 1000
+            }
+        }
+
+        import httpx
+        import json
+        
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                async with client.stream("POST", url, json=payload, headers=headers) as response:
+                    if response.status_code != 200:
+                        error_body = await response.aread()
+                        error_msg = error_body.decode()
+                        print(f"OllamaClient: [ERROR] Stream failed with {response.status_code}: {error_msg}")
+                        yield f"\n\n> [!ERROR]\n> **Stream Error ({response.status_code})**: {error_msg}"
+                        return
+
+                    async for line in response.aiter_lines():
+                        if not line or not line.strip():
+                            continue
+                        try:
+                            data = json.loads(line)
+                            token = data.get("response", "")
+                            if token:
+                                yield token
+                            if data.get("done", False):
+                                break
+                        except json.JSONDecodeError as e:
+                            print(f"OllamaClient: [ERROR] Failed to parse JSON line: {line} - {str(e)}")
+                            continue
+        except Exception as e:
+            print(f"OllamaClient: [EXCEPTION] Stream interrupted: {str(e)}")
+            yield f"\n\n> [!ERROR]\n> **Stream Interrupted**: {str(e)}"

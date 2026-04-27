@@ -95,3 +95,24 @@ async def test_generate_description_auth_failure(mock_db, mocker):
     with pytest.raises(Exception) as exc:
         await client.generate_description("test.csv", "sample")
     assert "authentication failed" in str(exc.value)
+
+@pytest.mark.anyio
+async def test_generate_suggested_prompts(mock_db, mocker):
+    client = OllamaClient(mock_db)
+    
+    # Mock _generate instead of full HTTP call for brevity
+    mock_gen = mocker.patch.object(OllamaClient, "_generate", new_callable=AsyncMock)
+    mock_gen.return_value = "- Analyze the trends.\n- Check anomalies.\n- Compare segments."
+    
+    prompts = await client.generate_suggested_prompts("data.csv", "Summary", "Context")
+    
+    assert len(prompts) == 3
+    assert prompts[0] == "Analyze the trends."
+    assert prompts[1] == "Check anomalies."
+    assert prompts[2] == "Compare segments."
+    
+    # Verify fallback
+    mock_gen.side_effect = Exception("AI failed")
+    fallback_prompts = await client.generate_suggested_prompts("data.csv", "Summary", "Context")
+    assert len(fallback_prompts) == 3
+    assert "Perform a deep dive" in fallback_prompts[0]

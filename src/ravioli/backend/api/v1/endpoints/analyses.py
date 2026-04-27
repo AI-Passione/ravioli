@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, BackgroundTasks
+from fastapi.responses import StreamingResponse
 import pandas as pd
 import asyncio
 import io
+import logging
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
@@ -13,6 +15,7 @@ from ydata_profiling import ProfileReport
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post("/", response_model=schemas.Analysis, status_code=status.HTTP_201_CREATED)
 def create_analysis(analysis_in: schemas.AnalysisCreate, db: Session = Depends(get_db)):
@@ -46,6 +49,47 @@ def list_analyses(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     """
     analyses = db.query(models.Analysis).order_by(models.Analysis.created_at.desc()).offset(skip).limit(limit).all()
     return analyses
+
+@router.get("/{analysis_id}/suggested-prompts", response_model=List[str])
+async def get_suggested_prompts(
+    analysis_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate 3 high-impact analytical prompts based on context.
+    """
+    analysis = db.query(models.Analysis).filter(models.Analysis.id == analysis_id).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    
+    # Context preparation
+    filename = analysis.analysis_metadata.get("filename", "Unknown Dataset")
+    summary = analysis.result or "No summary available."
+    
+    # Get last 5 logs for context
+    previous_logs = db.query(models.ExecutionLog)\
+        .filter(models.ExecutionLog.analysis_id == analysis_id)\
+        .order_by(models.ExecutionLog.timestamp.desc())\
+        .limit(5).all()
+    
+    context_str = ""
+    for log in reversed(previous_logs):
+        role = "Operator" if log.log_type == "user_query" else "Kowalski"
+        context_str += f"{role}: {log.content}\n"
+        
+    from ravioli.backend.core.ollama import OllamaClient
+    client = OllamaClient(db)
+    
+    try:
+        prompts = await client.generate_suggested_prompts(filename, summary, context_str)
+        return prompts
+    except Exception as e:
+        logger.error(f"Error generating suggested prompts: {e}")
+        return [
+            "Perform a deep dive into the primary volume drivers.",
+            "Analyze the temporal distribution of identified anomalies.",
+            "Quantify the statistical impact of the data limitations."
+        ]
 
 @router.get("/{analysis_id}", response_model=schemas.Analysis)
 def get_analysis(analysis_id: UUID, db: Session = Depends(get_db)):
@@ -88,7 +132,12 @@ def delete_analysis(analysis_id: UUID, db: Session = Depends(get_db)):
     return None
 
 @router.post("/{analysis_id}/ask", status_code=status.HTTP_202_ACCEPTED)
-def ask_question(analysis_id: UUID, question_in: schemas.QuestionCreate, db: Session = Depends(get_db)):
+async def ask_question(
+    analysis_id: UUID, 
+    question_in: schemas.QuestionCreate, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
     """
     Submit a question to an analysis.
     """
@@ -106,17 +155,142 @@ def ask_question(analysis_id: UUID, question_in: schemas.QuestionCreate, db: Ses
     
     # 2. Update analysis status
     analysis.status = "running"
-    
-    # 3. Create mock agent response (for UI testing)
-    agent_log = models.ExecutionLog(
-        analysis_id=analysis_id,
-        log_type="thought",
-        content=f"Analyzing your question: '{question_in.question}'..."
-    )
-    db.add(agent_log)
-    
     db.commit()
+    
+    # 3. Queue background processing
+    background_tasks.add_task(process_analysis_question, str(analysis_id), question_in.question)
+    
     return {"message": "Question received and processing started"}
+
+async def process_analysis_question(analysis_id: str, question: str):
+    """
+    Background task to generate AI response for a question.
+    """
+    from ravioli.backend.core.database import SessionLocal
+    from ravioli.backend.core.ollama import OllamaClient
+    import uuid
+    
+    db = SessionLocal()
+    try:
+        analysis_uuid = uuid.UUID(analysis_id)
+        analysis = db.query(models.Analysis).filter(models.Analysis.id == analysis_uuid).first()
+        if not analysis:
+            return
+
+        # Prepare context
+        filename = analysis.analysis_metadata.get("filename", "Unknown Dataset")
+        summary = analysis.result or "No summary available."
+        
+        # Get last 5 logs for context
+        previous_logs = db.query(models.ExecutionLog)\
+            .filter(models.ExecutionLog.analysis_id == analysis_uuid)\
+            .order_by(models.ExecutionLog.timestamp.desc())\
+            .limit(6).all() # 6 because we just added the current question
+        
+        context_str = ""
+        for log in reversed(previous_logs[1:]): # Skip the latest question for context
+            role = "Operator" if log.log_type == "user_query" else "Kowalski"
+            context_str += f"{role}: {log.content}\n"
+
+        # Generate answer
+        client = OllamaClient(db)
+        answer = await client.generate_answer(filename, summary, context_str, question)
+        
+        # Save answer
+        agent_log = models.ExecutionLog(
+            analysis_id=analysis_id,
+            log_type="thought",
+            content=answer
+        )
+        db.add(agent_log)
+        
+        # Update status
+        analysis.status = "completed"
+        db.commit()
+    except Exception as e:
+        print(f"Error in background task process_analysis_question: {e}")
+        # Optionally add an error log to the analysis
+    finally:
+        db.close()
+
+@router.get("/{analysis_id}/stream")
+async def stream_question(
+    analysis_id: UUID,
+    question: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Stream a response to a question using Server-Sent Events.
+    """
+    analysis = db.query(models.Analysis).filter(models.Analysis.id == analysis_id).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    # 1. Create user log
+    user_log = models.ExecutionLog(
+        analysis_id=analysis_id,
+        log_type="user_query",
+        content=question
+    )
+    db.add(user_log)
+    analysis.status = "running"
+    db.commit()
+
+    async def event_generator():
+        from ravioli.backend.core.database import SessionLocal
+        from ravioli.backend.core.ollama import OllamaClient
+        
+        # Context preparation (same as background task)
+        filename = analysis.analysis_metadata.get("filename", "Unknown Dataset")
+        summary = analysis.result or "No summary available."
+        
+        # Get last 5 logs for context
+        previous_logs = db.query(models.ExecutionLog)\
+            .filter(models.ExecutionLog.analysis_id == analysis_id)\
+            .order_by(models.ExecutionLog.timestamp.desc())\
+            .limit(6).all()
+        
+        context_str = ""
+        for log in reversed(previous_logs[1:]):
+            role = "Operator" if log.log_type == "user_query" else "Kowalski"
+            context_str += f"{role}: {log.content}\n"
+
+        client = OllamaClient(db)
+        full_response = ""
+        
+        try:
+            async for token in client.stream_answer(filename, summary, context_str, question):
+                full_response += token
+                yield f"data: {token}\n\n"
+            
+            # Persistence at the end
+            async_db = SessionLocal()
+            try:
+                agent_log = models.ExecutionLog(
+                    analysis_id=analysis_id,
+                    log_type="thought",
+                    content=full_response
+                )
+                async_db.add(agent_log)
+                
+                # Re-fetch analysis in this session
+                a = async_db.query(models.Analysis).filter(models.Analysis.id == analysis_id).first()
+                if a:
+                    a.status = "completed"
+                async_db.commit()
+            finally:
+                async_db.close()
+            
+            yield "data: [DONE]\n\n"
+                
+        except Exception as e:
+            logger.exception("Stream interrupted for analysis_id=%s", analysis_id)
+            yield "data: [ERROR] Stream interrupted due to an internal error.\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    
+
+
 
 def prepare_dataframe_for_analysis(df: pd.DataFrame) -> pd.DataFrame:
     """Intelligently detects and casts column types for better statistical analysis."""
@@ -225,13 +399,13 @@ REPRESENTATIVE SAMPLE (FIRST 10 ROWS):
 {sample}
 """
 
-async def generate_summary(db: Session, filename: str, row_count: int, col_count: int, columns: str, sample_data: str) -> str:
+async def generate_summary(db: Session, filename: str, row_count: int, col_count: int, columns: str, sample_data: str) -> tuple[str, list[str]]:
     template_path = Path(__file__).resolve().parents[4] / "ai" / "templates" / "quick_insight_template.md"
     try:
         template = template_path.read_text()
     except Exception:
         # Fallback if template is missing
-        return f"Summary for {filename}: {row_count} rows, {col_count} columns."
+        return f"Summary for {filename}: {row_count} rows, {col_count} columns.", []
 
     # Use Ollama for key insights, assumptions, and limitations
     from ravioli.backend.core.ollama import OllamaClient
@@ -269,10 +443,20 @@ async def generate_summary(db: Session, filename: str, row_count: int, col_count
         limitations_and_issues=limitations
     )
     # Regex to find standalone numbers (including decimals) and wrap them in backticks
-    # We avoid wrapping numbers that are already wrapped in backticks
     summary = re.sub(r'(?<!`)\b(\d+(?:\.\d+)?)\b(?!`)', r'`\1`', summary)
     
-    return summary
+    # Generate follow-up questions
+    try:
+        followup_questions = await client.generate_followup_questions(filename, summary, sample_data)
+    except Exception:
+        followup_questions = [
+            "What are the primary drivers behind the observed volume concentration?",
+            "Are there specific time periods where the anomalies are more prevalent?",
+            "How do these trends compare to historical baseline patterns?",
+            "What is the impact of the identified limitations on the overall analysis?"
+        ]
+    
+    return summary, followup_questions
 
 @router.post("/quick-insight", response_model=schemas.QuickInsightResponse)
 async def create_quick_insight(
@@ -300,7 +484,7 @@ async def create_quick_insight(
 
     # Generate Summary using template and Ollama
     title = f"Quick Insight: {file.filename}"
-    summary = await generate_summary(db, file.filename, row_count, col_count, columns, data_profile)
+    summary, followup_questions = await generate_summary(db, file.filename, row_count, col_count, columns, data_profile)
 
     # Create the analysis record
     db_analysis = models.Analysis(
@@ -308,7 +492,12 @@ async def create_quick_insight(
         description=f"Quick insight generated from {file.filename}",
         status="completed",
         result=summary,
-        analysis_metadata={"type": "quick_insight", "filename": file.filename, "row_count": row_count}
+        analysis_metadata={
+            "type": "quick_insight", 
+            "filename": file.filename, 
+            "row_count": row_count,
+            "followup_questions": followup_questions
+        }
     )
     db.add(db_analysis)
     db.commit()
@@ -318,7 +507,8 @@ async def create_quick_insight(
         analysis_id=db_analysis.id,
         title=title,
         summary=summary,
-        stats={"rows": row_count, "cols": col_count}
+        stats={"rows": row_count, "cols": col_count},
+        followup_questions=followup_questions
     )
 
 @router.post("/quick-insight/existing", response_model=schemas.QuickInsightResponse)
@@ -361,7 +551,7 @@ async def create_quick_insight_existing(
 
     # Generate Summary using template and Ollama
     title = f"Quick Insight: {db_file.original_filename}"
-    summary = await generate_summary(db, db_file.original_filename, row_count, col_count, columns, data_profile)
+    summary, followup_questions = await generate_summary(db, db_file.original_filename, row_count, col_count, columns, data_profile)
 
     # Create the analysis record
     db_analysis = models.Analysis(
@@ -369,7 +559,12 @@ async def create_quick_insight_existing(
         description=f"Quick insight generated from {db_file.original_filename}",
         status="completed",
         result=summary,
-        analysis_metadata={"type": "quick_insight", "file_id": str(db_file.id), "row_count": row_count}
+        analysis_metadata={
+            "type": "quick_insight", 
+            "file_id": str(db_file.id), 
+            "row_count": row_count,
+            "followup_questions": followup_questions
+        }
     )
     db.add(db_analysis)
     db.commit()
@@ -379,5 +574,6 @@ async def create_quick_insight_existing(
         analysis_id=db_analysis.id,
         title=title,
         summary=summary,
-        stats={"rows": row_count, "cols": col_count}
+        stats={"rows": row_count, "cols": col_count},
+        followup_questions=followup_questions
     )

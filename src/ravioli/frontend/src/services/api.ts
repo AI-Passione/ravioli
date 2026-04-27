@@ -1,4 +1,4 @@
-import type { Analysis, AnalysisCreate, ExecutionLog, UploadedFile } from '../types';
+import type { Analysis, AnalysisCreate, ExecutionLog, UploadedFile, QuickInsightResponse } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -40,8 +40,36 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to ask question');
   },
+  
+  streamQuestion(analysisId: string, question: string, onMessage: (token: string) => void, onComplete: () => void, onError: (err: any) => void) {
+    const url = `${API_BASE}/analyses/${analysisId}/stream?question=${encodeURIComponent(question)}`;
+    const eventSource = new EventSource(url);
+    
+    eventSource.onmessage = (event) => {
+      if (event.data === '[DONE]') {
+        eventSource.close();
+        onComplete();
+      } else {
+        onMessage(event.data);
+      }
+    };
+    
+    eventSource.onerror = (err) => {
+      eventSource.close();
+      onError(err);
+    };
 
-  async generateQuickInsight(file: File): Promise<any> {
+    return () => eventSource.close();
+  },
+  
+  async getSuggestedPrompts(analysisId: string): Promise<string[]> {
+    const response = await fetch(`${API_BASE}/analyses/${analysisId}/suggested-prompts`);
+    if (!response.ok) throw new Error('Failed to fetch suggested prompts');
+    return response.json();
+  },
+
+
+  async generateQuickInsight(file: File): Promise<QuickInsightResponse> {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -53,7 +81,7 @@ export const api = {
     return response.json();
   },
 
-  async generateQuickInsightFromExisting(fileId: string): Promise<any> {
+  async generateQuickInsightFromExisting(fileId: string): Promise<QuickInsightResponse> {
     const response = await fetch(`${API_BASE}/analyses/quick-insight/existing`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -103,3 +103,4 @@
 .custom-scrollbar::-webkit-scrollbar-thumb {
   @apply bg-outline-variant/20 rounded-full hover:bg-outline-variant/40 transition-colors;
 }
+
