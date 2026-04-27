@@ -100,7 +100,8 @@ async def upload_file(
                 full_table_name = f'"s_manual"."{table_name}"'
                 df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 100').fetchdf()
                 db_file.has_pii = pii_scanner.scan_dataframe(df_sample)
-            except:
+            except Exception as e:
+                logger.warning("PII scan failed for table %s: %s", table_name, e)
                 db_file.has_pii = False
                 
             db_file.status = "completed"
