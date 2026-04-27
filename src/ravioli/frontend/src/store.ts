@@ -7,7 +7,7 @@ class Store {
   private activeAnalysisId?: string;
   private logs: AnalysisLog[] = [];
   private dataSources: DataSource[] = [];
-  private currentView: 'insights' | 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings' = 'insights';
+  private currentView: 'insights' | 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings' | 'governance' = 'insights';
   private listeners: Listener[] = [];
 
   subscribe(listener: Listener) {
@@ -43,9 +43,9 @@ class Store {
 
   getActiveAnalysisId() { return this.activeAnalysisId; }
 
-  setCurrentView(view: 'insights' | 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings') {
+  setCurrentView(view: 'insights' | 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings' | 'governance') {
     this.currentView = view;
-    if (view === 'insights' || view === 'create-analysis' || view === 'data' || view === 'knowledge' || view === 'settings') {
+    if (view === 'insights' || view === 'create-analysis' || view === 'data' || view === 'knowledge' || view === 'settings' || view === 'governance') {
       this.activeAnalysisId = undefined;
     }
     this.notify();
