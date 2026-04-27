@@ -31,15 +31,15 @@ class Analysis(Base):
     notebook: Mapped[Optional[dict]] = mapped_column(JSON)
 
     # Relationships
-    logs: Mapped[List["ExecutionLog"]] = relationship("ExecutionLog", back_populates="analysis", cascade="all, delete-orphan")
+    logs: Mapped[List["AnalysisLog"]] = relationship("AnalysisLog", back_populates="analysis", cascade="all, delete-orphan")
     insights: Mapped[List["Insight"]] = relationship("Insight", back_populates="analysis", cascade="all, delete-orphan")
 
-class ExecutionLog(Base):
+class AnalysisLog(Base):
     """
     Granular logs for agent execution steps within an analysis.
     Stored in the 'app' schema.
     """
-    __tablename__ = "execution_logs"
+    __tablename__ = "analysis_logs"
     __table_args__ = {"schema": "app"}
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -62,12 +62,12 @@ class ExecutionLog(Base):
     # Relationships
     analysis: Mapped["Analysis"] = relationship("Analysis", back_populates="logs")
 
-class UploadedFile(Base):
+class DataSource(Base):
     """
-    Tracks metadata for files uploaded by the user.
+    Tracks metadata for data sources (files, WFS, etc.) ingested by the user.
     Stored in the 'app' schema.
     """
-    __tablename__ = "uploaded_files"
+    __tablename__ = "data_sources"
     __table_args__ = {"schema": "app"}
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

@@ -13,7 +13,7 @@ export function renderSidebar() {
     analysesListHtml = '<li class="px-8 py-4 text-neutral-600 italic text-[10px] uppercase tracking-widest">No Analyses found</li>';
   } else {
     analysesListHtml = analyses.map(a => {
-      const isQuick = (a as any).analysis_metadata?.type === 'quick_insight';
+      const isQuick = a.analysis_metadata?.type === 'quick_insight';
       const icon = isQuick ? 'bolt' : 'terminal';
       const isActive = a.id === activeId;
       return `
@@ -56,6 +56,10 @@ export function renderSidebar() {
             <span class="material-symbols-outlined" data-icon="storage">storage</span>
             <span>Data</span>
           </button>
+          <button class="nav-item ${currentView === 'governance' ? 'active' : ''} w-full" data-nav="governance">
+            <span class="material-symbols-outlined" data-icon="policy">policy</span>
+            <span>Governance</span>
+          </button>
           <button class="nav-item ${currentView === 'settings' ? 'active' : ''} w-full" data-nav="settings">
             <span class="material-symbols-outlined" data-icon="settings">settings</span>
             <span>Settings</span>
@@ -64,13 +68,13 @@ export function renderSidebar() {
       </section>
 
       <section class="mt-4">
-        <div class="flex items-center justify-between px-8 mb-4">
-          <p class="text-[10px] uppercase tracking-[0.2em] text-outline opacity-50 font-medium">Historical Analyses</p>
+        <div class="flex items-center justify-between px-8 mb-4 border-t border-outline-variant/10 pt-8">
+          <p class="text-[10px] uppercase tracking-[0.2em] text-on-surface-variant opacity-80 font-bold">Historical Analyses</p>
           <button class="text-primary-fixed-dim hover:text-white transition-colors" id="btn-new-analysis">
             <span class="material-symbols-outlined text-sm" data-icon="add">add</span>
           </button>
         </div>
-        <ul class="space-y-1 max-h-[40vh] overflow-y-auto px-4" id="analysis-list">
+        <ul class="space-y-1 px-4" id="analysis-list">
           ${analysesListHtml}
         </ul>
       </section>

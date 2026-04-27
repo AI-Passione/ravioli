@@ -8,6 +8,7 @@ import { renderCreateAnalysis } from './components/CreateAnalysis';
 import { renderKnowledge } from './components/Knowledge';
 import { renderData } from './components/Data';
 import { renderSettings } from './components/Settings';
+import { renderGovernance } from './components/Governance';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -29,6 +30,8 @@ function updateUI() {
     shell.appendChild(renderData());
   } else if (currentView === 'settings') {
     shell.appendChild(renderSettings());
+  } else if (currentView === 'governance') {
+    shell.appendChild(renderGovernance());
   } else if (currentView === 'insights' && !activeId) {
     shell.appendChild(renderInsights());
   } else {
@@ -50,12 +53,12 @@ async function init() {
       console.error('Failed to fetch analyses', err);
     }
 
-    // Fetch files
+    // Fetch data sources
     try {
-      const files = await api.listFiles();
-      store.setUploadedFiles(files);
+      const sources = await api.listFiles();
+      store.setDataSources(sources);
     } catch (err) {
-      console.error('Failed to fetch files', err);
+      console.error('Failed to fetch data sources', err);
     }
   } catch (err) {
     console.error('Initialization failed', err);
@@ -68,14 +71,14 @@ async function init() {
 let ingestionPollInterval: ReturnType<typeof setInterval> | null = null;
 
 function startIngestionPollingIfNeeded() {
-  const hasPending = store.getUploadedFiles().some(f => f.status === 'pending');
+  const hasPending = store.getDataSources().some(f => f.status === 'pending');
   if (hasPending && !ingestionPollInterval) {
     ingestionPollInterval = setInterval(async () => {
       try {
-        const files = await api.listFiles();
-        store.setUploadedFiles(files);
+        const sources = await api.listFiles();
+        store.setDataSources(sources);
         // Stop polling once nothing is pending anymore
-        if (!files.some(f => f.status === 'pending')) {
+        if (!sources.some(f => f.status === 'pending')) {
           clearInterval(ingestionPollInterval!);
           ingestionPollInterval = null;
         }

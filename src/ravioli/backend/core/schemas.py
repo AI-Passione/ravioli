@@ -3,18 +3,18 @@ from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
-# --- Execution Log Schemas ---
+# --- Analysis Log Schemas ---
 
-class ExecutionLogBase(BaseModel):
+class AnalysisLogBase(BaseModel):
     log_type: str
     content: str
     tool_name: Optional[str] = None
     data: Optional[dict] = None
 
-class ExecutionLogCreate(ExecutionLogBase):
+class AnalysisLogCreate(AnalysisLogBase):
     analysis_id: UUID
 
-class ExecutionLog(ExecutionLogBase):
+class AnalysisLog(AnalysisLogBase):
     id: UUID
     analysis_id: UUID
     timestamp: datetime
@@ -51,7 +51,7 @@ class Analysis(AnalysisBase):
     result: Optional[str] = None
     
     # Optionally include logs in the response
-    logs: List[ExecutionLog] = []
+    logs: List[AnalysisLog] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -91,9 +91,9 @@ class InsightStats(BaseModel):
     analyses_count: int
     contributors_count: int
 
-# --- Data Schemas ---
+# --- Data Source Schemas ---
 
-class UploadedFileBase(BaseModel):
+class DataSourceBase(BaseModel):
     filename: str
     original_filename: str
     content_type: str
@@ -109,7 +109,7 @@ class UploadedFileBase(BaseModel):
     source_url: Optional[str] = None
     has_pii: bool = False
 
-class UploadedFile(UploadedFileBase):
+class DataSource(DataSourceBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
@@ -117,10 +117,10 @@ class UploadedFile(UploadedFileBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-class UploadedFileUpdate(BaseModel):
+class DataSourceUpdate(BaseModel):
     description: Optional[str] = None
 
-class UploadedFilePIIUpdate(BaseModel):
+class DataSourcePIIUpdate(BaseModel):
     has_pii: bool
 
 # --- WFS Schemas ---

@@ -78,7 +78,7 @@ export function renderCreateAnalysis() {
           <div class="space-y-2">
             <h3 class="text-2xl font-headline-sm text-white">Deep Dive</h3>
             <p class="text-on-surface-variant text-sm leading-relaxed opacity-70">
-              Create a full investigation notebook. Query, transform, and visualize with the complete Ravioli toolset.
+              Create a full analysis notebook. Query, transform, and visualize with the complete Ravioli toolset.
             </p>
           </div>
           <div class="flex items-center gap-2 text-secondary text-[10px] font-label-sm uppercase tracking-widest pt-4">

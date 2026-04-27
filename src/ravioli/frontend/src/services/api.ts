@@ -1,4 +1,4 @@
-import type { Analysis, AnalysisCreate, ExecutionLog, UploadedFile, QuickInsightResponse, WFSLayer, Insight, InsightStats, InsightsSummary } from '../types';
+import type { Analysis, AnalysisCreate, AnalysisLog, DataSource, QuickInsightResponse, WFSLayer, Insight, InsightStats, InsightsSummary } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -34,8 +34,8 @@ export const api = {
     if (!response.ok) throw new Error('Failed to delete analysis');
   },
 
-  async listLogs(analysisId: string): Promise<ExecutionLog[]> {
-    const response = await fetch(`${API_BASE}/logs/analysis/${analysisId}`);
+  async listLogs(analysisId: string): Promise<AnalysisLog[]> {
+    const response = await fetch(`${API_BASE}/analysis-logs/analysis/${analysisId}`);
     if (!response.ok) throw new Error('Failed to fetch logs');
     return response.json();
   },
@@ -99,13 +99,13 @@ export const api = {
     return response.json();
   },
 
-  async listFiles(): Promise<UploadedFile[]> {
+  async listFiles(): Promise<DataSource[]> {
     const response = await fetch(`${API_BASE}/data/files`);
     if (!response.ok) throw new Error('Failed to fetch files');
     return response.json();
   },
 
-  async uploadFile(file: File): Promise<UploadedFile> {
+  async uploadFile(file: File): Promise<DataSource> {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -130,7 +130,7 @@ export const api = {
     if (!response.ok) throw new Error('Failed to delete file');
   },
 
-  async updateFileDescription(fileId: string, description: string): Promise<UploadedFile> {
+  async updateFileDescription(fileId: string, description: string): Promise<DataSource> {
     const response = await fetch(`${API_BASE}/data/files/${fileId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -140,7 +140,7 @@ export const api = {
     return response.json();
   },
 
-  async togglePIITag(fileId: string, hasPII: boolean): Promise<UploadedFile> {
+  async togglePIITag(fileId: string, hasPII: boolean): Promise<DataSource> {
     const response = await fetch(`${API_BASE}/data/files/${fileId}/pii`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -150,7 +150,7 @@ export const api = {
     return response.json();
   },
 
-  async generateFileDescription(fileId: string): Promise<UploadedFile> {
+  async generateFileDescription(fileId: string): Promise<DataSource> {
     const response = await fetch(`${API_BASE}/data/files/${fileId}/generate-description`, {
       method: 'POST',
     });
@@ -234,7 +234,7 @@ export const api = {
     return response.json();
   },
 
-  async ingestWFSLayer(url: string, layer?: string): Promise<UploadedFile> {
+  async ingestWFSLayer(url: string, layer?: string): Promise<DataSource> {
     const response = await fetch(`${API_BASE}/data/wfs/ingest`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

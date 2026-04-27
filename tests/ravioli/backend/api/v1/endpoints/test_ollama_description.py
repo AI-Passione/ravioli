@@ -2,7 +2,7 @@ import uuid
 import pytest
 from datetime import datetime, UTC
 from unittest.mock import AsyncMock, MagicMock
-from ravioli.backend.core.models import UploadedFile
+from ravioli.backend.core.models import DataSource
 
 @pytest.mark.anyio
 async def test_generate_file_description(client, session, mocker):
@@ -11,7 +11,7 @@ async def test_generate_file_description(client, session, mocker):
     filename = "test.csv"
     
     # Mock the DB file record
-    db_file = UploadedFile(
+    db_file = DataSource(
         id=file_id,
         filename=f"{file_id}.csv",
         original_filename=filename,

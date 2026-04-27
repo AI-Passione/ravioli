@@ -67,9 +67,9 @@ async def get_suggested_prompts(
     summary = analysis.result or "No summary available."
     
     # Get last 5 logs for context
-    previous_logs = db.query(models.ExecutionLog)\
-        .filter(models.ExecutionLog.analysis_id == analysis_id)\
-        .order_by(models.ExecutionLog.timestamp.desc())\
+    previous_logs = db.query(models.AnalysisLog)\
+        .filter(models.AnalysisLog.analysis_id == analysis_id)\
+        .order_by(models.AnalysisLog.timestamp.desc())\
         .limit(5).all()
     
     context_str = ""
@@ -209,7 +209,7 @@ async def ask_question(
         raise HTTPException(status_code=404, detail="Analysis not found")
     
     # 1. Create user log
-    user_log = models.ExecutionLog(
+    user_log = models.AnalysisLog(
         analysis_id=analysis_id,
         log_type="user_query",
         content=question_in.question
@@ -245,9 +245,9 @@ async def process_analysis_question(analysis_id: str, question: str):
         summary = analysis.result or "No summary available."
         
         # Get last 5 logs for context
-        previous_logs = db.query(models.ExecutionLog)\
-            .filter(models.ExecutionLog.analysis_id == analysis_uuid)\
-            .order_by(models.ExecutionLog.timestamp.desc())\
+        previous_logs = db.query(models.AnalysisLog)\
+            .filter(models.AnalysisLog.analysis_id == analysis_uuid)\
+            .order_by(models.AnalysisLog.timestamp.desc())\
             .limit(6).all() # 6 because we just added the current question
         
         context_str = ""
@@ -260,7 +260,7 @@ async def process_analysis_question(analysis_id: str, question: str):
         answer = await client.generate_answer(filename, summary, context_str, question)
         
         # Save answer
-        agent_log = models.ExecutionLog(
+        agent_log = models.AnalysisLog(
             analysis_id=analysis_id,
             log_type="thought",
             content=answer
@@ -290,7 +290,7 @@ async def stream_question(
         raise HTTPException(status_code=404, detail="Analysis not found")
 
     # 1. Create user log
-    user_log = models.ExecutionLog(
+    user_log = models.AnalysisLog(
         analysis_id=analysis_id,
         log_type="user_query",
         content=question
@@ -308,9 +308,9 @@ async def stream_question(
         summary = analysis.result or "No summary available."
         
         # Get last 5 logs for context
-        previous_logs = db.query(models.ExecutionLog)\
-            .filter(models.ExecutionLog.analysis_id == analysis_id)\
-            .order_by(models.ExecutionLog.timestamp.desc())\
+        previous_logs = db.query(models.AnalysisLog)\
+            .filter(models.AnalysisLog.analysis_id == analysis_id)\
+            .order_by(models.AnalysisLog.timestamp.desc())\
             .limit(6).all()
         
         context_str = ""
@@ -329,7 +329,7 @@ async def stream_question(
             # Persistence at the end
             async_db = SessionLocal()
             try:
-                agent_log = models.ExecutionLog(
+                agent_log = models.AnalysisLog(
                     analysis_id=analysis_id,
                     log_type="thought",
                     content=full_response
@@ -586,28 +586,28 @@ async def create_quick_insight_existing(
     """
     Generate quick insight from an already uploaded file.
     """
-    from ravioli.backend.core.models import UploadedFile
+    from ravioli.backend.core.models import DataSource
     from sqlalchemy import select
 
-    query = select(UploadedFile).where(UploadedFile.id == request.file_id)
-    db_file = db.execute(query).scalar_one_or_none()
+    query = select(DataSource).where(DataSource.id == request.file_id)
+    db_source = db.execute(query).scalar_one_or_none()
     
-    if not db_file:
+    if not db_source:
         raise HTTPException(status_code=404, detail="File not found")
     
-    if db_file.status != "completed":
+    if db_source.status != "completed":
         raise HTTPException(status_code=400, detail="File processing is not completed")
 
     # Get stats and sample data from DuckDB
-    row_count = db_file.row_count or 0
+    row_count = db_source.row_count or 0
     try:
         from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
-        df_cols = duckdb_manager.query(f"DESCRIBE {db_file.table_name}")
+        df_cols = duckdb_manager.query(f'DESCRIBE "{db_source.schema_name}"."{db_source.table_name}"')
         col_count = len(df_cols)
         columns = ", ".join([row['column_name'] for row in df_cols[:5]])
         
         # Get full data and create a profile for AI context
-        df_full = duckdb_manager.connection.execute(f'SELECT * FROM "{db_file.table_name}"').fetchdf()
+        df_full = duckdb_manager.connection.execute(f'SELECT * FROM "{db_source.schema_name}"."{db_source.table_name}"').fetchdf()
         df_full = prepare_dataframe_for_analysis(df_full)
         data_profile = create_data_profile(df_full)
     except Exception as e:
@@ -617,18 +617,18 @@ async def create_quick_insight_existing(
         data_profile = "No statistical profile available"
 
     # Generate Summary using template and Ollama
-    title = f"Quick Insight: {db_file.original_filename}"
-    summary, followup_questions = await generate_summary(db, db_file.original_filename, row_count, col_count, columns, data_profile)
+    title = f"Quick Insight: {db_source.original_filename}"
+    summary, followup_questions = await generate_summary(db, db_source.original_filename, row_count, col_count, columns, data_profile)
 
     # Create the analysis record
     db_analysis = models.Analysis(
         title=title,
-        description=f"Quick insight generated from {db_file.original_filename}",
+        description=f"Quick insight generated from {db_source.original_filename}",
         status="completed",
         result=summary,
         analysis_metadata={
             "type": "quick_insight", 
-            "file_id": str(db_file.id), 
+            "file_id": str(db_source.id), 
             "row_count": row_count,
             "followup_questions": followup_questions
         }

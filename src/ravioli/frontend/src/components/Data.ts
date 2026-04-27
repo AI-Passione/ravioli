@@ -6,7 +6,7 @@ export function renderData() {
   const container = document.createElement('main');
   container.className = 'flex-1 ml-64 h-full overflow-y-auto bg-surface flex flex-col p-8 pt-12 relative';
 
-  const files = store.getUploadedFiles();
+  const sources = store.getDataSources();
 
   container.innerHTML = `
     <div class="max-w-6xl mx-auto w-full pb-20">
@@ -25,7 +25,7 @@ export function renderData() {
       <div class="bg-surface-container-low rounded-3xl overflow-hidden border border-outline/10 shadow-2xl">
         <div class="px-8 py-6 border-b border-outline/10 flex items-center justify-between bg-surface-container-low/50 backdrop-blur-sm sticky top-0 z-10">
           <h2 class="text-lg font-medium text-neutral-200">Ingested Assets</h2>
-          <span class="text-[10px] text-neutral-500 uppercase tracking-[0.2em]">${files.length} Total Assets</span>
+          <span class="text-[10px] text-neutral-500 uppercase tracking-[0.2em]">${sources.length} Total Assets</span>
         </div>
         
         <div class="overflow-x-auto">
@@ -42,7 +42,7 @@ export function renderData() {
               </tr>
             </thead>
             <tbody class="divide-y divide-outline/5">
-              ${files.length === 0 ? `
+              ${sources.length === 0 ? `
                 <tr>
                   <td colspan="7" class="px-8 py-20 text-center">
                     <div class="flex flex-col items-center justify-center">
@@ -53,21 +53,21 @@ export function renderData() {
                     </div>
                   </td>
                 </tr>
-              ` : files.map(file => `
+              ` : sources.map(source => `
                 <tr class="hover:bg-white/[0.02] transition-colors group">
                   <td class="px-8 py-5">
                     <div class="w-10 h-10 rounded-xl bg-surface-container-highest flex items-center justify-center border border-outline/5">
-                      <span class="material-symbols-outlined text-lg ${file.source_type === 'wfs' ? 'text-primary' : 'text-neutral-400'}">
-                        ${file.source_type === 'wfs' ? 'api' : 'description'}
+                      <span class="material-symbols-outlined text-lg ${source.source_type === 'wfs' ? 'text-primary' : 'text-neutral-400'}">
+                        ${source.source_type === 'wfs' ? 'api' : 'description'}
                       </span>
                     </div>
                   </td>
                   <td class="px-8 py-5">
                     <div class="flex flex-col">
                       <div class="flex items-center gap-2">
-                        <span class="text-neutral-200 font-medium">${file.original_filename}</span>
-                        ${file.has_pii ? `
-                          <span class="pii-badge inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 text-[9px] font-bold uppercase tracking-wider border border-amber-500/20 group/pii" data-id="${file.id}" title="Likely contains PII">
+                        <span class="text-neutral-200 font-medium">${source.original_filename}</span>
+                        ${source.has_pii ? `
+                          <span class="pii-badge inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 text-[9px] font-bold uppercase tracking-wider border border-amber-500/20 group/pii" data-id="${source.id}" title="Likely contains PII">
                             PII
                             <button class="btn-dismiss-pii hover:text-amber-300 transition-colors opacity-0 group-hover/pii:opacity-100 transition-opacity">
                               <span class="material-symbols-outlined text-[10px]">close</span>
@@ -75,13 +75,13 @@ export function renderData() {
                           </span>
                         ` : ''}
                       </div>
-                      <span class="text-[10px] text-neutral-500 font-mono mt-0.5">${file.source_type === 'wfs' ? 'WFS API' : 'CSV File'} • ${formatBytes(file.size_bytes)}</span>
+                      <span class="text-[10px] text-neutral-500 font-mono mt-0.5">${source.source_type === 'wfs' ? 'WFS API' : 'CSV File'} • ${formatBytes(source.size_bytes)}</span>
                     </div>
                   </td>
                   <td class="px-8 py-5">
-                    <div class="desc-container flex items-center gap-2 group/desc max-w-xs w-full" data-id="${file.id}">
-                      <span class="desc-text text-neutral-400 text-sm truncate cursor-pointer hover:text-neutral-200 transition-colors flex-1" title="${file.description || ''}" data-desc="${file.description || ''}">${file.description || '<span class="italic opacity-30">Add description...</span>'}</span>
-                      <input type="text" class="desc-input hidden w-full bg-surface-container-highest border border-primary/30 rounded px-2 py-1 text-sm text-neutral-200 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all" value="${file.description || ''}" placeholder="Enter description..." />
+                    <div class="desc-container flex items-center gap-2 group/desc max-w-xs w-full" data-id="${source.id}">
+                      <span class="desc-text text-neutral-400 text-sm truncate cursor-pointer hover:text-neutral-200 transition-colors flex-1" title="${source.description || ''}" data-desc="${source.description || ''}">${source.description || '<span class="italic opacity-30">Add description...</span>'}</span>
+                      <input type="text" class="desc-input hidden w-full bg-surface-container-highest border border-primary/30 rounded px-2 py-1 text-sm text-neutral-200 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all" value="${source.description || ''}" placeholder="Enter description..." />
                       <div class="flex items-center gap-1 opacity-0 group-hover/desc:opacity-100 transition-opacity">
                         <button class="btn-generate-desc p-1 rounded-md hover:bg-primary/10 text-primary/70 hover:text-primary transition-all flex-shrink-0" title="AI Generate Description">
                           <span class="material-symbols-outlined text-[16px]">auto_awesome</span>
@@ -93,44 +93,44 @@ export function renderData() {
                     </div>
                   </td>
                   <td class="px-8 py-5">
-                    <code class="px-2 py-1 rounded bg-surface-container-highest text-primary-fixed-dim text-xs font-mono border border-outline/5">${file.schema_name}.${file.table_name}</code>
+                    <code class="px-2 py-1 rounded bg-surface-container-highest text-primary-fixed-dim text-xs font-mono border border-outline/5">${source.schema_name}.${source.table_name}</code>
                   </td>
                   <td class="px-8 py-5 text-neutral-300 font-medium">
-                    ${file.status === 'pending'
+                    ${source.status === 'pending'
                       ? `<span class="flex items-center gap-1.5">
-                           ${file.row_count
-                             ? `<span class="text-blue-400">${file.row_count.toLocaleString()}</span>
+                           ${source.row_count
+                             ? `<span class="text-blue-400">${source.row_count.toLocaleString()}</span>
                                 <span class="text-blue-400/50 text-[10px] animate-pulse">fetching…</span>`
                              : `<span class="text-blue-400/50 text-[10px] animate-pulse">fetching…</span>`
                            }
                          </span>`
-                      : (file.row_count ? file.row_count.toLocaleString() : '--')
+                      : (source.row_count ? source.row_count.toLocaleString() : '--')
                     }
                   </td>
                   <td class="px-8 py-5">
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold ${
-                      file.status === 'completed' ? 'bg-green-500/10 text-green-400' :
-                      file.status === 'failed'    ? 'bg-red-500/10 text-red-400' :
-                      file.status === 'pending'   ? 'bg-blue-500/10 text-blue-400' :
+                      source.status === 'completed' ? 'bg-green-500/10 text-green-400' :
+                      source.status === 'failed'    ? 'bg-red-500/10 text-red-400' :
+                      source.status === 'pending'   ? 'bg-blue-500/10 text-blue-400' :
                                                     'bg-yellow-500/10 text-yellow-400'
                     }">
-                      ${file.status === 'pending'
+                      ${source.status === 'pending'
                         ? `<span class="material-symbols-outlined text-[10px] animate-spin">sync</span>`
                         : `<span class="w-1.5 h-1.5 rounded-full ${
-                            file.status === 'completed' ? 'bg-green-400' :
-                            file.status === 'failed'    ? 'bg-red-400'   : 'bg-yellow-400'
+                            source.status === 'completed' ? 'bg-green-400' :
+                            source.status === 'failed'    ? 'bg-red-400'   : 'bg-yellow-400'
                           }"></span>`
                       }
-                      ${file.status === 'pending'   ? 'In Progress' :
-                        file.status === 'completed' ? 'Completed'   :
-                        file.status === 'failed'    ? 'Failed'      : file.status}
+                      ${source.status === 'pending'   ? 'In Progress' :
+                        source.status === 'completed' ? 'Completed'   :
+                        source.status === 'failed'    ? 'Failed'      : source.status}
                     </span>
                   </td>
                   <td class="px-8 py-5 text-right flex justify-end gap-2">
-                    <button class="btn-inspect p-2 rounded-lg hover:bg-primary/10 text-neutral-400 hover:text-primary transition-all" data-table="${file.schema_name}.${file.table_name}" data-filename="${file.original_filename}" title="Preview">
+                    <button class="btn-inspect p-2 rounded-lg hover:bg-primary/10 text-neutral-400 hover:text-primary transition-all" data-table="${source.schema_name}.${source.table_name}" data-filename="${source.original_filename}" title="Preview">
                       <span class="material-symbols-outlined">visibility</span>
                     </button>
-                    <button class="btn-delete p-2 rounded-lg hover:bg-red-500/10 text-neutral-400 hover:text-red-400 transition-all" data-id="${file.id}" title="Delete">
+                    <button class="btn-delete p-2 rounded-lg hover:bg-red-500/10 text-neutral-400 hover:text-red-400 transition-all" data-id="${source.id}" title="Delete">
                       <span class="material-symbols-outlined">delete</span>
                     </button>
                   </td>
@@ -312,8 +312,8 @@ export function renderData() {
       // store right now — no round-trip re-fetch needed. The global poller
       // in main.ts will keep it updated every 3s from here on.
       hideAddModal();
-      const existingFiles = store.getUploadedFiles();
-      store.setUploadedFiles([result, ...existingFiles]);
+      const existingSources = store.getDataSources();
+      store.setDataSources([result, ...existingSources]);
     } catch (err: any) {
       alert(`Failed to start ingestion: ${err.message || err}`);
     } finally {
@@ -353,8 +353,8 @@ export function renderData() {
 
   // --- General Table Logic ---
   const refreshFiles = async () => {
-    const updatedFiles = await api.listFiles();
-    store.setUploadedFiles(updatedFiles);
+    const updatedSources = await api.listFiles();
+    store.setDataSources(updatedSources);
     // Note: In this pure vanilla setup, the store update triggers a re-render 
     // of the app via the subscription in main.ts.
   };

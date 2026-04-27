@@ -1,13 +1,13 @@
-import type { Analysis, ExecutionLog, UploadedFile } from './types';
+import type { Analysis, AnalysisLog, DataSource } from './types';
 
 type Listener = () => void;
 
 class Store {
   private analyses: Analysis[] = [];
   private activeAnalysisId?: string;
-  private logs: ExecutionLog[] = [];
-  private uploadedFiles: UploadedFile[] = [];
-  private currentView: 'insights' | 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings' = 'insights';
+  private logs: AnalysisLog[] = [];
+  private dataSources: DataSource[] = [];
+  private currentView: 'insights' | 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings' | 'governance' = 'insights';
   private listeners: Listener[] = [];
 
   subscribe(listener: Listener) {
@@ -43,9 +43,9 @@ class Store {
 
   getActiveAnalysisId() { return this.activeAnalysisId; }
 
-  setCurrentView(view: 'insights' | 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings') {
+  setCurrentView(view: 'insights' | 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings' | 'governance') {
     this.currentView = view;
-    if (view === 'insights' || view === 'create-analysis' || view === 'data' || view === 'knowledge' || view === 'settings') {
+    if (view === 'insights' || view === 'create-analysis' || view === 'data' || view === 'knowledge' || view === 'settings' || view === 'governance') {
       this.activeAnalysisId = undefined;
     }
     this.notify();
@@ -53,19 +53,19 @@ class Store {
 
   getCurrentView() { return this.currentView; }
 
-  setLogs(logs: ExecutionLog[]) {
+  setLogs(logs: AnalysisLog[]) {
     this.logs = logs;
     this.notify();
   }
 
   getLogs() { return this.logs; }
 
-  setUploadedFiles(files: UploadedFile[]) {
-    this.uploadedFiles = files;
+  setDataSources(sources: DataSource[]) {
+    this.dataSources = sources;
     this.notify();
   }
 
-  getUploadedFiles() { return this.uploadedFiles; }
+  getDataSources() { return this.dataSources; }
 }
 
 export const store = new Store();
