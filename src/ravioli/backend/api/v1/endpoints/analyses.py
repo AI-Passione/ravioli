@@ -50,6 +50,47 @@ def list_analyses(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     analyses = db.query(models.Analysis).order_by(models.Analysis.created_at.desc()).offset(skip).limit(limit).all()
     return analyses
 
+@router.get("/{analysis_id}/suggested-prompts", response_model=List[str])
+async def get_suggested_prompts(
+    analysis_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate 3 high-impact analytical prompts based on context.
+    """
+    analysis = db.query(models.Analysis).filter(models.Analysis.id == analysis_id).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    
+    # Context preparation
+    filename = analysis.analysis_metadata.get("filename", "Unknown Dataset")
+    summary = analysis.result or "No summary available."
+    
+    # Get last 5 logs for context
+    previous_logs = db.query(models.ExecutionLog)\
+        .filter(models.ExecutionLog.analysis_id == analysis_id)\
+        .order_by(models.ExecutionLog.timestamp.desc())\
+        .limit(5).all()
+    
+    context_str = ""
+    for log in reversed(previous_logs):
+        role = "Operator" if log.log_type == "user_query" else "Kowalski"
+        context_str += f"{role}: {log.content}\n"
+        
+    from ravioli.backend.core.ollama import OllamaClient
+    client = OllamaClient(db)
+    
+    try:
+        prompts = await client.generate_suggested_prompts(filename, summary, context_str)
+        return prompts
+    except Exception as e:
+        logger.error(f"Error generating suggested prompts: {e}")
+        return [
+            "Perform a deep dive into the primary volume drivers.",
+            "Analyze the temporal distribution of identified anomalies.",
+            "Quantify the statistical impact of the data limitations."
+        ]
+
 @router.get("/{analysis_id}", response_model=schemas.Analysis)
 def get_analysis(analysis_id: UUID, db: Session = Depends(get_db)):
     """
@@ -248,46 +289,7 @@ async def stream_question(
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
     
-@router.get("/{analysis_id}/suggested-prompts", response_model=List[str])
-async def get_suggested_prompts(
-    analysis_id: UUID,
-    db: Session = Depends(get_db)
-):
-    """
-    Generate 3 high-impact analytical prompts based on context.
-    """
-    analysis = db.query(models.Analysis).filter(models.Analysis.id == analysis_id).first()
-    if not analysis:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-    
-    # Context preparation
-    filename = analysis.analysis_metadata.get("filename", "Unknown Dataset")
-    summary = analysis.result or "No summary available."
-    
-    # Get last 5 logs for context
-    previous_logs = db.query(models.ExecutionLog)\
-        .filter(models.ExecutionLog.analysis_id == analysis_id)\
-        .order_by(models.ExecutionLog.timestamp.desc())\
-        .limit(5).all()
-    
-    context_str = ""
-    for log in reversed(previous_logs):
-        role = "Operator" if log.log_type == "user_query" else "Kowalski"
-        context_str += f"{role}: {log.content}\n"
-        
-    from ravioli.backend.core.ollama import OllamaClient
-    client = OllamaClient(db)
-    
-    try:
-        prompts = await client.generate_suggested_prompts(filename, summary, context_str)
-        return prompts
-    except Exception as e:
-        logger.error(f"Error generating suggested prompts: {e}")
-        return [
-            "Perform a deep dive into the primary volume drivers.",
-            "Analyze the temporal distribution of identified anomalies.",
-            "Quantify the statistical impact of the data limitations."
-        ]
+
 
 
 def prepare_dataframe_for_analysis(df: pd.DataFrame) -> pd.DataFrame:
