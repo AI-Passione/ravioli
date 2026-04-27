@@ -16,7 +16,7 @@ export interface Analysis {
   updated_at: string;
 }
 
-export interface ExecutionLog {
+export interface AnalysisLog {
   id: string;
   analysis_id: string;
   log_type: string;
@@ -32,7 +32,7 @@ export interface AnalysisCreate {
   analysis_metadata?: any;
 }
 
-export interface UploadedFile {
+export interface DataSource {
   id: string;
   filename: string;
   original_filename: string;

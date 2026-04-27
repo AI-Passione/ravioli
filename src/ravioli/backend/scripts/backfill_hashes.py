@@ -2,7 +2,7 @@ import hashlib
 from pathlib import Path
 from sqlalchemy import select
 from ravioli.backend.core.database import SessionLocal
-from ravioli.backend.core.models import UploadedFile
+from ravioli.backend.core.models import DataSource
 from ravioli.backend.core.config import settings
 
 def calculate_hash(file_path: Path) -> str:
@@ -16,7 +16,7 @@ def backfill():
     db = SessionLocal()
     try:
         # Get all files with missing hash
-        query = select(UploadedFile).where(UploadedFile.file_hash.is_(None))
+        query = select(DataSource).where(DataSource.file_hash.is_(None))
         files = db.execute(query).scalars().all()
         
         print(f"Found {len(files)} files without hash.")
