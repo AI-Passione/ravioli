@@ -385,12 +385,8 @@ export function renderData() {
   const refreshFiles = async () => {
     const updatedFiles = await api.listFiles();
     store.setUploadedFiles(updatedFiles);
-    // Note: In this pure vanilla setup, we'd normally re-render the whole component 
-    // or use a reactive framework. Since we're returning the container, the caller 
-    // needs to handle the refresh. For now, we'll suggest a page reload or a manual 
-    // DOM update if this was a larger app. 
-    // In our case, the router usually handles this by calling renderData() again.
-    window.location.reload(); 
+    // Note: In this pure vanilla setup, the store update triggers a re-render 
+    // of the app via the subscription in main.ts.
   };
 
   container.querySelectorAll('.btn-inspect').forEach(btn => {
