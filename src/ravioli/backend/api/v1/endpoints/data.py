@@ -13,11 +13,11 @@ from ravioli.backend.core.database import get_db
 from ravioli.backend.core.config import settings
 from ravioli.backend.core.models import UploadedFile
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
-from ravioli.backend.data.wfs_client import WFSClient
+from ravioli.backend.data.olap.ingestion.wfs_client import WFSClient
 
 import logging
 from ravioli.backend.core.ollama import OllamaClient
-from ravioli.backend.data.pii_scanner import pii_scanner
+from ravioli.backend.data.olap.ingestion.pii_scanner import pii_scanner
 
 logger = logging.getLogger(__name__)
 
@@ -303,7 +303,7 @@ async def ingest_wfs_layer(
     db.refresh(db_file)
     
     try:
-        from ravioli.backend.data.dlt_utils import create_ravioli_pipeline
+        from ravioli.backend.data.olap.ingestion.dlt_utils import create_ravioli_pipeline
         
         # Ensure schema exists in DuckDB before dlt starts
         duckdb_manager.connection.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")

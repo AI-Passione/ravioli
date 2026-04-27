@@ -12,37 +12,37 @@ app.add_typer(ingest_app, name="ingest")
 @ingest_app.command("apple-health")
 def ingest_apple_health(file_path: Optional[Path] = None):
     """Ingest Apple Health XML export."""
-    from ravioli.backend.data.olap.ingestion.apple_health import AppleHealthIngestor
+    from ravioli.backend.data.olap.ingestion.Legacy.apple_health import AppleHealthIngestor
     AppleHealthIngestor().run(file_path)
 
 @ingest_app.command("spotify")
 def ingest_spotify(data_path: Optional[Path] = None):
     """Ingest Spotify JSON/CSV export."""
-    from ravioli.backend.data.olap.ingestion.spotify import SpotifyIngestor
+    from ravioli.backend.data.olap.ingestion.Legacy.spotify import SpotifyIngestor
     SpotifyIngestor().run(data_path)
 
 @ingest_app.command("linkedin")
 def ingest_linkedin(data_path: Optional[Path] = None):
     """Ingest LinkedIn Excel/CSV export."""
-    from ravioli.backend.data.olap.ingestion.linkedin import LinkedInIngestor
+    from ravioli.backend.data.olap.ingestion.Legacy.linkedin import LinkedInIngestor
     LinkedInIngestor().run(data_path)
 
 @ingest_app.command("substack")
 def ingest_substack(data_path: Optional[Path] = None):
     """Ingest Substack CSV export."""
-    from ravioli.backend.data.olap.ingestion.substack import SubstackIngestor
+    from ravioli.backend.data.olap.ingestion.Legacy.substack import SubstackIngestor
     SubstackIngestor().run(data_path)
 
 @ingest_app.command("bolt")
 def ingest_bolt(file_path: Optional[Path] = None):
     """Ingest Bolt rides CSV."""
-    from ravioli.backend.data.olap.ingestion.misc import BoltIngestor
+    from ravioli.backend.data.olap.ingestion.Legacy.misc import BoltIngestor
     BoltIngestor().run(file_path)
 
 @ingest_app.command("telegram")
 def ingest_telegram(file_path: Optional[Path] = None):
     """Ingest Telegram messages CSV."""
-    from ravioli.backend.data.olap.ingestion.misc import TelegramIngestor
+    from ravioli.backend.data.olap.ingestion.Legacy.misc import TelegramIngestor
     TelegramIngestor().run(file_path)
 
 @app.command()
