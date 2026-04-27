@@ -1,4 +1,3 @@
-import { store } from '../store';
 import { api } from '../services/api';
 import { formatDistanceToNow, format } from 'date-fns';
 import type { Insight, InsightStats, InsightsSummary } from '../types';

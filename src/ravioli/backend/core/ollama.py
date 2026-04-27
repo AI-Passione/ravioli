@@ -392,8 +392,8 @@ Extracted Insights:"""
                     for line in raw.splitlines()
                     if re.match(r"^\s*[-*•]\s+.{10,}", line)
                 ][:20]
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"OllamaClient: [WARNING] Failed to extract fallback insights bullets: {e}")
 
         return {
             "bullets": bullets[:20],
