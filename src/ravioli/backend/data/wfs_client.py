@@ -51,7 +51,7 @@ class WFSClient:
         
         return layers
 
-    async def get_features(self, layer_name: str, count: int = 100, output_format: Optional[str] = None) -> pd.DataFrame:
+    async def get_features_generator(self, layer_name: str, count: int = 100, output_format: Optional[str] = None):
         params = {
             "service": "WFS",
             "version": "2.0.0",
@@ -63,38 +63,31 @@ class WFSClient:
         if output_format:
             params["outputFormat"] = output_format
         else:
-            # Default to GeoJSON if possible, then CSV
             params["outputFormat"] = "application/json"
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(self.base_url, params=params)
-            
-            # If GeoJSON failed, try CSV if not already specified
             if response.status_code != 200 and not output_format:
                 params["outputFormat"] = "csv"
                 response = await client.get(self.base_url, params=params)
-            
             response.raise_for_status()
 
         content_type = response.headers.get("Content-Type", "")
         
         if "application/json" in content_type or "json" in response.text[:100].lower():
             data = response.json()
-            features = data.get("features", [])
-            if not features:
-                return pd.DataFrame()
-            
-            # Flatten GeoJSON features
-            rows = []
-            for feat in features:
-                row = feat.get("properties", {}).copy()
-                # Optionally add geometry as WKT or similar if needed
-                # For now, just properties
-                rows.append(row)
-            return pd.DataFrame(rows)
+            for feat in data.get("features", []):
+                yield feat.get("properties", {})
             
         elif "csv" in content_type or "," in response.text[:100]:
-            return pd.read_csv(io.StringIO(response.text))
-        
+            df = pd.read_csv(io.StringIO(response.text))
+            for _, row in df.iterrows():
+                yield row.to_dict()
         else:
             raise ValueError(f"Unsupported response format: {content_type}")
+
+    async def get_features(self, layer_name: str, count: int = 100, output_format: Optional[str] = None) -> pd.DataFrame:
+        rows = []
+        async for row in self.get_features_generator(layer_name, count, output_format):
+            rows.append(row)
+        return pd.DataFrame(rows)
