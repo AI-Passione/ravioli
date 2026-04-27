@@ -8,6 +8,7 @@ const DAY_OPTIONS = [1, 3, 7, 14, 28, 30];
 // Module-level state so re-renders within the same session preserve selections
 let activeDays = 7;
 let summaryCache: Map<number, InsightsSummary> = new Map();
+export const clearInsightsCache = () => summaryCache.clear();
 
 function banCard(value: number | string, label: string, icon: string, accent = 'text-primary') {
   return `
