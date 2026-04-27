@@ -14,10 +14,6 @@ logger = logging.getLogger(__name__)
 from ravioli.backend.core.database import engine, Base
 from ravioli.backend.data.oltp.session import ensure_schema
 
-# Import all models so SQLAlchemy registers them with Base.metadata before create_all.
-# These imports are intentional side-effects; the linter hint about "unused" is incorrect.
-import ravioli.backend.core.models  # noqa: F401
-
 # Create tables in the specified schemas
 # Note: schemas must exist before create_all is called for tables in those schemas
 def init_db():
