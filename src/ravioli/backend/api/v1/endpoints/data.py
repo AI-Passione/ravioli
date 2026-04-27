@@ -288,7 +288,7 @@ async def _run_wfs_ingestion(file_id: uuid.UUID, url: str, layer: Optional[str],
             layers = await client.get_capabilities()
             if not layers:
                 raise ValueError("No layers found at this WFS endpoint.")
-            layer = layers[0].name
+            layer = layers[0]["name"]
             base_name = layer.split(":")[-1]
             table_name = "".join(c if c.isalnum() else "_" for c in base_name).lower()
             db_file.original_filename = layer
