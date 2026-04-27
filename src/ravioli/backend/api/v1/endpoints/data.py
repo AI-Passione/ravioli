@@ -3,7 +3,7 @@ import shutil
 import uuid
 import hashlib
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -269,7 +269,7 @@ async def list_wfs_layers(url: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch WFS layers: {str(e)}")
 
-async def _run_wfs_ingestion(file_id: uuid.UUID, url: str, layer: str, table_name: str, schema_name: str):
+async def _run_wfs_ingestion(file_id: uuid.UUID, url: str, layer: Optional[str], table_name: str, schema_name: str):
     """Background task: performs the actual WFS data pull and DuckDB ingestion."""
     from ravioli.backend.core.database import SessionLocal
     db = SessionLocal()
@@ -281,10 +281,24 @@ async def _run_wfs_ingestion(file_id: uuid.UUID, url: str, layer: str, table_nam
 
         from ravioli.backend.data.olap.ingestion.dlt_utils import create_ravioli_pipeline
 
+        client = WFSClient(url)
+
+        # Auto-detect the primary layer if one was not specified
+        if not layer:
+            layers = await client.get_capabilities()
+            if not layers:
+                raise ValueError("No layers found at this WFS endpoint.")
+            layer = layers[0].name
+            base_name = layer.split(":")[-1]
+            table_name = "".join(c if c.isalnum() else "_" for c in base_name).lower()
+            db_file.original_filename = layer
+            db_file.table_name = table_name
+            db.commit()
+            logger.info(f"Auto-detected layer: {layer}, table: {table_name}")
+
         # Ensure schema exists in DuckDB before dlt starts
         duckdb_manager.connection.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
 
-        client = WFSClient(url)
         base_generator = client.get_features_generator(layer)
 
         # Wrap the generator to track & periodically persist row count
@@ -346,20 +360,26 @@ async def ingest_wfs_layer(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    # Generate names
-    base_name = request.layer.split(":")[-1]
-    table_name = "".join(c if c.isalnum() else "_" for c in base_name).lower()
-    app_name = request.url.split("/")[-1].split("?")[0]
+    # Derive placeholder names from the URL; the background task will update
+    # them once the real layer name is known (if layer was not provided).
+    app_name = request.url.split("/")[-1].split("?")[0] or "wfs"
     schema_name = f"s_{app_name}"
+    if request.layer:
+        base_name = request.layer.split(":")[-1]
+        table_name = "".join(c if c.isalnum() else "_" for c in base_name).lower()
+        display_name = request.layer
+    else:
+        table_name = "pending"
+        display_name = app_name
 
-    logger.info(f"Queuing WFS ingestion: layer={request.layer}, schema={schema_name}, table={table_name}")
+    logger.info(f"Queuing WFS ingestion: url={request.url}, layer={request.layer}, schema={schema_name}")
 
-    # Create the record immediately with 'pending' status
+    # Create the record immediately with 'pending' status so the UI shows it right away
     file_id = uuid.uuid4()
     db_file = UploadedFile(
         id=file_id,
         filename=f"wfs_{file_id}",
-        original_filename=request.layer,
+        original_filename=display_name,
         content_type="application/wfs",
         size_bytes=0,
         table_name=table_name,

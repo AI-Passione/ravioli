@@ -108,7 +108,7 @@ class WFSLayer(BaseModel):
 
 class WFSInjestRequest(BaseModel):
     url: str
-    layer: str
+    layer: Optional[str] = None
 
 
 # --- Setting Schemas ---

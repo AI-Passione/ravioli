@@ -191,11 +191,11 @@ export const api = {
     return response.json();
   },
 
-  async ingestWFSLayer(url: string, layer: string): Promise<UploadedFile> {
+  async ingestWFSLayer(url: string, layer?: string): Promise<UploadedFile> {
     const response = await fetch(`${API_BASE}/data/wfs/ingest`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, layer }),
+      body: JSON.stringify({ url, ...(layer ? { layer } : {}) }),
     });
     if (!response.ok) throw new Error('Failed to ingest WFS layer');
     return response.json();

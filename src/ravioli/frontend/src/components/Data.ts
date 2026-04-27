@@ -304,19 +304,13 @@ export function renderData() {
     ingestBtn.disabled = true;
 
     try {
-      // 1. Automatically determine the layer
-      const layers = await api.getWFSLayers(url);
-      if (layers.length === 0) {
-        throw new Error('No layers found at this URL.');
-      }
-      const primaryLayer = layers[0].name;
-      
-      // 2. Fire ingestion — backend returns the pending record immediately
-      const result = await api.ingestWFSLayer(url, primaryLayer);
-      
-      // 3. Close modal and optimistically inject the pending record into the
-      //    store right now — no round-trip re-fetch needed. The global poller
-      //    in main.ts will keep it updated every 3s from here on.
+      // Fire ingestion — backend returns the pending record immediately and
+      // auto-detects the layer in the background if not specified.
+      const result = await api.ingestWFSLayer(url);
+
+      // Close modal and optimistically inject the pending record into the
+      // store right now — no round-trip re-fetch needed. The global poller
+      // in main.ts will keep it updated every 3s from here on.
       hideAddModal();
       const existingFiles = store.getUploadedFiles();
       store.setUploadedFiles([result, ...existingFiles]);
