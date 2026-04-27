@@ -236,7 +236,7 @@ async function hydrateSummary(container: HTMLElement, days: number) {
     // Parse bullet lines from the summary; fall back to treating full text as one bullet
     const allBullets = data.summary
       .split('\n')
-      .map(l => l.replace(/^[-*•]\s*/, '').trim())
+      .map(l => l.replace(/^[\s\-*•]+/, '').trim())
       .filter(l => l.length > 10);
 
     const isExpandable = allBullets.length > 4;
@@ -245,7 +245,7 @@ async function hydrateSummary(container: HTMLElement, days: number) {
 
     const renderBullet = (b: string, index: number) => `
       <li class="flex items-start gap-5 group/item opacity-0 animate-reveal" style="animation-delay: ${index * 0.1}s">
-        <div class="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-primary/40 group-hover/item:bg-primary group-hover/item:scale-125 transition-all duration-300 shadow-[0_0_8px_rgba(var(--primary-rgb),0.3)]"></div>
+        <div class="mt-[0.65em] shrink-0 w-2 h-2 rounded-full bg-primary/40 group-hover/item:bg-primary group-hover/item:scale-125 transition-all duration-300 shadow-[0_0_8px_rgba(var(--primary-rgb),0.3)]"></div>
         <span class="text-lg font-body-lg text-on-surface-variant leading-relaxed group-hover/item:text-on-surface transition-colors duration-300">${b}</span>
       </li>`;
 
