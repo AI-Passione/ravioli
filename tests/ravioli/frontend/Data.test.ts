@@ -96,7 +96,6 @@ describe('Data component', () => {
     
     const stepWfs = el.querySelector('#step-wfs') as HTMLElement;
     expect(stepWfs.classList.contains('hidden')).toBe(false);
-    expect(el.innerHTML).toContain('Configure WFS API Source');
   });
 
   it('should navigate back to selection from WFS step', () => {

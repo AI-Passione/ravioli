@@ -279,59 +279,36 @@ export function renderData() {
 
   // --- WFS Ingestion Logic ---
   const wfsUrlInput = container.querySelector('#wfs-url') as HTMLInputElement;
-  const fetchLayersBtn = container.querySelector('#btn-fetch-layers') as HTMLButtonElement;
-  const layerContainer = container.querySelector('#wfs-layer-container') as HTMLElement;
-  const layerSelect = container.querySelector('#wfs-layer-select') as HTMLSelectElement;
-  const ingestControls = container.querySelector('#wfs-ingest-controls') as HTMLElement;
   const ingestBtn = container.querySelector('#btn-ingest-wfs') as HTMLButtonElement;
   const countInput = container.querySelector('#wfs-count') as HTMLInputElement;
 
-  fetchLayersBtn?.addEventListener('click', async () => {
-    const url = wfsUrlInput.value.trim();
-    if (!url) return;
-
-    fetchLayersBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Fetching...';
-    fetchLayersBtn.disabled = true;
-
-    try {
-      const layers = await api.getWFSLayers(url);
-      layerSelect.innerHTML = '<option value="">Select a layer...</option>' + 
-        layers.map(l => `<option value="${l.name}">${l.title || l.name}</option>`).join('');
-      layerContainer.classList.remove('hidden');
-      alert('Layers fetched successfully!');
-    } catch (err) {
-      console.error('Fetch layers failed', err);
-      alert('Failed to fetch layers. Please check the URL.');
-    } finally {
-      fetchLayersBtn.innerHTML = '<span class="material-symbols-outlined text-sm">sync</span> Fetch';
-      fetchLayersBtn.disabled = false;
-    }
-  });
-
-  layerSelect?.addEventListener('change', () => {
-    if (layerSelect.value) ingestControls.classList.remove('hidden');
-    else ingestControls.classList.add('hidden');
-  });
-
   ingestBtn?.addEventListener('click', async () => {
     const url = wfsUrlInput.value.trim();
-    const layer = layerSelect.value;
+    if (!url) return;
     const count = parseInt(countInput.value) || 1000;
 
     ingestBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Ingesting...';
     ingestBtn.disabled = true;
 
     try {
-      const result = await api.ingestWFSLayer(url, layer, count);
+      // 1. Automatically determine the layer
+      const layers = await api.getWFSLayers(url);
+      if (layers.length === 0) {
+        throw new Error('No layers found at this URL.');
+      }
+      const primaryLayer = layers[0].name;
+      
+      // 2. Ingest the primary layer
+      const result = await api.ingestWFSLayer(url, primaryLayer, count);
       if (result.status === 'completed') {
         hideAddModal();
-        alert(`Successfully ingested ${result.row_count} rows!`);
+        alert(`Successfully ingested ${result.row_count} rows from ${primaryLayer}!`);
         refreshFiles();
       } else {
         alert(`Ingestion failed: ${result.error_message}`);
       }
-    } catch (err) {
-      alert('Failed to start ingestion.');
+    } catch (err: any) {
+      alert(`Failed to start ingestion: ${err.message || err}`);
     } finally {
       ingestBtn.innerHTML = 'Start Ingestion <span class="material-symbols-outlined">arrow_forward</span>';
       ingestBtn.disabled = false;
