@@ -8,17 +8,17 @@ from ravioli.backend.core import models, schemas
 
 router = APIRouter()
 
-@router.post("/", response_model=schemas.ExecutionLog, status_code=status.HTTP_201_CREATED)
-def create_log(log_in: schemas.ExecutionLogCreate, db: Session = Depends(get_db)):
+@router.post("/", response_model=schemas.AnalysisLog, status_code=status.HTTP_201_CREATED)
+def create_log(log_in: schemas.AnalysisLogCreate, db: Session = Depends(get_db)):
     """
-    Create a new execution log entry.
+    Create a new analysis log entry.
     """
     # Verify analysis exists
     analysis = db.query(models.Analysis).filter(models.Analysis.id == log_in.analysis_id).first()
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
         
-    db_log = models.ExecutionLog(
+    db_log = models.AnalysisLog(
         analysis_id=log_in.analysis_id,
         log_type=log_in.log_type,
         content=log_in.content,
@@ -30,10 +30,10 @@ def create_log(log_in: schemas.ExecutionLogCreate, db: Session = Depends(get_db)
     db.refresh(db_log)
     return db_log
 
-@router.get("/analysis/{analysis_id}", response_model=List[schemas.ExecutionLog])
+@router.get("/analysis/{analysis_id}", response_model=List[schemas.AnalysisLog])
 def list_logs_for_analysis(analysis_id: UUID, db: Session = Depends(get_db)):
     """
     List all logs for a specific analysis.
     """
-    logs = db.query(models.ExecutionLog).filter(models.ExecutionLog.analysis_id == analysis_id).order_by(models.ExecutionLog.timestamp.asc()).all()
+    logs = db.query(models.AnalysisLog).filter(models.AnalysisLog.analysis_id == analysis_id).order_by(models.AnalysisLog.timestamp.asc()).all()
     return logs
