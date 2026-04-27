@@ -329,6 +329,105 @@ Answer:"""
         except Exception as e:
             return f"> [!WARNING]\n> **Neural Link Interrupted**: {str(e)}\n\nKowalski is currently unable to process this request. Please check your AI node connection."
 
+    async def extract_insights(self, result_markdown: str) -> dict:
+        """
+        Parse a quick-insight markdown result into structured sections.
+
+        Returns a dict with keys:
+          - bullets: list[str]   — one entry per Key Insights bullet point
+          - assumptions: str     — raw text of the Assumptions section
+          - limitations: str     — raw text of the Known Limitations section
+          - metadata: dict       — {"basic_stats": str, "appendix": str}
+        """
+        import re
+
+        sections: dict[str, str] = {}
+        current: str | None = None
+        buf: list[str] = []
+
+        for line in result_markdown.splitlines():
+            heading = re.match(r"^##\s+(.+)", line)
+            if heading:
+                if current is not None:
+                    sections[current] = "\n".join(buf).strip()
+                current = heading.group(1).strip()
+                buf = []
+            else:
+                buf.append(line)
+        if current is not None:
+            sections[current] = "\n".join(buf).strip()
+
+        def get_section(*names: str) -> str:
+            for n in names:
+                for k, v in sections.items():
+                    if n.lower() in k.lower():
+                        return v
+            return ""
+
+        key_insights_raw = get_section("Key Insights")
+        assumptions_raw = get_section("Assumptions")
+        limitations_raw = get_section("Known Limitation", "Limitations")
+        basic_stats_raw = get_section("Basic Stats")
+        appendix_raw = get_section("Appendix")
+
+        bullets = [
+            line.lstrip("-*• ").strip()
+            for line in key_insights_raw.splitlines()
+            if re.match(r"^\s*[-*•]\s+.{10,}", line)
+        ]
+
+        # LLM fallback if no bullets parsed
+        if not bullets:
+            prompt = f"""{KOWALSKI_PERSONA}
+Extract 3-7 standalone insight statements from the Key Insights section below.
+Return ONLY the insights, one per line, starting with a dash (-).
+
+{key_insights_raw or result_markdown[:4000]}
+
+Extracted Insights:"""
+            try:
+                raw = await self._generate(prompt, "Extract Insights", temperature=0.3, num_predict=600)
+                bullets = [
+                    line.lstrip("-*• ").strip()
+                    for line in raw.splitlines()
+                    if re.match(r"^\s*[-*•]\s+.{10,}", line)
+                ][:20]
+            except Exception as e:
+                print(f"OllamaClient: [WARNING] Failed to extract fallback insights bullets: {e}")
+
+        return {
+            "bullets": bullets[:20],
+            "assumptions": assumptions_raw,
+            "limitations": limitations_raw,
+            "metadata": {
+                "basic_stats": basic_stats_raw,
+                "appendix": appendix_raw,
+            },
+        }
+
+    async def generate_insights_summary(self, insights: list[str], days: int) -> str:
+        """
+        Generate an executive AI summary synthesizing all verified insights over the given window.
+        """
+        if not insights:
+            return "> [!NOTE]\n> No verified insights available for the selected period."
+
+        bullet_block = "\n".join(f"- {i}" for i in insights)
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Synthesize the following verified insights from the last {days} day(s) into an executive intelligence brief.
+Return ONLY a bullet-point list — maximum 10 points, minimum 3.
+Each point must be a single, standalone, actionable sentence. No headers, no preamble, no confirmation line.
+Start every line with a dash (-).
+
+Verified Insights:
+{bullet_block}
+
+Intelligence Brief (bullet points only):"""
+        try:
+            return await self._generate(prompt, "Insights Summary", temperature=0.5, num_predict=600)
+        except Exception:
+            return "\n".join(f"- {i}" for i in insights[:10])
+
     async def stream_answer(self, filename: str, summary: str, context: str, question: str):
         """
         Stream a clinical, precise answer to a user question.

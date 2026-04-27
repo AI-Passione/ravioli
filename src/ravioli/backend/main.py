@@ -20,11 +20,28 @@ def init_db():
     try:
         # Ensure 'app' schema exists
         ensure_schema("app")
-        # Create all tables
+        # Create all tables (new tables only; existing tables are not modified)
         Base.metadata.create_all(bind=engine)
+        # Idempotent column migrations for tables that already exist
+        _migrate_columns()
         print("Database tables initialized successfully.")
     except Exception as e:
         print(f"Error initializing database: {e}")
+
+def _migrate_columns():
+    """Add new columns to existing tables using IF NOT EXISTS (idempotent)."""
+    from sqlalchemy import text
+    migrations = [
+        "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS assumptions TEXT",
+        "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS limitations TEXT",
+        "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS insight_metadata JSONB",
+    ]
+    with engine.begin() as conn:
+        for stmt in migrations:
+            try:
+                conn.execute(text(stmt))
+            except Exception as e:
+                print(f"Migration warning (non-fatal): {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

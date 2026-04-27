@@ -161,9 +161,7 @@ export function renderNotebook() {
               <span class="material-symbols-outlined text-sm" data-icon="verified">verified</span>
               <span class="text-[10px] uppercase tracking-widest font-label-sm">Validated by Local LLM Node</span>
             </div>
-            <div class="flex gap-4">
-               <span class="text-[10px] text-outline uppercase tracking-widest opacity-40">System: Studio Noir</span>
-            </div>
+            <span class="text-[10px] text-outline uppercase tracking-widest opacity-40">System: Studio Noir</span>
           </div>
         </div>
       ` : ''}

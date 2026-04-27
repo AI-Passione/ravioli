@@ -119,6 +119,69 @@ def update_analysis(analysis_id: UUID, analysis_in: schemas.AnalysisUpdate, db: 
     db.refresh(db_analysis)
     return db_analysis
 
+@router.post("/{analysis_id}/approve", response_model=schemas.Analysis)
+def approve_analysis(analysis_id: UUID, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """
+    Mark an analysis result as approved and queue background extraction of individual insights.
+    """
+    db_analysis = db.query(models.Analysis).filter(models.Analysis.id == analysis_id).first()
+    if not db_analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    metadata = dict(db_analysis.analysis_metadata or {})
+    metadata['is_approved'] = True
+    db_analysis.analysis_metadata = metadata
+    db.commit()
+    db.refresh(db_analysis)
+    if db_analysis.result:
+        background_tasks.add_task(
+            extract_and_store_insights,
+            str(analysis_id),
+            db_analysis.result,
+            db_analysis.title,
+        )
+    return db_analysis
+
+
+async def extract_and_store_insights(analysis_id: str, result_markdown: str, title: str):
+    """Background task: parse all template sections and store one Insight row per Key Insight bullet."""
+    from ravioli.backend.core.database import SessionLocal
+    from ravioli.backend.core.ollama import OllamaClient
+    import uuid as _uuid
+
+    db = SessionLocal()
+    try:
+        analysis_uuid = _uuid.UUID(analysis_id)
+        # Skip if insights already extracted for this analysis
+        if db.query(models.Insight).filter(models.Insight.analysis_id == analysis_uuid).first():
+            return
+
+        client = OllamaClient(db)
+        parsed = await client.extract_insights(result_markdown)
+
+        bullets: list[str] = parsed.get("bullets", [])
+        assumptions: str = parsed.get("assumptions", "")
+        limitations: str = parsed.get("limitations", "")
+        metadata: dict = parsed.get("metadata", {})
+
+        for bullet in bullets:
+            if bullet.strip():
+                db.add(models.Insight(
+                    analysis_id=analysis_uuid,
+                    content=bullet.strip(),
+                    source_label=title,
+                    assumptions=assumptions or None,
+                    limitations=limitations or None,
+                    metadata=metadata if any(metadata.values()) else None,
+                    is_verified=False,
+                    is_published=False,
+                ))
+        db.commit()
+        logger.info("Extracted %d insights from analysis %s", len(bullets), analysis_id)
+    except Exception as e:
+        logger.error("Insight extraction failed for %s: %s", analysis_id, e)
+    finally:
+        db.close()
+
 @router.delete("/{analysis_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_analysis(analysis_id: UUID, db: Session = Depends(get_db)):
     """
@@ -460,6 +523,7 @@ async def generate_summary(db: Session, filename: str, row_count: int, col_count
 
 @router.post("/quick-insight", response_model=schemas.QuickInsightResponse)
 async def create_quick_insight(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
@@ -503,6 +567,8 @@ async def create_quick_insight(
     db.commit()
     db.refresh(db_analysis)
 
+    background_tasks.add_task(extract_and_store_insights, str(db_analysis.id), summary, title)
+
     return schemas.QuickInsightResponse(
         analysis_id=db_analysis.id,
         title=title,
@@ -513,6 +579,7 @@ async def create_quick_insight(
 
 @router.post("/quick-insight/existing", response_model=schemas.QuickInsightResponse)
 async def create_quick_insight_existing(
+    background_tasks: BackgroundTasks,
     request: schemas.QuickInsightExistingRequest,
     db: Session = Depends(get_db)
 ):
@@ -569,6 +636,8 @@ async def create_quick_insight_existing(
     db.add(db_analysis)
     db.commit()
     db.refresh(db_analysis)
+
+    background_tasks.add_task(extract_and_store_insights, str(db_analysis.id), summary, title)
 
     return schemas.QuickInsightResponse(
         analysis_id=db_analysis.id,

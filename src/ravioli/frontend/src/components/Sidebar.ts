@@ -44,9 +44,9 @@ export function renderSidebar() {
       <section class="mb-8">
         <p class="text-[10px] uppercase tracking-[0.2em] text-outline px-8 mb-4 opacity-50 font-medium">Vibe Analytics</p>
         <div class="space-y-1">
-          <button class="nav-item ${currentView === 'dashboard' && !activeId ? 'active' : ''} w-full" data-nav="dashboard">
-            <span class="material-symbols-outlined text-primary-fixed-dim" data-icon="dashboard">dashboard</span>
-            <span>Dashboard</span>
+          <button class="nav-item ${currentView === 'insights' || (currentView === 'dashboard' && !activeId) ? 'active' : ''} w-full" data-nav="insights">
+            <span class="material-symbols-outlined text-primary-fixed-dim" data-icon="auto_awesome">auto_awesome</span>
+            <span>Insights</span>
           </button>
           <button class="nav-item ${currentView === 'knowledge' ? 'active' : ''} w-full" data-nav="knowledge">
             <span class="material-symbols-outlined" data-icon="local_library">local_library</span>
@@ -90,8 +90,7 @@ export function renderSidebar() {
 
   // Brand header listener
   container.querySelector('#brand-header')?.addEventListener('click', () => {
-    store.setCurrentView('dashboard');
-    store.setActiveAnalysisId(undefined);
+    store.setCurrentView('insights');
   });
 
   // Navigation listeners

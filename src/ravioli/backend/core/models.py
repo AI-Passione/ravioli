@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, UTC
 from typing import Optional, List
-from sqlalchemy import String, DateTime, JSON, ForeignKey, Text
+from sqlalchemy import String, DateTime, JSON, ForeignKey, Text, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from ravioli.backend.core.database import Base
@@ -32,6 +32,7 @@ class Analysis(Base):
 
     # Relationships
     logs: Mapped[List["ExecutionLog"]] = relationship("ExecutionLog", back_populates="analysis", cascade="all, delete-orphan")
+    insights: Mapped[List["Insight"]] = relationship("Insight", back_populates="analysis", cascade="all, delete-orphan")
 
 class ExecutionLog(Base):
     """
@@ -96,6 +97,29 @@ class UploadedFile(Base):
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+
+class Insight(Base):
+    """
+    A single distilled insight extracted from an approved analysis result.
+    One row = one bullet point. Stored in the 'app' schema.
+    """
+    __tablename__ = "insights"
+    __table_args__ = {"schema": "app"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("app.analyses.id"), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    source_label: Mapped[Optional[str]] = mapped_column(String(255))
+    assumptions: Mapped[Optional[str]] = mapped_column(Text)
+    limitations: Mapped[Optional[str]] = mapped_column(Text)
+    insight_metadata: Mapped[Optional[dict]] = mapped_column(JSON, name="insight_metadata")
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_published: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+
+    analysis: Mapped["Analysis"] = relationship("Analysis", back_populates="insights")
+
 
 class SystemSetting(Base):
     """

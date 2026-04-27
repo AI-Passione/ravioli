@@ -3,7 +3,15 @@ export interface Analysis {
   title: string;
   description?: string;
   status: string;
-  analysis_metadata?: any;
+  result?: string;
+  analysis_metadata?: {
+    type?: string;
+    filename?: string;
+    row_count?: number;
+    followup_questions?: string[];
+    is_approved?: boolean;
+    [key: string]: any;
+  };
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +63,36 @@ export interface SystemSetting {
   key: string;
   value: Record<string, any>;
   updated_at?: string;
+}
+
+export interface Insight {
+  id: string;
+  analysis_id: string;
+  content: string;
+  source_label?: string;
+  assumptions?: string;
+  limitations?: string;
+  metadata?: {
+    basic_stats?: string;
+    appendix?: string;
+    [key: string]: any;
+  };
+  is_verified: boolean;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InsightStats {
+  verified_count: number;
+  analyses_count: number;
+  contributors_count: number;
+}
+
+export interface InsightsSummary {
+  summary: string;
+  insight_count: number;
+  days: number;
 }
 
 export interface QuickInsightResponse {
