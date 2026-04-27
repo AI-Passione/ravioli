@@ -82,6 +82,7 @@ class UploadedFileBase(BaseModel):
     file_hash: Optional[str] = None
     source_type: str = "file"
     source_url: Optional[str] = None
+    has_pii: bool = False
 
 class UploadedFile(UploadedFileBase):
     id: UUID
@@ -93,6 +94,9 @@ class UploadedFile(UploadedFileBase):
 
 class UploadedFileUpdate(BaseModel):
     description: Optional[str] = None
+
+class UploadedFilePIIUpdate(BaseModel):
+    has_pii: bool
 
 # --- WFS Schemas ---
 

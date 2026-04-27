@@ -132,6 +132,16 @@ export const api = {
     return response.json();
   },
 
+  async togglePIITag(fileId: string, hasPII: boolean): Promise<UploadedFile> {
+    const response = await fetch(`${API_BASE}/data/files/${fileId}/pii`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ has_pii: hasPII }),
+    });
+    if (!response.ok) throw new Error('Failed to update PII status');
+    return response.json();
+  },
+
   async generateFileDescription(fileId: string): Promise<UploadedFile> {
     const response = await fetch(`${API_BASE}/data/files/${fileId}/generate-description`, {
       method: 'POST',

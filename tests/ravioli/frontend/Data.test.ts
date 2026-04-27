@@ -108,4 +108,32 @@ describe('Data component', () => {
     
     expect(el.querySelector('#step-selection')?.classList.contains('hidden')).toBe(false);
   });
+
+  it('should render a PII tag and handle dismissal', () => {
+    store.setUploadedFiles([
+      {
+        id: 'pii-1',
+        filename: 'pii.csv',
+        original_filename: 'PII Data',
+        content_type: 'text/csv',
+        size_bytes: 100,
+        table_name: 'pii_data',
+        row_count: 5,
+        status: 'completed',
+        source_type: 'file',
+        has_pii: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ]);
+    
+    const el = renderData();
+    const piiBadge = el.querySelector('.pii-badge');
+    expect(piiBadge).not.toBeNull();
+    expect(piiBadge?.textContent).toContain('PII');
+    
+    // Test dismissal button presence
+    const dismissBtn = el.querySelector('.btn-dismiss-pii');
+    expect(dismissBtn).not.toBeNull();
+  });
 });

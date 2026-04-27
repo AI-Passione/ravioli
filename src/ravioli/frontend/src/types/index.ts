@@ -38,6 +38,7 @@ export interface UploadedFile {
   is_duplicate?: boolean;
   source_type?: string;
   source_url?: string;
+  has_pii: boolean;
   description?: string;
   created_at: string;
   updated_at: string;

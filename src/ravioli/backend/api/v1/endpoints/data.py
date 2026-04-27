@@ -16,6 +16,7 @@ from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
 from ravioli.backend.data.wfs_client import WFSClient
 
 from ravioli.backend.core.ollama import OllamaClient
+from ravioli.backend.data.pii_scanner import pii_scanner
 
 router = APIRouter()
 
@@ -89,6 +90,14 @@ async def upload_file(
         try:
             row_count = duckdb_manager.ingest_csv(file_path, table_name)
             db_file.row_count = row_count
+            
+            # PII Scan
+            try:
+                df_sample = duckdb_manager.connection.execute(f'SELECT * FROM "{table_name}" LIMIT 100').fetchdf()
+                db_file.has_pii = pii_scanner.scan_dataframe(df_sample)
+            except:
+                db_file.has_pii = False
+                
             db_file.status = "completed"
         except Exception as e:
             db_file.status = "failed"
@@ -182,6 +191,25 @@ async def update_file(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update file: {str(e)}")
 
+@router.patch("/files/{file_id}/pii", response_model=schemas.UploadedFile)
+async def update_file_pii(
+    file_id: uuid.UUID,
+    pii_update: schemas.UploadedFilePIIUpdate,
+    db: Session = Depends(get_db)
+):
+    db_file = db.execute(select(UploadedFile).where(UploadedFile.id == file_id)).scalar_one_or_none()
+    if not db_file:
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    db_file.has_pii = pii_update.has_pii
+    try:
+        db.commit()
+        db.refresh(db_file)
+        return db_file
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update PII status: {str(e)}")
+
 @router.post("/files/{file_id}/generate-description", response_model=schemas.UploadedFile)
 async def generate_file_description(
     file_id: uuid.UUID,
@@ -269,11 +297,18 @@ async def ingest_wfs_layer(
         load_info = pipeline.run(data_generator, table_name=table_name, write_disposition="replace")
         
         # Update metadata
-        # Since dlt is async-ish in how it returns info, we can just query the table for row count
         db_file.row_count = duckdb_manager.connection.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()[0]
+        
+        # PII Scan
+        try:
+            df_sample = duckdb_manager.connection.execute(f'SELECT * FROM "{table_name}" LIMIT 100').fetchdf()
+            db_file.has_pii = pii_scanner.scan_dataframe(df_sample)
+        except:
+            db_file.has_pii = False
+            
         db_file.status = "completed"
         # Approx size
-        db_file.size_bytes = 0 # In a real scenario we'd get this from dlt or duckdb
+        db_file.size_bytes = 0 
         
     except Exception as e:
         db_file.status = "failed"

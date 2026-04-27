@@ -64,7 +64,17 @@ export function renderData() {
                   </td>
                   <td class="px-8 py-5">
                     <div class="flex flex-col">
-                      <span class="text-neutral-200 font-medium">${file.original_filename}</span>
+                      <div class="flex items-center gap-2">
+                        <span class="text-neutral-200 font-medium">${file.original_filename}</span>
+                        ${file.has_pii ? `
+                          <span class="pii-badge inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 text-[9px] font-bold uppercase tracking-wider border border-amber-500/20 group/pii" data-id="${file.id}" title="Likely contains PII">
+                            PII
+                            <button class="btn-dismiss-pii hover:text-amber-300 transition-colors opacity-0 group-hover/pii:opacity-100 transition-opacity">
+                              <span class="material-symbols-outlined text-[10px]">close</span>
+                            </button>
+                          </span>
+                        ` : ''}
+                      </div>
                       <span class="text-[10px] text-neutral-500 font-mono mt-0.5">${file.source_type === 'wfs' ? 'WFS API' : 'CSV File'} • ${formatBytes(file.size_bytes)}</span>
                     </div>
                   </td>
@@ -500,6 +510,23 @@ export function renderData() {
     inputEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') stopEditing(true);
       else if (e.key === 'Escape') stopEditing(false);
+    });
+  });
+
+  // PII Tag Dismissal
+  container.querySelectorAll('.btn-dismiss-pii').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const badge = btn.closest('.pii-badge') as HTMLElement;
+      const fileId = badge.getAttribute('data-id');
+      if (fileId && confirm('Mark this as false positive? The PII tag will be removed.')) {
+        try {
+          await api.togglePIITag(fileId, false);
+          refreshFiles();
+        } catch (err) {
+          alert('Failed to update PII status.');
+        }
+      }
     });
   });
 
