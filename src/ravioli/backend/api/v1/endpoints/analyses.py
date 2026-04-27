@@ -143,7 +143,7 @@ def approve_analysis(analysis_id: UUID, background_tasks: BackgroundTasks, db: S
 
 
 async def extract_and_store_insights(analysis_id: str, result_markdown: str, title: str):
-    """Background task: extract bullet-point insights from an approved analysis result."""
+    """Background task: parse all template sections and store one Insight row per Key Insight bullet."""
     from ravioli.backend.core.database import SessionLocal
     from ravioli.backend.core.ollama import OllamaClient
     import uuid as _uuid
@@ -152,12 +152,16 @@ async def extract_and_store_insights(analysis_id: str, result_markdown: str, tit
     try:
         analysis_uuid = _uuid.UUID(analysis_id)
         # Skip if insights already extracted for this analysis
-        existing = db.query(models.Insight).filter(models.Insight.analysis_id == analysis_uuid).first()
-        if existing:
+        if db.query(models.Insight).filter(models.Insight.analysis_id == analysis_uuid).first():
             return
 
         client = OllamaClient(db)
-        bullets = await client.extract_insights(result_markdown)
+        parsed = await client.extract_insights(result_markdown)
+
+        bullets: list[str] = parsed.get("bullets", [])
+        assumptions: str = parsed.get("assumptions", "")
+        limitations: str = parsed.get("limitations", "")
+        metadata: dict = parsed.get("metadata", {})
 
         for bullet in bullets:
             if bullet.strip():
@@ -165,6 +169,9 @@ async def extract_and_store_insights(analysis_id: str, result_markdown: str, tit
                     analysis_id=analysis_uuid,
                     content=bullet.strip(),
                     source_label=title,
+                    assumptions=assumptions or None,
+                    limitations=limitations or None,
+                    metadata=metadata if any(metadata.values()) else None,
                     is_verified=False,
                     is_published=False,
                 ))
@@ -516,6 +523,7 @@ async def generate_summary(db: Session, filename: str, row_count: int, col_count
 
 @router.post("/quick-insight", response_model=schemas.QuickInsightResponse)
 async def create_quick_insight(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
@@ -559,6 +567,8 @@ async def create_quick_insight(
     db.commit()
     db.refresh(db_analysis)
 
+    background_tasks.add_task(extract_and_store_insights, str(db_analysis.id), summary, title)
+
     return schemas.QuickInsightResponse(
         analysis_id=db_analysis.id,
         title=title,
@@ -569,6 +579,7 @@ async def create_quick_insight(
 
 @router.post("/quick-insight/existing", response_model=schemas.QuickInsightResponse)
 async def create_quick_insight_existing(
+    background_tasks: BackgroundTasks,
     request: schemas.QuickInsightExistingRequest,
     db: Session = Depends(get_db)
 ):
@@ -625,6 +636,8 @@ async def create_quick_insight_existing(
     db.add(db_analysis)
     db.commit()
     db.refresh(db_analysis)
+
+    background_tasks.add_task(extract_and_store_insights, str(db_analysis.id), summary, title)
 
     return schemas.QuickInsightResponse(
         analysis_id=db_analysis.id,

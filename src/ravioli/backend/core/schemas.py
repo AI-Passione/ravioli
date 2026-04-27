@@ -72,6 +72,9 @@ class QuickInsightExistingRequest(BaseModel):
 class InsightBase(BaseModel):
     content: str
     source_label: Optional[str] = None
+    assumptions: Optional[str] = None
+    limitations: Optional[str] = None
+    metadata: Optional[dict] = None
 
 class Insight(InsightBase):
     id: UUID

@@ -70,6 +70,13 @@ export interface Insight {
   analysis_id: string;
   content: string;
   source_label?: string;
+  assumptions?: string;
+  limitations?: string;
+  metadata?: {
+    basic_stats?: string;
+    appendix?: string;
+    [key: string]: any;
+  };
   is_verified: boolean;
   is_published: boolean;
   created_at: string;

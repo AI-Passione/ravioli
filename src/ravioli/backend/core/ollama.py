@@ -329,42 +329,81 @@ Answer:"""
         except Exception as e:
             return f"> [!WARNING]\n> **Neural Link Interrupted**: {str(e)}\n\nKowalski is currently unable to process this request. Please check your AI node connection."
 
-    async def extract_insights(self, result_markdown: str) -> list[str]:
+    async def extract_insights(self, result_markdown: str) -> dict:
         """
-        Extract individual insight bullet points from an analysis result.
-        Returns a list of plain-text insight strings (one per bullet point).
+        Parse a quick-insight markdown result into structured sections.
+
+        Returns a dict with keys:
+          - bullets: list[str]   — one entry per Key Insights bullet point
+          - assumptions: str     — raw text of the Assumptions section
+          - limitations: str     — raw text of the Known Limitations section
+          - metadata: dict       — {"basic_stats": str, "appendix": str}
         """
         import re
-        # Fast path: pull bullet lines directly from the markdown
+
+        sections: dict[str, str] = {}
+        current: str | None = None
+        buf: list[str] = []
+
+        for line in result_markdown.splitlines():
+            heading = re.match(r"^##\s+(.+)", line)
+            if heading:
+                if current is not None:
+                    sections[current] = "\n".join(buf).strip()
+                current = heading.group(1).strip()
+                buf = []
+            else:
+                buf.append(line)
+        if current is not None:
+            sections[current] = "\n".join(buf).strip()
+
+        def get_section(*names: str) -> str:
+            for n in names:
+                for k, v in sections.items():
+                    if n.lower() in k.lower():
+                        return v
+            return ""
+
+        key_insights_raw = get_section("Key Insights")
+        assumptions_raw = get_section("Assumptions")
+        limitations_raw = get_section("Known Limitation", "Limitations")
+        basic_stats_raw = get_section("Basic Stats")
+        appendix_raw = get_section("Appendix")
+
         bullets = [
             line.lstrip("-*• ").strip()
-            for line in result_markdown.splitlines()
-            if re.match(r"^\s*[-*•]\s+.{15,}", line)
+            for line in key_insights_raw.splitlines()
+            if re.match(r"^\s*[-*•]\s+.{10,}", line)
         ]
-        if len(bullets) >= 2:
-            return bullets[:20]
 
-        # Fallback: ask the LLM to extract them
-        prompt = f"""{KOWALSKI_PERSONA}
-Task: Extract 3-7 standalone, self-contained insight statements from the analysis result below.
-Each insight must be a complete sentence that makes sense without any surrounding context.
-Return ONLY the insights, one per line, starting with a dash (-). No titles, no headers.
+        # LLM fallback if no bullets parsed
+        if not bullets:
+            prompt = f"""{KOWALSKI_PERSONA}
+Extract 3-7 standalone insight statements from the Key Insights section below.
+Return ONLY the insights, one per line, starting with a dash (-).
 
-Analysis Result:
----
-{result_markdown[:6000]}
----
+{key_insights_raw or result_markdown[:4000]}
 
 Extracted Insights:"""
-        try:
-            raw = await self._generate(prompt, "Extract Insights", temperature=0.3, num_predict=600)
-            return [
-                line.lstrip("-*• ").strip()
-                for line in raw.splitlines()
-                if re.match(r"^\s*[-*•]\s+.{10,}", line)
-            ][:20]
-        except Exception:
-            return bullets
+            try:
+                raw = await self._generate(prompt, "Extract Insights", temperature=0.3, num_predict=600)
+                bullets = [
+                    line.lstrip("-*• ").strip()
+                    for line in raw.splitlines()
+                    if re.match(r"^\s*[-*•]\s+.{10,}", line)
+                ][:20]
+            except Exception:
+                pass
+
+        return {
+            "bullets": bullets[:20],
+            "assumptions": assumptions_raw,
+            "limitations": limitations_raw,
+            "metadata": {
+                "basic_stats": basic_stats_raw,
+                "appendix": appendix_raw,
+            },
+        }
 
     async def generate_insights_summary(self, insights: list[str], days: int) -> str:
         """
