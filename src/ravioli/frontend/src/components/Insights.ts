@@ -22,34 +22,10 @@ function banCard(value: number | string, label: string, icon: string, accent = '
     </div>`;
 }
 
-function insightPill(insight: Insight, context: 'queue' | 'feed') {
+function insightPill(insight: Insight) {
   const ago = formatDistanceToNow(new Date(insight.created_at), { addSuffix: true });
   const dateStr = format(new Date(insight.created_at), 'MMM d');
   const source = insight.source_label ?? 'Unknown analysis';
-
-  if (context === 'queue') {
-    return `
-      <div class="review-item flex items-start gap-4 p-5 rounded-2xl bg-surface-container-low/30 border border-white/5 hover:border-tertiary/30 transition-all duration-500 group insight-card-hover" data-insight-id="${insight.id}">
-        <div class="w-2 h-2 rounded-full bg-tertiary mt-2 shrink-0 animate-pulse shadow-[0_0_8px_rgba(var(--tertiary-rgb),0.5)]"></div>
-        <div class="flex-1 min-w-0 space-y-2">
-          <p class="text-sm font-body-md text-on-surface leading-relaxed group-hover:text-white transition-colors">${insight.content}</p>
-          <div class="flex items-center gap-3">
-            <span class="text-[10px] uppercase tracking-[0.2em] text-outline font-label-sm opacity-40">${source}</span>
-            <span class="text-[10px] text-outline opacity-20">·</span>
-            <span class="text-[10px] uppercase tracking-[0.2em] text-outline font-label-sm opacity-40">${ago}</span>
-          </div>
-        </div>
-        <div class="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
-          <button class="btn-verify-insight flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-on-primary transition-all text-[10px] uppercase tracking-widest font-bold" data-id="${insight.id}">
-            <span class="material-symbols-outlined text-sm" data-icon="check">check</span>
-            Verify
-          </button>
-          <button class="btn-reject-insight p-2 rounded-full bg-error/5 text-outline hover:text-error hover:bg-error/10 border border-transparent hover:border-error/20 transition-all" data-id="${insight.id}" title="Reject">
-            <span class="material-symbols-outlined text-sm" data-icon="close">close</span>
-          </button>
-        </div>
-      </div>`;
-  }
 
   return `
     <div class="flex items-start gap-5 py-6 border-b border-white/5 last:border-0 group insight-card-hover rounded-xl px-4 -mx-4 transition-all duration-500">
@@ -134,40 +110,24 @@ export function renderInsights() {
         </div>
       </section>
 
-      <!-- Two-column: Review Queue + News Feed -->
-      <div class="grid grid-cols-2 gap-10">
+      <!-- News Feed -->
+      <section class="max-w-4xl mx-auto">
+        <div class="flex items-center gap-3 mb-8">
+          <div class="w-10 h-10 rounded-[1rem] bg-primary/10 flex items-center justify-center border border-primary/20 shadow-lg shadow-primary/5">
+            <span class="material-symbols-outlined text-primary text-2xl" data-icon="newspaper">newspaper</span>
+          </div>
+          <div>
+            <h2 class="text-xl font-headline-sm text-on-surface uppercase tracking-[0.2em] font-medium">Intelligence Feed</h2>
+            <p class="text-[10px] uppercase tracking-[0.3em] text-outline opacity-30 font-bold mt-0.5">Chronicle of verified signals</p>
+          </div>
+        </div>
+        <div id="news-feed" class="space-y-0 min-h-[200px]">
+          <div class="h-20 border-b border-white/5 animate-pulse bg-surface-container-low/20 rounded mb-2"></div>
+          <div class="h-20 border-b border-white/5 animate-pulse bg-surface-container-low/20 rounded mb-2"></div>
+          <div class="h-20 border-b border-white/5 animate-pulse bg-surface-container-low/20 rounded"></div>
+        </div>
+      </section>
 
-        <!-- Review Queue -->
-        <section>
-          <div class="flex items-center gap-3 mb-6">
-            <div class="w-8 h-8 rounded-xl bg-tertiary/10 flex items-center justify-center">
-              <span class="material-symbols-outlined text-tertiary" data-icon="pending_actions">pending_actions</span>
-            </div>
-            <h2 class="text-lg font-headline-sm text-on-surface uppercase tracking-[0.15em]">Review Queue</h2>
-            <span id="queue-badge" class="ml-auto px-2 py-0.5 rounded-full bg-tertiary/10 text-tertiary text-[10px] font-label-sm uppercase tracking-widest hidden">0</span>
-          </div>
-          <div id="review-queue" class="space-y-3">
-            <div class="h-20 rounded-2xl bg-surface-container-low animate-pulse"></div>
-            <div class="h-20 rounded-2xl bg-surface-container-low animate-pulse"></div>
-          </div>
-        </section>
-
-        <!-- News Feed -->
-        <section>
-          <div class="flex items-center gap-3 mb-6">
-            <div class="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-              <span class="material-symbols-outlined text-primary" data-icon="newspaper">newspaper</span>
-            </div>
-            <h2 class="text-lg font-headline-sm text-on-surface uppercase tracking-[0.15em]">News Feed</h2>
-          </div>
-          <div id="news-feed" class="space-y-0">
-            <div class="h-16 border-b border-outline-variant/10 animate-pulse bg-surface-container-low/20 rounded mb-1"></div>
-            <div class="h-16 border-b border-outline-variant/10 animate-pulse bg-surface-container-low/20 rounded mb-1"></div>
-            <div class="h-16 border-b border-outline-variant/10 animate-pulse bg-surface-container-low/20 rounded"></div>
-          </div>
-        </section>
-
-      </div>
     </div>
   `;
 
@@ -181,7 +141,6 @@ async function hydrate(container: HTMLElement) {
   await Promise.all([
     hydrateBans(container),
     hydrateSummary(container, activeDays),
-    hydrateQueue(container),
     hydrateFeed(container),
   ]);
 
@@ -310,71 +269,6 @@ async function hydrateSummary(container: HTMLElement, days: number) {
   }
 }
 
-async function hydrateQueue(container: HTMLElement) {
-  const queueEl = container.querySelector('#review-queue');
-  const badge = container.querySelector('#queue-badge');
-  if (!queueEl) return;
-  try {
-    let queue = await api.getReviewQueue();
-
-    const render = (items: typeof queue) => {
-      if (badge) {
-        if (items.length > 0) {
-          badge.textContent = String(items.length);
-          badge.classList.remove('hidden');
-        } else {
-          badge.classList.add('hidden');
-        }
-      }
-      queueEl.innerHTML = items.length === 0
-        ? `<div class="glass-card flex flex-col items-center gap-4 py-16 text-center rounded-[2rem] border-dashed border-white/5 group animate-reveal">
-            <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform duration-700">
-              <span class="material-symbols-outlined text-4xl text-outline opacity-20" data-icon="inbox_customize">inbox_customize</span>
-            </div>
-            <div class="space-y-1">
-              <p class="text-xs uppercase tracking-[0.3em] font-bold text-on-surface opacity-40">Queue is Clear</p>
-              <p class="text-[10px] uppercase tracking-[0.1em] text-outline opacity-20 font-medium">All insights have been processed</p>
-            </div>
-          </div>`
-        : items.map((i, index) => `<div class="opacity-0 animate-reveal" style="animation-delay: ${index * 0.05}s">${insightPill(i, 'queue')}</div>`).join('');
-
-      // Bind verify / reject buttons
-      queueEl.querySelectorAll('.btn-verify-insight').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const id = btn.getAttribute('data-id');
-          if (!id) return;
-          btn.setAttribute('disabled', 'true');
-          try {
-            await api.verifyInsight(id);
-            queue = queue.filter(i => i.id !== id);
-            summaryCache.clear(); // Invalidate summary cache
-            render(queue);
-            // Refresh feed and BANs
-            await Promise.all([hydrateFeed(container), hydrateBans(container), hydrateSummary(container, activeDays)]);
-          } catch { btn.removeAttribute('disabled'); }
-        });
-      });
-
-      queueEl.querySelectorAll('.btn-reject-insight').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const id = btn.getAttribute('data-id');
-          if (!id) return;
-          try {
-            await api.rejectInsight(id);
-            queue = queue.filter(i => i.id !== id);
-            render(queue);
-            await hydrateBans(container);
-          } catch {}
-        });
-      });
-    };
-
-    render(queue);
-  } catch {
-    queueEl.innerHTML = `<p class="text-sm text-outline opacity-50">Failed to load queue.</p>`;
-  }
-}
-
 async function hydrateFeed(container: HTMLElement) {
   const feedEl = container.querySelector('#news-feed');
   if (!feedEl) return;
@@ -390,7 +284,7 @@ async function hydrateFeed(container: HTMLElement) {
             <p class="text-[10px] uppercase tracking-[0.1em] text-outline opacity-20 font-medium">Verified signals will appear here</p>
           </div>
         </div>`
-      : feed.map((i, index) => `<div class="opacity-0 animate-reveal" style="animation-delay: ${index * 0.05}s">${insightPill(i, 'feed')}</div>`).join('');
+      : feed.map((i, index) => `<div class="opacity-0 animate-reveal" style="animation-delay: ${index * 0.05}s">${insightPill(i)}</div>`).join('');
   } catch {
     feedEl.innerHTML = `<p class="text-sm text-outline opacity-50">Failed to load feed.</p>`;
   }

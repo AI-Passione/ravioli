@@ -56,6 +56,10 @@ export function renderSidebar() {
             <span class="material-symbols-outlined" data-icon="storage">storage</span>
             <span>Data</span>
           </button>
+          <button class="nav-item ${currentView === 'governance' ? 'active' : ''} w-full" data-nav="governance">
+            <span class="material-symbols-outlined" data-icon="policy">policy</span>
+            <span>Governance</span>
+          </button>
           <button class="nav-item ${currentView === 'settings' ? 'active' : ''} w-full" data-nav="settings">
             <span class="material-symbols-outlined" data-icon="settings">settings</span>
             <span>Settings</span>

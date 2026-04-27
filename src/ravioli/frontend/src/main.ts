@@ -8,6 +8,7 @@ import { renderCreateAnalysis } from './components/CreateAnalysis';
 import { renderKnowledge } from './components/Knowledge';
 import { renderData } from './components/Data';
 import { renderSettings } from './components/Settings';
+import { renderGovernance } from './components/Governance';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -29,6 +30,8 @@ function updateUI() {
     shell.appendChild(renderData());
   } else if (currentView === 'settings') {
     shell.appendChild(renderSettings());
+  } else if (currentView === 'governance') {
+    shell.appendChild(renderGovernance());
   } else if (currentView === 'insights' && !activeId) {
     shell.appendChild(renderInsights());
   } else {
