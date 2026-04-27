@@ -1,4 +1,4 @@
-from ravioli.backend.data.olap.ingestion.base import CSVIngestor
+from ravioli.backend.data.olap.ingestion.Legacy.base import CSVIngestor
 from ravioli.backend.core.config import settings
 
 class BoltIngestor(CSVIngestor):

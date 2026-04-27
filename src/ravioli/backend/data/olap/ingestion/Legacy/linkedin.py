@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from tqdm import tqdm
 from psycopg2 import sql
-from ravioli.backend.data.olap.ingestion.base import BaseIngestor
+from ravioli.backend.data.olap.ingestion.Legacy.base import BaseIngestor
 from ravioli.backend.data.oltp.session import get_db_connection, ensure_schema, get_engine
 from ravioli.backend.core.config import settings
 

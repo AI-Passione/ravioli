@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 from tqdm import tqdm
-from ravioli.backend.data.olap.ingestion.base import BaseIngestor
+from ravioli.backend.data.olap.ingestion.Legacy.base import BaseIngestor
 from ravioli.backend.data.oltp.session import get_db_connection, ensure_schema
 from ravioli.backend.core.config import settings
 

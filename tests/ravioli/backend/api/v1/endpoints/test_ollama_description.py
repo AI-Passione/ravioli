@@ -18,6 +18,9 @@ async def test_generate_file_description(client, session, mocker):
         content_type="text/csv",
         size_bytes=100,
         table_name=table_name,
+        schema_name="main",
+        source_type="file",
+        has_pii=False,
         status="completed",
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC)

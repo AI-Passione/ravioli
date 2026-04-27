@@ -13,8 +13,13 @@ from ravioli.backend.core.database import get_db
 from ravioli.backend.core.config import settings
 from ravioli.backend.core.models import UploadedFile
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
+from ravioli.backend.data.olap.ingestion.wfs_client import WFSClient
 
+import logging
 from ravioli.backend.core.ollama import OllamaClient
+from ravioli.backend.data.olap.ingestion.pii_scanner import pii_scanner
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -77,6 +82,7 @@ async def upload_file(
             content_type=file.content_type,
             size_bytes=file_path.stat().st_size,
             table_name=table_name,
+            schema_name="s_manual",
             file_hash=file_hash,
             status="pending"
         )
@@ -86,8 +92,18 @@ async def upload_file(
         
         # Ingest into DuckDB
         try:
-            row_count = duckdb_manager.ingest_csv(file_path, table_name)
+            row_count = duckdb_manager.ingest_csv(file_path, table_name, schema="s_manual")
             db_file.row_count = row_count
+            
+            # PII Scan
+            try:
+                full_table_name = f'"s_manual"."{table_name}"'
+                df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 100').fetchdf()
+                db_file.has_pii = pii_scanner.scan_dataframe(df_sample)
+            except Exception as e:
+                logger.warning("PII scan failed for table %s: %s", table_name, e)
+                db_file.has_pii = False
+                
             db_file.status = "completed"
         except Exception as e:
             db_file.status = "failed"
@@ -116,18 +132,26 @@ async def list_duckdb_tables():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list tables: {str(e)}")
 
-@router.get("/preview/{table_name}")
-async def get_table_preview(table_name: str):
-    if not re.match(r"^[a-zA-Z0-9_]+$", table_name):
-        raise HTTPException(status_code=400, detail="Invalid table name")
+@router.get("/preview/{full_table_name}")
+async def get_table_preview(full_table_name: str):
+    # Allow alphanumeric, underscores, and exactly one dot for schema separation
+    if not re.match(r"^[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)?$", full_table_name):
+        raise HTTPException(status_code=400, detail="Invalid table name format. Use 'table' or 'schema.table'")
 
     try:
         # Validate table name to prevent SQL injection
         tables = duckdb_manager.list_tables()
-        if table_name not in tables:
-            raise HTTPException(status_code=404, detail="Table not found")
+        if full_table_name not in tables:
+            raise HTTPException(status_code=404, detail=f"Table {full_table_name} not found")
             
-        data = duckdb_manager.query(f"SELECT * FROM {table_name} LIMIT 10")
+        # Wrap components in quotes for DuckDB safety
+        if "." in full_table_name:
+            s, t = full_table_name.split(".")
+            quoted_name = f'"{s}"."{t}"'
+        else:
+            quoted_name = f'"{full_table_name}"'
+            
+        data = duckdb_manager.query(f"SELECT * FROM {quoted_name} LIMIT 10")
         return data
     except HTTPException:
         raise
@@ -144,7 +168,8 @@ async def delete_file(file_id: uuid.UUID, db: Session = Depends(get_db)):
     try:
         # 2. Drop table from DuckDB
         if db_file.table_name:
-            duckdb_manager.connection.execute(f"DROP TABLE IF EXISTS {db_file.table_name}")
+            full_table_name = f'"{db_file.schema_name}"."{db_file.table_name}"'
+            duckdb_manager.connection.execute(f"DROP TABLE IF EXISTS {full_table_name}")
             
         # 3. Delete physical file
         file_path = UPLOAD_DIR / db_file.filename
@@ -181,6 +206,25 @@ async def update_file(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update file: {str(e)}")
 
+@router.patch("/files/{file_id}/pii", response_model=schemas.UploadedFile)
+async def update_file_pii(
+    file_id: uuid.UUID,
+    pii_update: schemas.UploadedFilePIIUpdate,
+    db: Session = Depends(get_db)
+):
+    db_file = db.execute(select(UploadedFile).where(UploadedFile.id == file_id)).scalar_one_or_none()
+    if not db_file:
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    db_file.has_pii = pii_update.has_pii
+    try:
+        db.commit()
+        db.refresh(db_file)
+        return db_file
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update PII status: {str(e)}")
+
 @router.post("/files/{file_id}/generate-description", response_model=schemas.UploadedFile)
 async def generate_file_description(
     file_id: uuid.UUID,
@@ -196,7 +240,8 @@ async def generate_file_description(
     try:
         # Get sample data from DuckDB
         from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
-        query = f'SELECT * FROM "{db_file.table_name}" LIMIT 5'
+        full_table_name = f'"{db_file.schema_name}"."{db_file.table_name}"'
+        query = f'SELECT * FROM {full_table_name} LIMIT 5'
         df = duckdb_manager.connection.execute(query).fetchdf()
         sample_data = df.to_csv(index=False)
 
@@ -213,3 +258,95 @@ async def generate_file_description(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to generate description: {str(e)}")
+
+# --- WFS Endpoints ---
+
+@router.get("/wfs/layers", response_model=List[schemas.WFSLayer])
+async def list_wfs_layers(url: str):
+    try:
+        client = WFSClient(url)
+        return await client.get_capabilities()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch WFS layers: {str(e)}")
+
+@router.post("/wfs/ingest", response_model=schemas.UploadedFile)
+async def ingest_wfs_layer(
+    request: schemas.WFSInjestRequest,
+    db: Session = Depends(get_db)
+):
+    # Create record
+    file_id = uuid.uuid4()
+    
+    # Generate a clean table name
+    base_name = request.layer.split(":")[-1]
+    table_name = "".join(c if c.isalnum() else "_" for c in base_name).lower()
+    
+    # Determine schema name (s_<app>)
+    app_name = request.url.split("/")[-1].split("?")[0]
+    schema_name = f"s_{app_name}"
+    
+    logger.info(f"Starting WFS ingestion: layer={request.layer}, url={request.url}, schema={schema_name}, table={table_name}")
+    
+    db_file = UploadedFile(
+        id=file_id,
+        filename=f"wfs_{file_id}",
+        original_filename=request.layer,
+        content_type="application/wfs",
+        size_bytes=0,
+        table_name=table_name,
+        schema_name=schema_name,
+        source_type="wfs",
+        source_url=request.url,
+        status="pending"
+    )
+    db.add(db_file)
+    db.commit()
+    db.refresh(db_file)
+    
+    try:
+        from ravioli.backend.data.olap.ingestion.dlt_utils import create_ravioli_pipeline
+        
+        # Ensure schema exists in DuckDB before dlt starts
+        duckdb_manager.connection.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
+        
+        client = WFSClient(request.url)
+        data_generator = client.get_features_generator(request.layer, count=request.count)
+        
+        # dlt pipeline - isolate by schema and use a unique ID to avoid state collisions
+        pipeline = create_ravioli_pipeline(
+            pipeline_name=f"wfs_{schema_name}_{table_name}_{uuid.uuid4().hex[:8]}",
+            dataset_name=schema_name  # Use the s_<app> schema
+        )
+        
+        # Run the pipeline
+        logger.info(f"Running dlt pipeline for {schema_name}.{table_name}...")
+        load_info = pipeline.run(data_generator, table_name=table_name, write_disposition="replace")
+        logger.info(f"dlt pipeline completed. Load Info: {load_info}")
+        
+        # Update metadata
+        full_table_name = f'"{schema_name}"."{table_name}"'
+        db_file.row_count = duckdb_manager.connection.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
+        
+        # PII Scan
+        logger.info(f"Performing PII scan on {full_table_name}...")
+        try:
+            df_sample = duckdb_manager.connection.execute(f"SELECT * FROM {full_table_name} LIMIT 100").fetchdf()
+            db_file.has_pii = pii_scanner.scan_dataframe(df_sample)
+            logger.info(f"PII scan completed. Detected: {db_file.has_pii}")
+        except Exception as scan_err:
+            logger.warning(f"PII scan failed: {scan_err}")
+            db_file.has_pii = False
+            
+        db_file.status = "completed"
+        logger.info(f"WFS ingestion completed successfully: {db_file.row_count} rows.")
+        # Approx size
+        db_file.size_bytes = 0 
+        
+    except Exception as e:
+        logger.exception(f"WFS Ingestion failed for {request.layer}")
+        db_file.status = "failed"
+        db_file.error_message = str(e)
+        
+    db.commit()
+    db.refresh(db_file)
+    return db_file

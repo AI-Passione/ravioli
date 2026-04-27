@@ -75,11 +75,15 @@ class UploadedFileBase(BaseModel):
     content_type: str
     size_bytes: int
     table_name: str
+    schema_name: str = "main"
     row_count: Optional[int] = None
     description: Optional[str] = None
     status: str
     error_message: Optional[str] = None
     file_hash: Optional[str] = None
+    source_type: str = "file"
+    source_url: Optional[str] = None
+    has_pii: bool = False
 
 class UploadedFile(UploadedFileBase):
     id: UUID
@@ -91,6 +95,21 @@ class UploadedFile(UploadedFileBase):
 
 class UploadedFileUpdate(BaseModel):
     description: Optional[str] = None
+
+class UploadedFilePIIUpdate(BaseModel):
+    has_pii: bool
+
+# --- WFS Schemas ---
+
+class WFSLayer(BaseModel):
+    name: str
+    title: str
+    formats: List[str]
+
+class WFSInjestRequest(BaseModel):
+    url: str
+    layer: str
+    count: int = 100
 
 # --- Setting Schemas ---
 

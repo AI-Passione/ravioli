@@ -77,6 +77,7 @@ class UploadedFile(Base):
     
     # Table name in DuckDB
     table_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    schema_name: Mapped[str] = mapped_column(String(100), default="main")
     row_count: Mapped[Optional[int]] = mapped_column()
     description: Mapped[Optional[str]] = mapped_column(Text)
     
@@ -85,6 +86,13 @@ class UploadedFile(Base):
     error_message: Mapped[Optional[str]] = mapped_column(Text)
     
     file_hash: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    
+    # Source info
+    source_type: Mapped[str] = mapped_column(String(50), default="file")  # file, wfs
+    source_url: Mapped[Optional[str]] = mapped_column(Text)
+    
+    # PII detection
+    has_pii: Mapped[bool] = mapped_column(default=False)
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))

@@ -215,3 +215,5 @@ ravioli_local_data/
 .duckdb/
 *.duckdb
 *.duckdb.*
+
+scratch/

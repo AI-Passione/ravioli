@@ -31,13 +31,24 @@ export interface UploadedFile {
   content_type: string;
   size_bytes: number;
   table_name: string;
+  schema_name: string;
   row_count?: number;
   status: string;
   error_message?: string;
   file_hash?: string;
   is_duplicate?: boolean;
+  source_type?: string;
+  source_url?: string;
+  has_pii: boolean;
+  description?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface WFSLayer {
+  name: string;
+  title: string;
+  formats: string[];
 }
 
 export interface SystemSetting {

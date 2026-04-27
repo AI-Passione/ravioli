@@ -1,4 +1,4 @@
-import type { Analysis, AnalysisCreate, ExecutionLog, UploadedFile, QuickInsightResponse } from '../types';
+import type { Analysis, AnalysisCreate, ExecutionLog, UploadedFile, QuickInsightResponse, WFSLayer } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -132,6 +132,16 @@ export const api = {
     return response.json();
   },
 
+  async togglePIITag(fileId: string, hasPII: boolean): Promise<UploadedFile> {
+    const response = await fetch(`${API_BASE}/data/files/${fileId}/pii`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ has_pii: hasPII }),
+    });
+    if (!response.ok) throw new Error('Failed to update PII status');
+    return response.json();
+  },
+
   async generateFileDescription(fileId: string): Promise<UploadedFile> {
     const response = await fetch(`${API_BASE}/data/files/${fileId}/generate-description`, {
       method: 'POST',
@@ -172,6 +182,22 @@ export const api = {
       const errorData = await response.json();
       throw new Error(errorData.detail || 'Connection test failed');
     }
+    return response.json();
+  },
+
+  async getWFSLayers(url: string): Promise<WFSLayer[]> {
+    const response = await fetch(`${API_BASE}/data/wfs/layers?url=${encodeURIComponent(url)}`);
+    if (!response.ok) throw new Error('Failed to fetch WFS layers');
+    return response.json();
+  },
+
+  async ingestWFSLayer(url: string, layer: string, count: number = 100): Promise<UploadedFile> {
+    const response = await fetch(`${API_BASE}/data/wfs/ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, layer, count }),
+    });
+    if (!response.ok) throw new Error('Failed to ingest WFS layer');
     return response.json();
   }
 };
