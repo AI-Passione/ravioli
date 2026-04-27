@@ -2,7 +2,7 @@ import uuid
 import pytest
 from datetime import datetime, UTC
 from unittest.mock import MagicMock, AsyncMock
-from ravioli.backend.core.models import Insight, Analysis
+from ravioli.backend.core.models import Insight
 
 def create_mock_insight(id=None, analysis_id=None, content="Test", is_verified=False):
     return Insight(
