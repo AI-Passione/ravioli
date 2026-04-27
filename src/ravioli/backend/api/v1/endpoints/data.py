@@ -311,9 +311,9 @@ async def ingest_wfs_layer(
         client = WFSClient(request.url)
         data_generator = client.get_features_generator(request.layer, count=request.count)
         
-        # dlt pipeline - isolate by schema to avoid state collisions
+        # dlt pipeline - isolate by schema and use a unique ID to avoid state collisions
         pipeline = create_ravioli_pipeline(
-            pipeline_name=f"wfs_{schema_name}_{table_name}",
+            pipeline_name=f"wfs_{schema_name}_{table_name}_{uuid.uuid4().hex[:8]}",
             dataset_name=schema_name  # Use the s_<app> schema
         )
         
