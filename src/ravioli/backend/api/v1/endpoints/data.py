@@ -15,8 +15,11 @@ from ravioli.backend.core.models import UploadedFile
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
 from ravioli.backend.data.wfs_client import WFSClient
 
+import logging
 from ravioli.backend.core.ollama import OllamaClient
 from ravioli.backend.data.pii_scanner import pii_scanner
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -265,6 +268,8 @@ async def ingest_wfs_layer(
     base_name = request.layer.split(":")[-1]
     table_name = "".join(c if c.isalnum() else "_" for c in base_name).lower()
     
+    logger.info(f"Starting WFS ingestion: layer={request.layer}, url={request.url}, table={table_name}")
+    
     db_file = UploadedFile(
         id=file_id,
         filename=f"wfs_{file_id}",
@@ -293,20 +298,25 @@ async def ingest_wfs_layer(
         )
         
         # Run the pipeline
-        # Note: dlt handles table creation/replacement and data types
+        logger.info(f"Running dlt pipeline for table {table_name}...")
         load_info = pipeline.run(data_generator, table_name=table_name, write_disposition="replace")
+        logger.info(f"dlt pipeline completed. Load Info: {load_info}")
         
         # Update metadata
         db_file.row_count = duckdb_manager.connection.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()[0]
         
         # PII Scan
+        logger.info(f"Performing PII scan on {table_name}...")
         try:
             df_sample = duckdb_manager.connection.execute(f'SELECT * FROM "{table_name}" LIMIT 100').fetchdf()
             db_file.has_pii = pii_scanner.scan_dataframe(df_sample)
-        except:
+            logger.info(f"PII scan completed. Detected: {db_file.has_pii}")
+        except Exception as scan_err:
+            logger.warning(f"PII scan failed: {scan_err}")
             db_file.has_pii = False
             
         db_file.status = "completed"
+        logger.info(f"WFS ingestion completed successfully: {db_file.row_count} rows.")
         # Approx size
         db_file.size_bytes = 0 
         
