@@ -225,30 +225,58 @@ async function hydrateSummary(container: HTMLElement, days: number) {
       summaryCache.set(days, data);
     }
     // Parse bullet lines from the summary; fall back to treating full text as one bullet
-    const bullets = data.summary
+    const allBullets = data.summary
       .split('\n')
       .map(l => l.replace(/^[-*•]\s*/, '').trim())
-      .filter(l => l.length > 10)
-      .slice(0, 10);
+      .filter(l => l.length > 10);
+
+    const isExpandable = allBullets.length > 4;
+    const bullets = isExpandable ? allBullets.slice(0, 4) : allBullets;
+    const hiddenBullets = isExpandable ? allBullets.slice(4) : [];
+
+    const renderBullet = (b: string) => `
+      <li class="flex items-start gap-4 group/item">
+        <span class="material-symbols-outlined text-primary text-base mt-0.5 shrink-0 opacity-70 group-hover/item:opacity-100 transition-opacity" data-icon="arrow_right">arrow_right</span>
+        <span class="text-base font-body-lg text-on-surface-variant leading-relaxed group-hover/item:text-on-surface transition-colors">${b}</span>
+      </li>`;
 
     const bulletHtml = bullets.length > 0
-      ? bullets.map(b => `
-          <li class="flex items-start gap-4 group/item">
-            <span class="material-symbols-outlined text-primary text-base mt-0.5 shrink-0 opacity-70 group-hover/item:opacity-100 transition-opacity" data-icon="arrow_right">arrow_right</span>
-            <span class="text-base font-body-lg text-on-surface-variant leading-relaxed group-hover/item:text-on-surface transition-colors">${b}</span>
-          </li>`).join('')
+      ? bullets.map(renderBullet).join('')
       : `<li class="text-on-surface-variant opacity-60 font-body-md text-sm">${data.summary}</li>`;
 
     const countNote = data.insight_count > 0
-      ? `<div class="pt-6 border-t border-outline-variant/10 flex items-center gap-2 opacity-40">
+      ? `<div class="pt-6 border-t border-outline-variant/10 flex items-center gap-2 opacity-40 mt-8">
           <span class="material-symbols-outlined text-sm" data-icon="analytics">analytics</span>
           <span class="text-[10px] uppercase tracking-widest text-outline font-label-sm">${data.insight_count} verified insight${data.insight_count !== 1 ? 's' : ''} · last ${data.days}d</span>
         </div>`
       : '';
 
     heroText.innerHTML = `
-      <ul class="space-y-5 list-none">${bulletHtml}</ul>
+      <ul id="hero-bullets" class="space-y-5 list-none">${bulletHtml}</ul>
+      ${isExpandable ? `
+        <div id="hidden-bullets" class="hidden space-y-5 mt-5 animate-in fade-in slide-in-from-top-2 duration-300">
+          ${hiddenBullets.map(renderBullet).join('')}
+        </div>
+        <button id="btn-toggle-hero" class="mt-8 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-primary hover:text-primary-fixed transition-all font-label-sm group">
+          <span class="material-symbols-outlined text-sm group-hover:translate-y-0.5 transition-transform" data-icon="expand_more">expand_more</span>
+          <span>Expand Brief</span>
+        </button>
+      ` : ''}
       ${countNote}`;
+
+    if (isExpandable) {
+      const toggleBtn = heroText.querySelector('#btn-toggle-hero');
+      const hiddenEl = heroText.querySelector('#hidden-bullets');
+      toggleBtn?.addEventListener('click', () => {
+        const isHidden = hiddenEl?.classList.contains('hidden');
+        hiddenEl?.classList.toggle('hidden');
+        if (toggleBtn) {
+          toggleBtn.innerHTML = isHidden 
+            ? `<span class="material-symbols-outlined text-sm group-hover:-translate-y-0.5 transition-transform" data-icon="expand_less">expand_less</span><span>Collapse Brief</span>`
+            : `<span class="material-symbols-outlined text-sm group-hover:translate-y-0.5 transition-transform" data-icon="expand_more">expand_more</span><span>Expand Brief</span>`;
+        }
+      });
+    }
   } catch {
     heroText.innerHTML = `<p class="text-sm text-outline opacity-50">Summary unavailable.</p>`;
   }
