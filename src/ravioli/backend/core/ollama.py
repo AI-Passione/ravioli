@@ -414,18 +414,19 @@ Extracted Insights:"""
 
         bullet_block = "\n".join(f"- {i}" for i in insights)
         prompt = f"""{KOWALSKI_PERSONA}
-Task: Synthesize the following verified insights from the last {days} day(s) into a concise executive briefing.
-Focus on themes, patterns, and high-level implications. 3-5 sentences maximum.
-Use Markdown. Be direct and clinical.
+Task: Synthesize the following verified insights from the last {days} day(s) into an executive intelligence brief.
+Return ONLY a bullet-point list — maximum 10 points, minimum 3.
+Each point must be a single, standalone, actionable sentence. No headers, no preamble, no confirmation line.
+Start every line with a dash (-).
 
 Verified Insights:
 {bullet_block}
 
-Executive Briefing:"""
+Intelligence Brief (bullet points only):"""
         try:
-            return await self._generate(prompt, "Insights Summary", temperature=0.5, num_predict=500)
+            return await self._generate(prompt, "Insights Summary", temperature=0.5, num_predict=600)
         except Exception:
-            return f"> [!NOTE]\n> AI synthesis unavailable. {len(insights)} verified insight(s) on record for the last {days} day(s)."
+            return "\n".join(f"- {i}" for i in insights[:10])
 
     async def stream_answer(self, filename: str, summary: str, context: str, question: str):
         """

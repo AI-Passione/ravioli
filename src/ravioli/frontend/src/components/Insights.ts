@@ -1,10 +1,7 @@
 import { store } from '../store';
 import { api } from '../services/api';
-import MarkdownIt from 'markdown-it';
 import { formatDistanceToNow, format } from 'date-fns';
 import type { Insight, InsightStats, InsightsSummary } from '../types';
-
-const md = new MarkdownIt({ html: false, linkify: true, typographer: true });
 
 const DAY_OPTIONS = [1, 3, 7, 14, 28, 30];
 
@@ -14,12 +11,12 @@ let summaryCache: Map<number, InsightsSummary> = new Map();
 
 function banCard(value: number | string, label: string, icon: string, accent = 'text-primary') {
   return `
-    <div class="glass-panel p-8 rounded-[1.5rem] flex flex-col gap-3 border-outline-variant/10">
-      <div class="flex items-center gap-3">
-        <span class="material-symbols-outlined ${accent} text-2xl" data-icon="${icon}">${icon}</span>
-        <span class="text-[10px] uppercase tracking-[0.25em] text-outline font-label-sm opacity-60">${label}</span>
+    <div class="glass-panel px-6 py-4 rounded-2xl flex items-center gap-5 border-outline-variant/10">
+      <span class="material-symbols-outlined ${accent} text-xl shrink-0" data-icon="${icon}">${icon}</span>
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <span class="text-[10px] uppercase tracking-[0.25em] text-outline font-label-sm opacity-60 truncate">${label}</span>
+        <span class="font-display-lg text-3xl text-on-surface tracking-tight tabular-nums leading-none">${value}</span>
       </div>
-      <div class="font-display-lg text-5xl text-on-surface tracking-tight tabular-nums">${value}</div>
     </div>`;
 }
 
@@ -90,32 +87,36 @@ export function renderInsights() {
 
       <!-- BANs -->
       <section id="bans-section">
-        <div class="grid grid-cols-3 gap-6">
-          <div class="glass-panel p-8 rounded-[1.5rem] animate-pulse bg-surface-container-low h-32"></div>
-          <div class="glass-panel p-8 rounded-[1.5rem] animate-pulse bg-surface-container-low h-32"></div>
-          <div class="glass-panel p-8 rounded-[1.5rem] animate-pulse bg-surface-container-low h-32"></div>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="rounded-2xl animate-pulse bg-surface-container-low h-16"></div>
+          <div class="rounded-2xl animate-pulse bg-surface-container-low h-16"></div>
+          <div class="rounded-2xl animate-pulse bg-surface-container-low h-16"></div>
         </div>
       </section>
 
-      <!-- Hero: AI Summary -->
+      <!-- Hero: AI Summary (dominant) -->
       <section id="hero-section">
-        <div class="flex items-center justify-between mb-6">
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-              <span class="material-symbols-outlined text-primary" data-icon="auto_awesome">auto_awesome</span>
+        <div class="flex items-center justify-between mb-8">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center">
+              <span class="material-symbols-outlined text-primary text-2xl" data-icon="auto_awesome">auto_awesome</span>
             </div>
-            <h2 class="text-lg font-headline-sm text-on-surface uppercase tracking-[0.15em]">Intelligence Brief</h2>
+            <div>
+              <h2 class="text-2xl font-headline-sm text-on-surface uppercase tracking-[0.15em]">Intelligence Brief</h2>
+              <p class="text-[10px] uppercase tracking-[0.25em] text-primary-fixed-dim opacity-50 font-label-sm mt-0.5">AI synthesis of verified insights</p>
+            </div>
           </div>
           <!-- Day selector -->
           <div class="flex items-center gap-1 p-1 bg-surface-container-low rounded-full border border-outline-variant/10" id="day-selector">
             ${DAY_OPTIONS.map(d => `
-              <button class="day-btn px-3 py-1 rounded-full text-[10px] font-label-sm uppercase tracking-widest transition-all duration-200 ${d === activeDays ? 'bg-primary text-on-primary' : 'text-outline hover:text-on-surface'}" data-days="${d}">${d}d</button>
+              <button class="day-btn px-3 py-1.5 rounded-full text-[10px] font-label-sm uppercase tracking-widest transition-all duration-200 ${d === activeDays ? 'bg-primary text-on-primary' : 'text-outline hover:text-on-surface'}" data-days="${d}">${d}d</button>
             `).join('')}
           </div>
         </div>
-        <div id="hero-content" class="glass-panel p-10 rounded-[1.5rem] border-primary/10 bg-primary/[0.02] relative overflow-hidden">
-          <div class="absolute -top-16 -right-16 w-48 h-48 bg-primary/10 rounded-full blur-[80px]"></div>
-          <div id="hero-text" class="prose prose-invert max-w-none text-on-surface-variant leading-relaxed font-body-lg relative z-10">
+        <div id="hero-content" class="glass-panel p-12 rounded-[2rem] border-primary/15 bg-primary/[0.03] relative overflow-hidden shadow-2xl shadow-primary/5">
+          <div class="absolute -top-24 -right-24 w-72 h-72 bg-primary/10 rounded-full blur-[100px] pointer-events-none"></div>
+          <div class="absolute -bottom-16 -left-16 w-48 h-48 bg-tertiary/5 rounded-full blur-[80px] pointer-events-none"></div>
+          <div id="hero-text" class="relative z-10">
             <div class="flex items-center gap-3 opacity-40">
               <span class="material-symbols-outlined animate-spin" data-icon="progress_activity">progress_activity</span>
               <span class="text-sm uppercase tracking-widest font-label-sm">Synthesizing intelligence…</span>
@@ -223,14 +224,31 @@ async function hydrateSummary(container: HTMLElement, days: number) {
       data = await api.getInsightsSummary(days);
       summaryCache.set(days, data);
     }
+    // Parse bullet lines from the summary; fall back to treating full text as one bullet
+    const bullets = data.summary
+      .split('\n')
+      .map(l => l.replace(/^[-*•]\s*/, '').trim())
+      .filter(l => l.length > 10)
+      .slice(0, 10);
+
+    const bulletHtml = bullets.length > 0
+      ? bullets.map(b => `
+          <li class="flex items-start gap-4 group/item">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 shrink-0 opacity-70 group-hover/item:opacity-100 transition-opacity" data-icon="arrow_right">arrow_right</span>
+            <span class="text-base font-body-lg text-on-surface-variant leading-relaxed group-hover/item:text-on-surface transition-colors">${b}</span>
+          </li>`).join('')
+      : `<li class="text-on-surface-variant opacity-60 font-body-md text-sm">${data.summary}</li>`;
+
     const countNote = data.insight_count > 0
-      ? `<span class="text-[10px] uppercase tracking-widest text-outline opacity-40 font-label-sm">${data.insight_count} verified insight${data.insight_count !== 1 ? 's' : ''} in window</span>`
+      ? `<div class="pt-6 border-t border-outline-variant/10 flex items-center gap-2 opacity-40">
+          <span class="material-symbols-outlined text-sm" data-icon="analytics">analytics</span>
+          <span class="text-[10px] uppercase tracking-widest text-outline font-label-sm">${data.insight_count} verified insight${data.insight_count !== 1 ? 's' : ''} · last ${data.days}d</span>
+        </div>`
       : '';
+
     heroText.innerHTML = `
-      <div class="space-y-4">
-        ${md.render(data.summary)}
-        <div class="pt-4 border-t border-outline-variant/10">${countNote}</div>
-      </div>`;
+      <ul class="space-y-5 list-none">${bulletHtml}</ul>
+      ${countNote}`;
   } catch {
     heroText.innerHTML = `<p class="text-sm text-outline opacity-50">Summary unavailable.</p>`;
   }
