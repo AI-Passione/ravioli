@@ -33,6 +33,51 @@ export function renderData() {
         </div>
       </div>
 
+      <!-- API Ingestion Section -->
+      <div class="mb-12">
+        <div class="bg-surface-container-low rounded-3xl p-8 border border-outline/10 shadow-xl">
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <span class="material-symbols-outlined text-primary text-2xl">api</span>
+            </div>
+            <div>
+              <h2 class="text-xl font-medium text-neutral-100">API Integration</h2>
+              <p class="text-xs text-neutral-500 uppercase tracking-widest mt-1">Ingest data from WFS services</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div class="md:col-span-8 relative">
+              <input type="text" id="wfs-url" placeholder="Enter WFS Service URL (e.g., https://gdi.berlin.de/services/wfs/gewerbedaten)" 
+                class="w-full bg-surface-container-highest border border-outline/20 rounded-2xl px-6 py-4 text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-primary/50 transition-all pr-32"
+                value="https://gdi.berlin.de/services/wfs/gewerbedaten" />
+              <button id="btn-fetch-layers" class="absolute right-2 top-2 bottom-2 px-6 rounded-xl bg-primary text-on-primary font-medium hover:bg-primary/90 transition-all flex items-center gap-2">
+                <span class="material-symbols-outlined text-sm">sync</span>
+                Fetch
+              </button>
+            </div>
+            <div class="md:col-span-4">
+               <select id="wfs-layer-select" disabled class="w-full h-full bg-surface-container-highest border border-outline/20 rounded-2xl px-6 py-4 text-neutral-200 focus:outline-none focus:border-primary/50 transition-all appearance-none disabled:opacity-50 disabled:cursor-not-allowed">
+                <option value="">Select a layer...</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="wfs-ingest-container" class="mt-6 flex items-center justify-between opacity-0 pointer-events-none transition-all duration-300 translate-y-2">
+            <div class="flex items-center gap-4">
+              <div class="flex flex-col">
+                <label class="text-[10px] uppercase tracking-widest text-neutral-500 mb-1">Max Rows</label>
+                <input type="number" id="wfs-count" value="1000" step="100" min="1" max="50000" class="w-32 bg-surface-container-highest border border-outline/20 rounded-xl px-4 py-2 text-neutral-200 focus:outline-none focus:border-primary/50" />
+              </div>
+            </div>
+            <button id="btn-ingest-wfs" class="px-8 py-3 rounded-2xl bg-primary/20 text-primary border border-primary/30 font-medium hover:bg-primary hover:text-on-primary transition-all flex items-center gap-3 group">
+              <span>Start Ingestion</span>
+              <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Files List -->
       <div class="bg-surface-container-low rounded-3xl overflow-hidden border border-outline/10 shadow-2xl">
         <div class="px-8 py-6 border-b border-outline/10 flex items-center justify-between bg-surface-container-low/50 backdrop-blur-sm sticky top-0 z-10">
@@ -144,6 +189,75 @@ export function renderData() {
   const modalContent = container.querySelector('#modal-content') as HTMLElement;
   const modalTitle = container.querySelector('#modal-title') as HTMLElement;
   const closeModal = container.querySelector('#close-modal');
+
+  // WFS Elements
+  const wfsUrlInput = container.querySelector('#wfs-url') as HTMLInputElement;
+  const fetchLayersBtn = container.querySelector('#btn-fetch-layers') as HTMLButtonElement;
+  const layerSelect = container.querySelector('#wfs-layer-select') as HTMLSelectElement;
+  const ingestContainer = container.querySelector('#wfs-ingest-container') as HTMLElement;
+  const ingestBtn = container.querySelector('#btn-ingest-wfs') as HTMLButtonElement;
+  const countInput = container.querySelector('#wfs-count') as HTMLInputElement;
+
+  fetchLayersBtn?.addEventListener('click', async () => {
+    const url = wfsUrlInput.value.trim();
+    if (!url) return;
+
+    const originalText = fetchLayersBtn.innerHTML;
+    fetchLayersBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Fetching...';
+    fetchLayersBtn.disabled = true;
+
+    try {
+      const layers = await api.getWFSLayers(url);
+      layerSelect.innerHTML = '<option value="">Select a layer...</option>' + 
+        layers.map(l => `<option value="${l.name}">${l.title || l.name}</option>`).join('');
+      layerSelect.disabled = false;
+      alert('Layers fetched successfully!');
+    } catch (err) {
+      console.error('Fetch layers failed', err);
+      alert('Failed to fetch layers. Please check the URL and ensure it is a valid WFS service.');
+    } finally {
+      fetchLayersBtn.innerHTML = originalText;
+      fetchLayersBtn.disabled = false;
+    }
+  });
+
+  layerSelect?.addEventListener('change', () => {
+    if (layerSelect.value) {
+      ingestContainer.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-2');
+    } else {
+      ingestContainer.classList.add('opacity-0', 'pointer-events-none', 'translate-y-2');
+    }
+  });
+
+  ingestBtn?.addEventListener('click', async () => {
+    const url = wfsUrlInput.value.trim();
+    const layer = layerSelect.value;
+    const count = parseInt(countInput.value) || 1000;
+
+    if (!url || !layer) return;
+
+    const originalText = ingestBtn.innerHTML;
+    ingestBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Ingesting...';
+    ingestBtn.disabled = true;
+
+    try {
+      const result = await api.ingestWFSLayer(url, layer, count);
+      if (result.status === 'completed') {
+        alert(`Successfully ingested ${result.row_count} rows from ${layer}!`);
+      } else if (result.status === 'failed') {
+        alert(`Ingestion failed: ${result.error_message}`);
+      }
+      
+      const updatedFiles = await api.listFiles();
+      store.setUploadedFiles(updatedFiles);
+    } catch (err) {
+      console.error('Ingestion failed', err);
+      alert('Failed to start ingestion.');
+    } finally {
+      ingestBtn.innerHTML = originalText;
+      ingestBtn.disabled = false;
+    }
+  });
 
   dropZone?.addEventListener('click', () => fileInput.click());
 

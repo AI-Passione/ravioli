@@ -36,8 +36,17 @@ export interface UploadedFile {
   error_message?: string;
   file_hash?: string;
   is_duplicate?: boolean;
+  source_type?: string;
+  source_url?: string;
+  description?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface WFSLayer {
+  name: string;
+  title: string;
+  formats: string[];
 }
 
 export interface SystemSetting {

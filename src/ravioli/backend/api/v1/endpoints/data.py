@@ -13,6 +13,7 @@ from ravioli.backend.core.database import get_db
 from ravioli.backend.core.config import settings
 from ravioli.backend.core.models import UploadedFile
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
+from ravioli.backend.data.wfs_client import WFSClient
 
 from ravioli.backend.core.ollama import OllamaClient
 
@@ -213,3 +214,66 @@ async def generate_file_description(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to generate description: {str(e)}")
+
+# --- WFS Endpoints ---
+
+@router.get("/wfs/layers", response_model=List[schemas.WFSLayer])
+async def list_wfs_layers(url: str):
+    try:
+        client = WFSClient(url)
+        return await client.get_capabilities()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch WFS layers: {str(e)}")
+
+@router.post("/wfs/ingest", response_model=schemas.UploadedFile)
+async def ingest_wfs_layer(
+    request: schemas.WFSInjestRequest,
+    db: Session = Depends(get_db)
+):
+    # Create record
+    file_id = uuid.uuid4()
+    
+    # Generate a clean table name
+    base_name = request.layer.split(":")[-1]
+    table_name = "".join(c if c.isalnum() else "_" for c in base_name).lower()
+    
+    db_file = UploadedFile(
+        id=file_id,
+        filename=f"wfs_{file_id}",
+        original_filename=request.layer,
+        content_type="application/wfs",
+        size_bytes=0,
+        table_name=table_name,
+        source_type="wfs",
+        source_url=request.url,
+        status="pending"
+    )
+    db.add(db_file)
+    db.commit()
+    db.refresh(db_file)
+    
+    try:
+        client = WFSClient(request.url)
+        df = await client.get_features(request.layer, count=request.count)
+        
+        if df.empty:
+            raise Exception("No features returned from WFS")
+            
+        # Ingest into DuckDB
+        duckdb_manager.connection.register("tmp_wfs_df", df)
+        duckdb_manager.connection.execute(f'CREATE OR REPLACE TABLE "{table_name}" AS SELECT * FROM tmp_wfs_df')
+        duckdb_manager.connection.unregister("tmp_wfs_df")
+        
+        # Update metadata
+        db_file.row_count = len(df)
+        db_file.status = "completed"
+        # Approx size
+        db_file.size_bytes = int(df.memory_usage(deep=True).sum())
+        
+    except Exception as e:
+        db_file.status = "failed"
+        db_file.error_message = str(e)
+        
+    db.commit()
+    db.refresh(db_file)
+    return db_file

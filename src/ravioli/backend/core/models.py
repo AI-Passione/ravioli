@@ -86,6 +86,10 @@ class UploadedFile(Base):
     
     file_hash: Mapped[Optional[str]] = mapped_column(String(64), index=True)
     
+    # Source info
+    source_type: Mapped[str] = mapped_column(String(50), default="file")  # file, wfs
+    source_url: Mapped[Optional[str]] = mapped_column(Text)
+    
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 

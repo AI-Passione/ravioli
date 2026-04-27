@@ -80,6 +80,8 @@ class UploadedFileBase(BaseModel):
     status: str
     error_message: Optional[str] = None
     file_hash: Optional[str] = None
+    source_type: str = "file"
+    source_url: Optional[str] = None
 
 class UploadedFile(UploadedFileBase):
     id: UUID
@@ -91,6 +93,18 @@ class UploadedFile(UploadedFileBase):
 
 class UploadedFileUpdate(BaseModel):
     description: Optional[str] = None
+
+# --- WFS Schemas ---
+
+class WFSLayer(BaseModel):
+    name: str
+    title: str
+    formats: List[str]
+
+class WFSInjestRequest(BaseModel):
+    url: str
+    layer: str
+    count: int = 100
 
 # --- Setting Schemas ---
 
