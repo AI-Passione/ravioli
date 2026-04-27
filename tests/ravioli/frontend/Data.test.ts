@@ -5,7 +5,7 @@ import { store } from '../../../src/ravioli/frontend/src/store';
 describe('Data component', () => {
   beforeEach(() => {
     // Clear store state
-    store.setUploadedFiles([]);
+    store.setDataSources([]);
     
     // Mock refreshFiles behavior (which calls reload)
     // We don't want tests to actually reload
@@ -26,7 +26,7 @@ describe('Data component', () => {
   });
 
   it('should render a list of uploaded files', () => {
-    store.setUploadedFiles([
+    store.setDataSources([
       {
         id: '1',
         filename: 'test.csv',
@@ -34,9 +34,11 @@ describe('Data component', () => {
         content_type: 'text/csv',
         size_bytes: 1024,
         table_name: 'my_data',
+        schema_name: 'main',
         row_count: 100,
         status: 'completed',
         source_type: 'file',
+        has_pii: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
@@ -51,7 +53,7 @@ describe('Data component', () => {
   });
 
   it('should render WFS API sources with correct icon', () => {
-    store.setUploadedFiles([
+    store.setDataSources([
       {
         id: '2',
         filename: 'wfs_data',
@@ -59,10 +61,12 @@ describe('Data component', () => {
         content_type: 'application/wfs',
         size_bytes: 0,
         table_name: 'traffic',
+        schema_name: 's_geoserver',
         row_count: 50,
         status: 'completed',
         source_type: 'wfs',
         source_url: 'https://api.example.com',
+        has_pii: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
@@ -109,7 +113,7 @@ describe('Data component', () => {
   });
 
   it('should render a PII tag and handle dismissal', () => {
-    store.setUploadedFiles([
+    store.setDataSources([
       {
         id: 'pii-1',
         filename: 'pii.csv',
@@ -117,6 +121,7 @@ describe('Data component', () => {
         content_type: 'text/csv',
         size_bytes: 100,
         table_name: 'pii_data',
+        schema_name: 'main',
         row_count: 5,
         status: 'completed',
         source_type: 'file',

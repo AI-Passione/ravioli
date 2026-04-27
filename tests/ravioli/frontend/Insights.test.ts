@@ -71,7 +71,7 @@ describe('Insights Component', () => {
       
       const toggleBtn = el.querySelector('#btn-toggle-hero');
       expect(toggleBtn).not.toBeNull();
-      expect(toggleBtn?.textContent).toContain('Expand Brief');
+      expect(toggleBtn?.textContent).toContain('Explore Full Intelligence');
       
       const hiddenContainer = el.querySelector('#hidden-bullets');
       expect(hiddenContainer?.classList.contains('hidden')).toBe(true);

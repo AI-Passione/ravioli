@@ -23,6 +23,10 @@ describe('Sidebar Component', () => {
     const sidebar = renderSidebar();
     expect(sidebar.innerHTML).toContain('Vibe Analytics');
     expect(sidebar.innerHTML).toContain('Insights');
+    expect(sidebar.innerHTML).toContain('Knowledge');
+    expect(sidebar.innerHTML).toContain('Data');
+    expect(sidebar.innerHTML).toContain('Governance');
+    expect(sidebar.innerHTML).toContain('Settings');
     expect(sidebar.innerHTML).toContain('Historical Analyses');
   });
 });

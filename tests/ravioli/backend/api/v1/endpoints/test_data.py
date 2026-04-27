@@ -2,11 +2,11 @@ import uuid
 import pytest
 from datetime import datetime, UTC
 from unittest.mock import MagicMock, AsyncMock
-from ravioli.backend.core.models import UploadedFile
+from ravioli.backend.core.models import DataSource
 
 def test_list_files(client, session):
     file_id = uuid.uuid4()
-    mock_file = UploadedFile(
+    mock_file = DataSource(
         id=file_id,
         filename="test_uuid.csv",
         original_filename="test.csv",
@@ -46,7 +46,7 @@ def test_get_table_preview_schema_qualified(client, mocker):
 
 def test_delete_file(client, session, mocker):
     file_id = uuid.uuid4()
-    mock_file = UploadedFile(
+    mock_file = DataSource(
         id=file_id,
         filename="test_uuid.csv",
         original_filename="test.csv",
@@ -78,7 +78,7 @@ def test_delete_file(client, session, mocker):
 
 def test_update_file_pii(client, session):
     file_id = uuid.uuid4()
-    mock_file = UploadedFile(
+    mock_file = DataSource(
         id=file_id,
         filename="test.csv",
         original_filename="test.csv",
@@ -105,7 +105,7 @@ def test_update_file_pii(client, session):
 
 def test_update_file_description(client, session):
     file_id = uuid.uuid4()
-    mock_file = UploadedFile(
+    mock_file = DataSource(
         id=file_id,
         filename="test.csv",
         original_filename="test.csv",
@@ -148,7 +148,7 @@ async def test_ingest_wfs_layer(client, session, mocker):
     mocker.patch("ravioli.backend.api.v1.endpoints.data._run_wfs_ingestion")
 
     # Mock UploadedFile to ensure Pydantic validation passes since we don't have a real DB filling in the defaults
-    mock_file = UploadedFile(
+    mock_file = DataSource(
         id=uuid.uuid4(),
         filename="wfs_test",
         original_filename="test:layer",
@@ -162,7 +162,7 @@ async def test_ingest_wfs_layer(client, session, mocker):
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC)
     )
-    mocker.patch("ravioli.backend.api.v1.endpoints.data.UploadedFile", return_value=mock_file)
+    mocker.patch("ravioli.backend.api.v1.endpoints.data.DataSource", return_value=mock_file)
 
     payload = {
         "url": "https://test-wfs.com/geoserver",

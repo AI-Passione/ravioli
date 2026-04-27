@@ -23,7 +23,7 @@ def test_create_log(client, session):
     session.query().filter().first.return_value = True
 
     # Execute request
-    response = client.post("/api/v1/logs/", json=log_data)
+    response = client.post("/api/v1/analysis-logs/", json=log_data)
 
     # Assertions
     assert response.status_code == 201
@@ -47,7 +47,7 @@ def test_list_logs_for_analysis(client, session):
     session.query().filter().order_by().all.return_value = [mock_log]
 
     # Execute request
-    response = client.get(f"/api/v1/logs/analysis/{analysis_id}")
+    response = client.get(f"/api/v1/analysis-logs/analysis/{analysis_id}")
 
     # Assertions
     assert response.status_code == 200
