@@ -161,25 +161,11 @@ export function renderData() {
             <div class="space-y-6">
               <div class="relative">
                 <label class="text-[10px] uppercase tracking-widest text-neutral-500 mb-2 block">Service URL</label>
-                <div class="relative">
-                  <input type="text" id="wfs-url" placeholder="https://..." 
-                    class="w-full bg-surface-container-highest border border-outline/20 rounded-2xl px-6 py-4 text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-primary/50 transition-all pr-32"
-                    value="https://gdi.berlin.de/services/wfs/gewerbedaten" />
-                  <button id="btn-fetch-layers" class="absolute right-2 top-2 bottom-2 px-6 rounded-xl bg-primary text-on-primary font-medium hover:bg-primary/90 transition-all flex items-center gap-2">
-                    <span class="material-symbols-outlined text-sm">sync</span>
-                    Fetch
-                  </button>
-                </div>
+                <input type="text" id="wfs-url" placeholder="https://..." 
+                  class="w-full bg-surface-container-highest border border-outline/20 rounded-2xl px-6 py-4 text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-primary/50 transition-all" />
               </div>
               
-              <div id="wfs-layer-container" class="hidden">
-                <label class="text-[10px] uppercase tracking-widest text-neutral-500 mb-2 block">Available Layers</label>
-                <select id="wfs-layer-select" class="w-full bg-surface-container-highest border border-outline/20 rounded-2xl px-6 py-4 text-neutral-200 focus:outline-none focus:border-primary/50 transition-all appearance-none">
-                  <option value="">Select a layer...</option>
-                </select>
-              </div>
-
-              <div id="wfs-ingest-controls" class="hidden flex items-center justify-between pt-4 border-t border-outline/5">
+              <div id="wfs-ingest-controls" class="flex items-center justify-between pt-4 border-t border-outline/5">
                 <div class="flex flex-col">
                   <label class="text-[10px] uppercase tracking-widest text-neutral-500 mb-1">Max Rows</label>
                   <input type="number" id="wfs-count" value="1000" step="100" min="1" class="w-32 bg-surface-container-highest border border-outline/20 rounded-xl px-4 py-2 text-neutral-200 focus:outline-none focus:border-primary/50" />
