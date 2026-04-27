@@ -281,7 +281,7 @@ export function renderData() {
     const url = wfsUrlInput.value.trim();
     if (!url) return;
 
-    ingestBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Ingesting...';
+    ingestBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Starting...';
     ingestBtn.disabled = true;
 
     try {
@@ -292,14 +292,27 @@ export function renderData() {
       }
       const primaryLayer = layers[0].name;
       
-      // 2. Ingest the primary layer
+      // 2. Fire ingestion — backend returns immediately with 'pending' status
       const result = await api.ingestWFSLayer(url, primaryLayer);
-      if (result.status === 'completed') {
-        hideAddModal();
-        alert(`Successfully ingested ${result.row_count} rows from ${primaryLayer}!`);
-        refreshFiles();
-      } else {
-        alert(`Ingestion failed: ${result.error_message}`);
+      
+      // 3. Close modal right away — user can do other things
+      hideAddModal();
+      refreshFiles();
+
+      // 4. Poll in the background until completed or failed
+      if (result.status === 'pending') {
+        const pollInterval = setInterval(async () => {
+          try {
+            const files = await api.listFiles();
+            const updated = files.find(f => f.id === result.id);
+            if (updated && updated.status !== 'pending') {
+              clearInterval(pollInterval);
+              refreshFiles();
+            }
+          } catch {
+            clearInterval(pollInterval);
+          }
+        }, 3000);
       }
     } catch (err: any) {
       alert(`Failed to start ingestion: ${err.message || err}`);
