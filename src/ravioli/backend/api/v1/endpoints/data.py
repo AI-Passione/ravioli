@@ -332,8 +332,8 @@ async def _run_wfs_ingestion(file_id: uuid.UUID, url: str, layer: str, table_nam
         try:
             db_file.status = "failed"
             db_file.error_message = str(e)
-        except Exception:
-            pass
+        except Exception as status_err:
+            logger.warning(f"Failed to persist failure status for layer {layer}: {status_err}")
 
     finally:
         db.commit()
