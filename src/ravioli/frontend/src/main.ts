@@ -88,11 +88,8 @@ store.subscribe(() => {
 
   // Refresh files if we are in data view
   if (store.getCurrentView() === 'data') {
-    api.listFiles().then(files => {
-      if (JSON.stringify(files) !== JSON.stringify(store.getUploadedFiles())) {
-        store.setUploadedFiles(files);
-      }
-    }).catch(err => console.error('Failed to fetch files', err));
+    // Files are already up-to-date in the store (refreshFiles() in Data.ts
+    // fetches and commits before calling store.setUploadedFiles). Just re-render.
   }
   
   updateUI();
