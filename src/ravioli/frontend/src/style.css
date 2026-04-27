@@ -104,3 +104,56 @@
   @apply bg-outline-variant/20 rounded-full hover:bg-outline-variant/40 transition-colors;
 }
 
+/* Premium Animations */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.03) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.glow-primary {
+  filter: drop-shadow(0 0 8px rgba(var(--primary-rgb), 0.3));
+}
+
+.glass-card {
+  @apply bg-surface-container-low/40 backdrop-blur-xl border border-white/5 hover:border-white/10 transition-all duration-500;
+}
+
+.insight-card-hover {
+  @apply hover:bg-surface-container-lowest/60 hover:shadow-2xl hover:shadow-primary/5 hover:-translate-y-0.5;
+}
+
+@keyframes slide-up-fade {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-reveal {
+  animation: slide-up-fade 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+
