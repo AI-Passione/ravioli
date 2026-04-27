@@ -194,9 +194,20 @@ export function renderNotebook() {
       <div class="max-w-4xl mx-auto relative">
         <div class="glass-panel p-2 rounded-[2rem] group focus-within:border-primary/30 transition-all duration-500 shadow-2xl shadow-primary/5">
           <div class="flex items-center gap-4 px-4">
-            <div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0">
-               <span class="material-symbols-outlined text-primary text-xl" data-icon="auto_awesome">auto_awesome</span>
-            </div>
+            <button id="btn-magic" class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 hover:bg-primary/20 transition-colors relative group/magic" title="Magic Suggestions">
+               <span class="material-symbols-outlined text-primary text-xl group-hover/magic:rotate-12 transition-transform" data-icon="auto_awesome">auto_awesome</span>
+               
+               <!-- Suggestions Popover -->
+               <div id="magic-popover" class="absolute bottom-full left-0 mb-4 w-80 glass-panel p-4 rounded-2xl hidden animate-in fade-in slide-in-from-bottom-2 duration-300 z-50">
+                  <div class="flex items-center gap-2 mb-3 text-tertiary">
+                    <span class="material-symbols-outlined text-sm" data-icon="lightbulb">lightbulb</span>
+                    <span class="text-[10px] font-label-md uppercase tracking-[0.2em]">Neural Suggestions</span>
+                  </div>
+                  <div id="magic-suggestions-list" class="space-y-2">
+                    <!-- Dynamic suggestions here -->
+                  </div>
+               </div>
+            </button>
             <div class="flex-1 min-w-0 py-2">
               <textarea id="cell-input" class="w-full bg-transparent border-none text-on-surface focus:ring-0 resize-none py-2 text-lg font-body-lg max-h-48 custom-scrollbar" placeholder="Ask Kowalski a follow-up question..." rows="1"></textarea>
             </div>
@@ -226,6 +237,61 @@ export function renderNotebook() {
 
   const input = container.querySelector('#cell-input') as HTMLTextAreaElement;
   const btn = container.querySelector('#btn-execute');
+  const btnMagic = container.querySelector('#btn-magic');
+  const magicPopover = container.querySelector('#magic-popover');
+  const suggestionsList = container.querySelector('#magic-suggestions-list');
+
+  // Magic Suggestions
+  btnMagic?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!activeId) return;
+
+    if (magicPopover?.classList.contains('hidden')) {
+      // Show and Load
+      magicPopover.classList.remove('hidden');
+      if (suggestionsList) {
+        suggestionsList.innerHTML = `
+          <div class="py-4 flex flex-col items-center gap-2 opacity-50">
+            <span class="material-symbols-outlined animate-spin text-lg" data-icon="progress_activity">progress_activity</span>
+            <span class="text-[9px] uppercase tracking-widest font-label-sm">Analyzing context...</span>
+          </div>
+        `;
+
+        try {
+          const prompts = await api.getSuggestedPrompts(activeId);
+          suggestionsList.innerHTML = prompts.map(p => `
+            <button class="magic-suggestion-item w-full text-left px-3 py-2 text-xs font-body-sm text-on-surface-variant hover:bg-primary/10 hover:text-primary rounded-lg border border-transparent hover:border-primary/20 transition-all duration-200" data-prompt="${p.replace(/"/g, '&quot;')}">
+              ${p}
+            </button>
+          `).join('');
+
+          // Bind items
+          suggestionsList.querySelectorAll('.magic-suggestion-item').forEach(item => {
+            item.addEventListener('click', () => {
+              const prompt = item.getAttribute('data-prompt');
+              if (prompt && input) {
+                input.value = prompt;
+                input.dispatchEvent(new Event('input'));
+                magicPopover.classList.add('hidden');
+                input.focus();
+              }
+            });
+          });
+        } catch (err) {
+          suggestionsList.innerHTML = `<div class="text-[10px] text-error p-2">Neural Link Interrupted</div>`;
+        }
+      }
+    } else {
+      magicPopover?.classList.add('hidden');
+    }
+  });
+
+  // Close popover on outside click
+  document.addEventListener('click', () => {
+    magicPopover?.classList.add('hidden');
+  });
+  
+  magicPopover?.addEventListener('click', (e) => e.stopPropagation());
 
   // Auto-resize textarea
   input?.addEventListener('input', () => {

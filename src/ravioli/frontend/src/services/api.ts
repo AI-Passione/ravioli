@@ -61,6 +61,13 @@ export const api = {
 
     return () => eventSource.close();
   },
+  
+  async getSuggestedPrompts(analysisId: string): Promise<string[]> {
+    const response = await fetch(`${API_BASE}/analyses/${analysisId}/suggested-prompts`);
+    if (!response.ok) throw new Error('Failed to fetch suggested prompts');
+    return response.json();
+  },
+
 
   async generateQuickInsight(file: File): Promise<QuickInsightResponse> {
     const formData = new FormData();

@@ -280,6 +280,34 @@ Follow-up Questions:"""
                 "What is the impact of the identified limitations on the overall analysis?"
             ]
 
+    async def generate_suggested_prompts(self, filename: str, summary: str, context: str) -> list[str]:
+        """
+        Generate 3 high-impact analytical prompts based on the summary and conversation history.
+        """
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Based on the Summary and Conversation History for dataset "{filename}", generate 3 high-impact analytical prompts that the user can click to deep dive into specific trends or anomalies.
+Be extremely concise. Each prompt should be a clear, actionable instruction for Kowalski.
+Return ONLY the prompts, one per line, starting with a dash (-). No confirmation line.
+
+Summary:
+{summary}
+
+Conversation History:
+{context}
+
+Suggested Prompts:"""
+
+        try:
+            content = await self._generate(prompt, "Suggested Prompts", temperature=0.7, num_predict=400)
+            prompts = [p.strip("- ").strip() for p in content.split('\n') if p.strip().startswith("-")]
+            return [p for p in prompts if len(p) > 5][:3]
+        except Exception:
+            return [
+                "Perform a deep dive into the primary volume drivers.",
+                "Analyze the temporal distribution of identified anomalies.",
+                "Quantify the statistical impact of the data limitations."
+            ]
+
     async def generate_answer(self, filename: str, summary: str, context: str, question: str) -> str:
         """
         Generate a clinical, precise answer to a user question based on data context.
