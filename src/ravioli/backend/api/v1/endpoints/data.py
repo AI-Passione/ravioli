@@ -273,6 +273,9 @@ async def _run_wfs_ingestion(file_id: uuid.UUID, url: str, layer: str, table_nam
     """Background task: performs the actual WFS data pull and DuckDB ingestion."""
     from ravioli.backend.core.database import SessionLocal
     db = SessionLocal()
+
+    PROGRESS_FLUSH_EVERY = 5_000  # commit row count to DB every N rows
+
     try:
         db_file = db.execute(select(UploadedFile).where(UploadedFile.id == file_id)).scalar_one()
 
@@ -282,7 +285,20 @@ async def _run_wfs_ingestion(file_id: uuid.UUID, url: str, layer: str, table_nam
         duckdb_manager.connection.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
 
         client = WFSClient(url)
-        data_generator = client.get_features_generator(layer)
+        base_generator = client.get_features_generator(layer)
+
+        # Wrap the generator to track & periodically persist row count
+        rows_fetched = 0
+
+        async def progress_tracking_generator():
+            nonlocal rows_fetched
+            async for row in base_generator:
+                yield row
+                rows_fetched += 1
+                if rows_fetched % PROGRESS_FLUSH_EVERY == 0:
+                    db_file.row_count = rows_fetched
+                    db.commit()
+                    logger.info(f"Progress: {rows_fetched:,} rows fetched so far for {schema_name}.{table_name}")
 
         # dlt pipeline - isolate by schema and unique ID to avoid state collisions
         pipeline = create_ravioli_pipeline(
@@ -291,10 +307,10 @@ async def _run_wfs_ingestion(file_id: uuid.UUID, url: str, layer: str, table_nam
         )
 
         logger.info(f"Running dlt pipeline for {schema_name}.{table_name}...")
-        load_info = pipeline.run(data_generator, table_name=table_name, write_disposition="replace")
+        load_info = pipeline.run(progress_tracking_generator(), table_name=table_name, write_disposition="replace")
         logger.info(f"dlt pipeline completed. Load Info: {load_info}")
 
-        # Update row count
+        # Final accurate row count from DuckDB
         full_table_name = f'"{schema_name}"."{table_name}"'
         db_file.row_count = duckdb_manager.connection.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
 
@@ -309,7 +325,7 @@ async def _run_wfs_ingestion(file_id: uuid.UUID, url: str, layer: str, table_nam
             db_file.has_pii = False
 
         db_file.status = "completed"
-        logger.info(f"WFS ingestion completed successfully: {db_file.row_count} rows.")
+        logger.info(f"WFS ingestion completed successfully: {db_file.row_count:,} rows.")
 
     except Exception as e:
         logger.exception(f"WFS Ingestion background task failed for layer {layer}")

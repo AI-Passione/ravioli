@@ -96,7 +96,16 @@ export function renderData() {
                     <code class="px-2 py-1 rounded bg-surface-container-highest text-primary-fixed-dim text-xs font-mono border border-outline/5">${file.schema_name}.${file.table_name}</code>
                   </td>
                   <td class="px-8 py-5 text-neutral-300 font-medium">
-                    ${file.row_count ? file.row_count.toLocaleString() : '--'}
+                    ${file.status === 'pending'
+                      ? `<span class="flex items-center gap-1.5">
+                           ${file.row_count
+                             ? `<span class="text-blue-400">${file.row_count.toLocaleString()}</span>
+                                <span class="text-blue-400/50 text-[10px] animate-pulse">fetching…</span>`
+                             : `<span class="text-blue-400/50 text-[10px] animate-pulse">fetching…</span>`
+                           }
+                         </span>`
+                      : (file.row_count ? file.row_count.toLocaleString() : '--')
+                    }
                   </td>
                   <td class="px-8 py-5">
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold ${
