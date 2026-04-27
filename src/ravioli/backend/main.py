@@ -38,7 +38,7 @@ def _migrate_columns():
     migrations = [
         "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS assumptions TEXT",
         "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS limitations TEXT",
-        "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS metadata JSONB",
+        "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS insight_metadata JSONB",
     ]
     with engine.begin() as conn:
         for stmt in migrations:

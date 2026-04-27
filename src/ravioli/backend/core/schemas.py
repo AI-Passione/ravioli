@@ -74,7 +74,7 @@ class InsightBase(BaseModel):
     source_label: Optional[str] = None
     assumptions: Optional[str] = None
     limitations: Optional[str] = None
-    metadata: Optional[dict] = None
+    insight_metadata: Optional[dict] = None
 
 class Insight(InsightBase):
     id: UUID

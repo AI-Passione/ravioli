@@ -112,7 +112,7 @@ class Insight(Base):
     source_label: Mapped[Optional[str]] = mapped_column(String(255))
     assumptions: Mapped[Optional[str]] = mapped_column(Text)
     limitations: Mapped[Optional[str]] = mapped_column(Text)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSON, name="metadata")
+    insight_metadata: Mapped[Optional[dict]] = mapped_column(JSON, name="insight_metadata")
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
