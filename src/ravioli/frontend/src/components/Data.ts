@@ -311,29 +311,15 @@ export function renderData() {
       }
       const primaryLayer = layers[0].name;
       
-      // 2. Fire ingestion — backend returns immediately with 'pending' status
+      // 2. Fire ingestion — backend returns the pending record immediately
       const result = await api.ingestWFSLayer(url, primaryLayer);
       
-      // 3. Close modal and immediately show the pending row in the table
+      // 3. Close modal and optimistically inject the pending record into the
+      //    store right now — no round-trip re-fetch needed. The global poller
+      //    in main.ts will keep it updated every 3s from here on.
       hideAddModal();
-      await refreshFiles();
-
-      // 4. Poll every 3s: refresh the table on every tick so live row count
-      //    updates are visible. Stop once the status leaves 'pending'.
-      if (result.status === 'pending') {
-        const pollInterval = setInterval(async () => {
-          try {
-            await refreshFiles();
-            const files = await api.listFiles();
-            const updated = files.find(f => f.id === result.id);
-            if (updated && updated.status !== 'pending') {
-              clearInterval(pollInterval);
-            }
-          } catch {
-            clearInterval(pollInterval);
-          }
-        }, 3000);
-      }
+      const existingFiles = store.getUploadedFiles();
+      store.setUploadedFiles([result, ...existingFiles]);
     } catch (err: any) {
       alert(`Failed to start ingestion: ${err.message || err}`);
     } finally {
