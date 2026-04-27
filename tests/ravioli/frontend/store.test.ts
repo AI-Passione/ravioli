@@ -25,4 +25,18 @@ describe('Store', () => {
     store.setActiveAnalysisId('1');
     expect(called).toBe(true);
   });
+
+  it('should manage current view and clear active analysis when switching to main views', () => {
+    store.setActiveAnalysisId('42');
+    store.setCurrentView('governance');
+    expect(store.getCurrentView()).toBe('governance');
+    expect(store.getActiveAnalysisId()).toBeUndefined();
+  });
+
+  it('should set active analysis id and switch view to dashboard', () => {
+    store.setCurrentView('insights');
+    store.setActiveAnalysisId('123');
+    expect(store.getCurrentView()).toBe('dashboard');
+    expect(store.getActiveAnalysisId()).toBe('123');
+  });
 });

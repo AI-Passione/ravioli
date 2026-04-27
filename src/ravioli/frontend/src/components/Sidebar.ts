@@ -13,7 +13,7 @@ export function renderSidebar() {
     analysesListHtml = '<li class="px-8 py-4 text-neutral-600 italic text-[10px] uppercase tracking-widest">No Analyses found</li>';
   } else {
     analysesListHtml = analyses.map(a => {
-      const isQuick = (a as any).analysis_metadata?.type === 'quick_insight';
+      const isQuick = a.analysis_metadata?.type === 'quick_insight';
       const icon = isQuick ? 'bolt' : 'terminal';
       const isActive = a.id === activeId;
       return `
