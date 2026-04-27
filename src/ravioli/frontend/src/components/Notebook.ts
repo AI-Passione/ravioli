@@ -161,7 +161,17 @@ export function renderNotebook() {
               <span class="material-symbols-outlined text-sm" data-icon="verified">verified</span>
               <span class="text-[10px] uppercase tracking-widest font-label-sm">Validated by Local LLM Node</span>
             </div>
-            <div class="flex gap-4">
+            <div class="flex items-center gap-4">
+              ${analysis.analysis_metadata?.is_approved
+                ? `<div class="flex items-center gap-2 text-tertiary">
+                    <span class="material-symbols-outlined text-sm" data-icon="check_circle">check_circle</span>
+                    <span class="text-[10px] uppercase tracking-widest font-label-sm">Added to Insights</span>
+                  </div>`
+                : `<button id="btn-approve-insight" class="flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 text-primary hover:bg-primary/10 transition-all duration-300 group">
+                    <span class="material-symbols-outlined text-sm group-hover:scale-110 transition-transform" data-icon="add_circle">add_circle</span>
+                    <span class="text-[10px] uppercase tracking-widest font-label-sm">Add to Insights</span>
+                  </button>`
+              }
                <span class="text-[10px] text-outline uppercase tracking-widest opacity-40">System: Studio Noir</span>
             </div>
           </div>
@@ -234,6 +244,17 @@ export function renderNotebook() {
       scrollContainer.scrollTop = scrollContainer.scrollHeight;
     }
   }, 100);
+
+  // Approve insight
+  container.querySelector('#btn-approve-insight')?.addEventListener('click', async () => {
+    if (!activeId) return;
+    try {
+      const updated = await api.approveAnalysis(activeId);
+      store.refreshAnalysis(updated);
+    } catch (err) {
+      console.error('Failed to approve analysis', err);
+    }
+  });
 
   const input = container.querySelector('#cell-input') as HTMLTextAreaElement;
   const btn = container.querySelector('#btn-execute');

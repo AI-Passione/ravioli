@@ -119,6 +119,21 @@ def update_analysis(analysis_id: UUID, analysis_in: schemas.AnalysisUpdate, db: 
     db.refresh(db_analysis)
     return db_analysis
 
+@router.post("/{analysis_id}/approve", response_model=schemas.Analysis)
+def approve_analysis(analysis_id: UUID, db: Session = Depends(get_db)):
+    """
+    Mark an analysis result as approved, making it surface on the Insights homepage.
+    """
+    db_analysis = db.query(models.Analysis).filter(models.Analysis.id == analysis_id).first()
+    if not db_analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    metadata = dict(db_analysis.analysis_metadata or {})
+    metadata['is_approved'] = True
+    db_analysis.analysis_metadata = metadata
+    db.commit()
+    db.refresh(db_analysis)
+    return db_analysis
+
 @router.delete("/{analysis_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_analysis(analysis_id: UUID, db: Session = Depends(get_db)):
     """

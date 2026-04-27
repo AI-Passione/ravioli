@@ -19,6 +19,14 @@ export const api = {
     return response.json();
   },
 
+  async approveAnalysis(id: string): Promise<Analysis> {
+    const response = await fetch(`${API_BASE}/analyses/${id}/approve`, {
+      method: 'POST',
+    });
+    if (!response.ok) throw new Error('Failed to approve analysis');
+    return response.json();
+  },
+
   async deleteAnalysis(id: string): Promise<void> {
     const response = await fetch(`${API_BASE}/analyses/${id}`, {
       method: 'DELETE',

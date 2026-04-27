@@ -3,7 +3,15 @@ export interface Analysis {
   title: string;
   description?: string;
   status: string;
-  analysis_metadata?: any;
+  result?: string;
+  analysis_metadata?: {
+    type?: string;
+    filename?: string;
+    row_count?: number;
+    followup_questions?: string[];
+    is_approved?: boolean;
+    [key: string]: any;
+  };
   created_at: string;
   updated_at: string;
 }

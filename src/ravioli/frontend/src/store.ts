@@ -7,7 +7,7 @@ class Store {
   private activeAnalysisId?: string;
   private logs: ExecutionLog[] = [];
   private uploadedFiles: UploadedFile[] = [];
-  private currentView: 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings' = 'dashboard';
+  private currentView: 'insights' | 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings' = 'insights';
   private listeners: Listener[] = [];
 
   subscribe(listener: Listener) {
@@ -36,11 +36,16 @@ class Store {
     this.notify();
   }
 
+  refreshAnalysis(updated: import('./types').Analysis) {
+    this.analyses = this.analyses.map(a => a.id === updated.id ? updated : a);
+    this.notify();
+  }
+
   getActiveAnalysisId() { return this.activeAnalysisId; }
 
-  setCurrentView(view: 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings') {
+  setCurrentView(view: 'insights' | 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings') {
     this.currentView = view;
-    if (view === 'create-analysis' || view === 'data' || view === 'knowledge' || view === 'settings') {
+    if (view === 'insights' || view === 'create-analysis' || view === 'data' || view === 'knowledge' || view === 'settings') {
       this.activeAnalysisId = undefined;
     }
     this.notify();

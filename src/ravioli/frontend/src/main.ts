@@ -3,6 +3,7 @@ import { store } from './store';
 import { api } from './services/api';
 import { renderSidebar } from './components/Sidebar';
 import { renderNotebook } from './components/Notebook';
+import { renderInsights } from './components/Insights';
 import { renderCreateAnalysis } from './components/CreateAnalysis';
 import { renderKnowledge } from './components/Knowledge';
 import { renderData } from './components/Data';
@@ -19,6 +20,7 @@ function updateUI() {
   shell.appendChild(renderSidebar());
   
   const currentView = store.getCurrentView();
+  const activeId = store.getActiveAnalysisId();
   if (currentView === 'create-analysis') {
     shell.appendChild(renderCreateAnalysis());
   } else if (currentView === 'knowledge') {
@@ -27,6 +29,8 @@ function updateUI() {
     shell.appendChild(renderData());
   } else if (currentView === 'settings') {
     shell.appendChild(renderSettings());
+  } else if (currentView === 'insights' && !activeId) {
+    shell.appendChild(renderInsights());
   } else {
     shell.appendChild(renderNotebook());
   }
