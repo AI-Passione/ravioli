@@ -96,15 +96,34 @@ export function renderData() {
                     <code class="px-2 py-1 rounded bg-surface-container-highest text-primary-fixed-dim text-xs font-mono border border-outline/5">${file.schema_name}.${file.table_name}</code>
                   </td>
                   <td class="px-8 py-5 text-neutral-300 font-medium">
-                    ${file.row_count ? file.row_count.toLocaleString() : '--'}
+                    ${file.status === 'pending'
+                      ? `<span class="flex items-center gap-1.5">
+                           ${file.row_count
+                             ? `<span class="text-blue-400">${file.row_count.toLocaleString()}</span>
+                                <span class="text-blue-400/50 text-[10px] animate-pulse">fetching…</span>`
+                             : `<span class="text-blue-400/50 text-[10px] animate-pulse">fetching…</span>`
+                           }
+                         </span>`
+                      : (file.row_count ? file.row_count.toLocaleString() : '--')
+                    }
                   </td>
                   <td class="px-8 py-5">
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold ${
-                      file.status === 'completed' ? 'bg-green-500/10 text-green-400' : 
-                      file.status === 'failed' ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-400'
+                      file.status === 'completed' ? 'bg-green-500/10 text-green-400' :
+                      file.status === 'failed'    ? 'bg-red-500/10 text-red-400' :
+                      file.status === 'pending'   ? 'bg-blue-500/10 text-blue-400' :
+                                                    'bg-yellow-500/10 text-yellow-400'
                     }">
-                      <span class="w-1.5 h-1.5 rounded-full ${file.status === 'completed' ? 'bg-green-400' : file.status === 'failed' ? 'bg-red-400' : 'bg-yellow-400'} ${file.status !== 'completed' ? 'animate-pulse' : ''}"></span>
-                      ${file.status}
+                      ${file.status === 'pending'
+                        ? `<span class="material-symbols-outlined text-[10px] animate-spin">sync</span>`
+                        : `<span class="w-1.5 h-1.5 rounded-full ${
+                            file.status === 'completed' ? 'bg-green-400' :
+                            file.status === 'failed'    ? 'bg-red-400'   : 'bg-yellow-400'
+                          }"></span>`
+                      }
+                      ${file.status === 'pending'   ? 'In Progress' :
+                        file.status === 'completed' ? 'Completed'   :
+                        file.status === 'failed'    ? 'Failed'      : file.status}
                     </span>
                   </td>
                   <td class="px-8 py-5 text-right flex justify-end gap-2">
@@ -165,11 +184,7 @@ export function renderData() {
                   class="w-full bg-surface-container-highest border border-outline/20 rounded-2xl px-6 py-4 text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-primary/50 transition-all" />
               </div>
               
-              <div id="wfs-ingest-controls" class="flex items-center justify-between pt-4 border-t border-outline/5">
-                <div class="flex flex-col">
-                  <label class="text-[10px] uppercase tracking-widest text-neutral-500 mb-1">Max Rows</label>
-                  <input type="number" id="wfs-count" value="1000" step="100" min="1" class="w-32 bg-surface-container-highest border border-outline/20 rounded-xl px-4 py-2 text-neutral-200 focus:outline-none focus:border-primary/50" />
-                </div>
+              <div id="wfs-ingest-controls" class="flex justify-end pt-4 border-t border-outline/5">
                 <button id="btn-ingest-wfs" class="px-8 py-3 rounded-2xl bg-primary text-on-primary font-medium hover:bg-primary/90 transition-all flex items-center gap-2 group">
                   Start Ingestion
                   <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
@@ -280,33 +295,25 @@ export function renderData() {
   // --- WFS Ingestion Logic ---
   const wfsUrlInput = container.querySelector('#wfs-url') as HTMLInputElement;
   const ingestBtn = container.querySelector('#btn-ingest-wfs') as HTMLButtonElement;
-  const countInput = container.querySelector('#wfs-count') as HTMLInputElement;
 
   ingestBtn?.addEventListener('click', async () => {
     const url = wfsUrlInput.value.trim();
     if (!url) return;
-    const count = parseInt(countInput.value) || 1000;
 
-    ingestBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Ingesting...';
+    ingestBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Starting...';
     ingestBtn.disabled = true;
 
     try {
-      // 1. Automatically determine the layer
-      const layers = await api.getWFSLayers(url);
-      if (layers.length === 0) {
-        throw new Error('No layers found at this URL.');
-      }
-      const primaryLayer = layers[0].name;
-      
-      // 2. Ingest the primary layer
-      const result = await api.ingestWFSLayer(url, primaryLayer, count);
-      if (result.status === 'completed') {
-        hideAddModal();
-        alert(`Successfully ingested ${result.row_count} rows from ${primaryLayer}!`);
-        refreshFiles();
-      } else {
-        alert(`Ingestion failed: ${result.error_message}`);
-      }
+      // Fire ingestion — backend returns the pending record immediately and
+      // auto-detects the layer in the background if not specified.
+      const result = await api.ingestWFSLayer(url);
+
+      // Close modal and optimistically inject the pending record into the
+      // store right now — no round-trip re-fetch needed. The global poller
+      // in main.ts will keep it updated every 3s from here on.
+      hideAddModal();
+      const existingFiles = store.getUploadedFiles();
+      store.setUploadedFiles([result, ...existingFiles]);
     } catch (err: any) {
       alert(`Failed to start ingestion: ${err.message || err}`);
     } finally {

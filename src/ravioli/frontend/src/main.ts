@@ -42,9 +42,6 @@ async function init() {
       const analyses = await api.listAnalyses();
       console.log(`Fetched ${analyses.length} analyses from API`);
       store.setAnalyses(analyses);
-      if (analyses.length > 0 && !store.getActiveAnalysisId()) {
-        // Removed auto-selecting the first analysis to default to the Dashboard tab
-      }
     } catch (err) {
       console.error('Failed to fetch analyses', err);
     }
@@ -58,6 +55,30 @@ async function init() {
     }
   } catch (err) {
     console.error('Initialization failed', err);
+  }
+}
+
+// --- Global ingestion progress poller ---
+// Survives UI re-renders (unlike intervals defined inside renderData).
+// Polls every 3s while any file is 'pending', updating the store directly.
+let ingestionPollInterval: ReturnType<typeof setInterval> | null = null;
+
+function startIngestionPollingIfNeeded() {
+  const hasPending = store.getUploadedFiles().some(f => f.status === 'pending');
+  if (hasPending && !ingestionPollInterval) {
+    ingestionPollInterval = setInterval(async () => {
+      try {
+        const files = await api.listFiles();
+        store.setUploadedFiles(files);
+        // Stop polling once nothing is pending anymore
+        if (!files.some(f => f.status === 'pending')) {
+          clearInterval(ingestionPollInterval!);
+          ingestionPollInterval = null;
+        }
+      } catch (err) {
+        console.error('Ingestion poll failed', err);
+      }
+    }, 3000);
   }
 }
 
@@ -86,17 +107,12 @@ store.subscribe(() => {
     pollInterval = setInterval(fetchLogs, 3000);
   }
 
-  // Refresh files if we are in data view
-  if (store.getCurrentView() === 'data') {
-    api.listFiles().then(files => {
-      if (JSON.stringify(files) !== JSON.stringify(store.getUploadedFiles())) {
-        store.setUploadedFiles(files);
-      }
-    }).catch(err => console.error('Failed to fetch files', err));
-  }
-  
   updateUI();
+
+  // Kick off ingestion progress polling if any file is pending
+  startIngestionPollingIfNeeded();
 });
 
 init();
 updateUI();
+

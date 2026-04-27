@@ -3,8 +3,8 @@ import shutil
 import uuid
 import hashlib
 from pathlib import Path
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from typing import List, Optional
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -269,28 +269,117 @@ async def list_wfs_layers(url: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch WFS layers: {str(e)}")
 
+async def _run_wfs_ingestion(file_id: uuid.UUID, url: str, layer: Optional[str], table_name: str, schema_name: str):
+    """Background task: performs the actual WFS data pull and DuckDB ingestion."""
+    from ravioli.backend.core.database import SessionLocal
+    db = SessionLocal()
+
+    PROGRESS_FLUSH_EVERY = 5_000  # commit row count to DB every N rows
+
+    try:
+        db_file = db.execute(select(UploadedFile).where(UploadedFile.id == file_id)).scalar_one()
+
+        from ravioli.backend.data.olap.ingestion.dlt_utils import create_ravioli_pipeline
+
+        client = WFSClient(url)
+
+        # Auto-detect the primary layer if one was not specified
+        if not layer:
+            layers = await client.get_capabilities()
+            if not layers:
+                raise ValueError("No layers found at this WFS endpoint.")
+            layer = layers[0]["name"]
+            base_name = layer.split(":")[-1]
+            table_name = "".join(c if c.isalnum() else "_" for c in base_name).lower()
+            db_file.original_filename = layer
+            db_file.table_name = table_name
+            db.commit()
+            logger.info(f"Auto-detected layer: {layer}, table: {table_name}")
+
+        # Ensure schema exists in DuckDB before dlt starts
+        duckdb_manager.connection.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
+
+        base_generator = client.get_features_generator(layer)
+
+        # Wrap the generator to track & periodically persist row count
+        rows_fetched = 0
+
+        async def progress_tracking_generator():
+            nonlocal rows_fetched
+            async for row in base_generator:
+                yield row
+                rows_fetched += 1
+                if rows_fetched % PROGRESS_FLUSH_EVERY == 0:
+                    db_file.row_count = rows_fetched
+                    db.commit()
+                    logger.info(f"Progress: {rows_fetched:,} rows fetched so far for {schema_name}.{table_name}")
+
+        # dlt pipeline - isolate by schema and unique ID to avoid state collisions
+        pipeline = create_ravioli_pipeline(
+            pipeline_name=f"wfs_{schema_name}_{table_name}_{uuid.uuid4().hex[:8]}",
+            dataset_name=schema_name
+        )
+
+        logger.info(f"Running dlt pipeline for {schema_name}.{table_name}...")
+        load_info = pipeline.run(progress_tracking_generator(), table_name=table_name, write_disposition="replace")
+        logger.info(f"dlt pipeline completed. Load Info: {load_info}")
+
+        # Final accurate row count from DuckDB
+        full_table_name = f'"{schema_name}"."{table_name}"'
+        db_file.row_count = duckdb_manager.connection.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
+
+        # PII Scan
+        logger.info(f"Performing PII scan on {full_table_name}...")
+        try:
+            df_sample = duckdb_manager.connection.execute(f"SELECT * FROM {full_table_name} LIMIT 100").fetchdf()
+            db_file.has_pii = pii_scanner.scan_dataframe(df_sample)
+            logger.info(f"PII scan completed. Detected: {db_file.has_pii}")
+        except Exception as scan_err:
+            logger.warning(f"PII scan failed: {scan_err}")
+            db_file.has_pii = False
+
+        db_file.status = "completed"
+        logger.info(f"WFS ingestion completed successfully: {db_file.row_count:,} rows.")
+
+    except Exception as e:
+        logger.exception(f"WFS Ingestion background task failed for layer {layer}")
+        try:
+            db_file.status = "failed"
+            db_file.error_message = str(e)
+        except Exception as status_err:
+            logger.warning(f"Failed to persist failure status for layer {layer}: {status_err}")
+
+    finally:
+        db.commit()
+        db.close()
+
+
 @router.post("/wfs/ingest", response_model=schemas.UploadedFile)
 async def ingest_wfs_layer(
     request: schemas.WFSInjestRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    # Create record
-    file_id = uuid.uuid4()
-    
-    # Generate a clean table name
-    base_name = request.layer.split(":")[-1]
-    table_name = "".join(c if c.isalnum() else "_" for c in base_name).lower()
-    
-    # Determine schema name (s_<app>)
-    app_name = request.url.split("/")[-1].split("?")[0]
+    # Derive placeholder names from the URL; the background task will update
+    # them once the real layer name is known (if layer was not provided).
+    app_name = request.url.split("/")[-1].split("?")[0] or "wfs"
     schema_name = f"s_{app_name}"
-    
-    logger.info(f"Starting WFS ingestion: layer={request.layer}, url={request.url}, schema={schema_name}, table={table_name}")
-    
+    if request.layer:
+        base_name = request.layer.split(":")[-1]
+        table_name = "".join(c if c.isalnum() else "_" for c in base_name).lower()
+        display_name = request.layer
+    else:
+        table_name = "pending"
+        display_name = app_name
+
+    logger.info(f"Queuing WFS ingestion: url={request.url}, layer={request.layer}, schema={schema_name}")
+
+    # Create the record immediately with 'pending' status so the UI shows it right away
+    file_id = uuid.uuid4()
     db_file = UploadedFile(
         id=file_id,
         filename=f"wfs_{file_id}",
-        original_filename=request.layer,
+        original_filename=display_name,
         content_type="application/wfs",
         size_bytes=0,
         table_name=table_name,
@@ -302,51 +391,17 @@ async def ingest_wfs_layer(
     db.add(db_file)
     db.commit()
     db.refresh(db_file)
-    
-    try:
-        from ravioli.backend.data.olap.ingestion.dlt_utils import create_ravioli_pipeline
-        
-        # Ensure schema exists in DuckDB before dlt starts
-        duckdb_manager.connection.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
-        
-        client = WFSClient(request.url)
-        data_generator = client.get_features_generator(request.layer, count=request.count)
-        
-        # dlt pipeline - isolate by schema and use a unique ID to avoid state collisions
-        pipeline = create_ravioli_pipeline(
-            pipeline_name=f"wfs_{schema_name}_{table_name}_{uuid.uuid4().hex[:8]}",
-            dataset_name=schema_name  # Use the s_<app> schema
-        )
-        
-        # Run the pipeline
-        logger.info(f"Running dlt pipeline for {schema_name}.{table_name}...")
-        load_info = pipeline.run(data_generator, table_name=table_name, write_disposition="replace")
-        logger.info(f"dlt pipeline completed. Load Info: {load_info}")
-        
-        # Update metadata
-        full_table_name = f'"{schema_name}"."{table_name}"'
-        db_file.row_count = duckdb_manager.connection.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
-        
-        # PII Scan
-        logger.info(f"Performing PII scan on {full_table_name}...")
-        try:
-            df_sample = duckdb_manager.connection.execute(f"SELECT * FROM {full_table_name} LIMIT 100").fetchdf()
-            db_file.has_pii = pii_scanner.scan_dataframe(df_sample)
-            logger.info(f"PII scan completed. Detected: {db_file.has_pii}")
-        except Exception as scan_err:
-            logger.warning(f"PII scan failed: {scan_err}")
-            db_file.has_pii = False
-            
-        db_file.status = "completed"
-        logger.info(f"WFS ingestion completed successfully: {db_file.row_count} rows.")
-        # Approx size
-        db_file.size_bytes = 0 
-        
-    except Exception as e:
-        logger.exception(f"WFS Ingestion failed for {request.layer}")
-        db_file.status = "failed"
-        db_file.error_message = str(e)
-        
-    db.commit()
-    db.refresh(db_file)
+
+    # Fire-and-forget: schedule the heavy work in the background
+    background_tasks.add_task(
+        _run_wfs_ingestion,
+        file_id=file_id,
+        url=request.url,
+        layer=request.layer,
+        table_name=table_name,
+        schema_name=schema_name
+    )
+
+    # Return immediately — the client will poll for status updates
     return db_file
+
