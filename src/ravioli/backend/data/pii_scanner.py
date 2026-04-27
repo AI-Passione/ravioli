@@ -1,6 +1,9 @@
 import re
 import pandas as pd
+import logging
 from typing import List, Dict
+
+logger = logging.getLogger(__name__)
 
 class PIIScanner:
     """
@@ -40,15 +43,20 @@ class PIIScanner:
         if df.empty:
             return False
             
+        logger.info(f"Starting PII scan on sample of {len(df)} rows")
         # Take a sample for performance
         sample = df.head(sample_size)
         
         for column in sample.columns:
             # Only scan object (string) columns
             if sample[column].dtype == 'object':
+                logger.debug(f"Scanning column: {column}")
                 for value in sample[column].dropna():
-                    if self.scan_string(str(value)):
+                    found = self.scan_string(str(value))
+                    if found:
+                        logger.info(f"PII detected in column '{column}': {found}")
                         return True
+        logger.info("PII scan completed: No PII detected")
         return False
 
 # Global instance

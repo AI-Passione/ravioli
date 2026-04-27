@@ -305,12 +305,15 @@ async def ingest_wfs_layer(
     try:
         from ravioli.backend.data.dlt_utils import create_ravioli_pipeline
         
+        # Ensure schema exists in DuckDB before dlt starts
+        duckdb_manager.connection.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
+        
         client = WFSClient(request.url)
         data_generator = client.get_features_generator(request.layer, count=request.count)
         
-        # dlt pipeline
+        # dlt pipeline - isolate by schema to avoid state collisions
         pipeline = create_ravioli_pipeline(
-            pipeline_name=f"wfs_{table_name}",
+            pipeline_name=f"wfs_{schema_name}_{table_name}",
             dataset_name=schema_name  # Use the s_<app> schema
         )
         
@@ -339,6 +342,7 @@ async def ingest_wfs_layer(
         db_file.size_bytes = 0 
         
     except Exception as e:
+        logger.exception(f"WFS Ingestion failed for {request.layer}")
         db_file.status = "failed"
         db_file.error_message = str(e)
         
