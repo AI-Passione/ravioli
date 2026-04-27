@@ -329,6 +329,65 @@ Answer:"""
         except Exception as e:
             return f"> [!WARNING]\n> **Neural Link Interrupted**: {str(e)}\n\nKowalski is currently unable to process this request. Please check your AI node connection."
 
+    async def extract_insights(self, result_markdown: str) -> list[str]:
+        """
+        Extract individual insight bullet points from an analysis result.
+        Returns a list of plain-text insight strings (one per bullet point).
+        """
+        import re
+        # Fast path: pull bullet lines directly from the markdown
+        bullets = [
+            line.lstrip("-*• ").strip()
+            for line in result_markdown.splitlines()
+            if re.match(r"^\s*[-*•]\s+.{15,}", line)
+        ]
+        if len(bullets) >= 2:
+            return bullets[:20]
+
+        # Fallback: ask the LLM to extract them
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Extract 3-7 standalone, self-contained insight statements from the analysis result below.
+Each insight must be a complete sentence that makes sense without any surrounding context.
+Return ONLY the insights, one per line, starting with a dash (-). No titles, no headers.
+
+Analysis Result:
+---
+{result_markdown[:6000]}
+---
+
+Extracted Insights:"""
+        try:
+            raw = await self._generate(prompt, "Extract Insights", temperature=0.3, num_predict=600)
+            return [
+                line.lstrip("-*• ").strip()
+                for line in raw.splitlines()
+                if re.match(r"^\s*[-*•]\s+.{10,}", line)
+            ][:20]
+        except Exception:
+            return bullets
+
+    async def generate_insights_summary(self, insights: list[str], days: int) -> str:
+        """
+        Generate an executive AI summary synthesizing all verified insights over the given window.
+        """
+        if not insights:
+            return "> [!NOTE]\n> No verified insights available for the selected period."
+
+        bullet_block = "\n".join(f"- {i}" for i in insights)
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Synthesize the following verified insights from the last {days} day(s) into a concise executive briefing.
+Focus on themes, patterns, and high-level implications. 3-5 sentences maximum.
+Use Markdown. Be direct and clinical.
+
+Verified Insights:
+{bullet_block}
+
+Executive Briefing:"""
+        try:
+            return await self._generate(prompt, "Insights Summary", temperature=0.5, num_predict=500)
+        except Exception:
+            return f"> [!NOTE]\n> AI synthesis unavailable. {len(insights)} verified insight(s) on record for the last {days} day(s)."
+
     async def stream_answer(self, filename: str, summary: str, context: str, question: str):
         """
         Stream a clinical, precise answer to a user question.

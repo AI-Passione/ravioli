@@ -67,6 +67,27 @@ class QuickInsightResponse(BaseModel):
 class QuickInsightExistingRequest(BaseModel):
     file_id: UUID
 
+# --- Insight Schemas ---
+
+class InsightBase(BaseModel):
+    content: str
+    source_label: Optional[str] = None
+
+class Insight(InsightBase):
+    id: UUID
+    analysis_id: UUID
+    is_verified: bool
+    is_published: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class InsightStats(BaseModel):
+    verified_count: int
+    analyses_count: int
+    contributors_count: int
+
 # --- Data Schemas ---
 
 class UploadedFileBase(BaseModel):

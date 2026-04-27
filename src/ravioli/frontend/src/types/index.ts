@@ -65,6 +65,29 @@ export interface SystemSetting {
   updated_at?: string;
 }
 
+export interface Insight {
+  id: string;
+  analysis_id: string;
+  content: string;
+  source_label?: string;
+  is_verified: boolean;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InsightStats {
+  verified_count: number;
+  analyses_count: number;
+  contributors_count: number;
+}
+
+export interface InsightsSummary {
+  summary: string;
+  insight_count: number;
+  days: number;
+}
+
 export interface QuickInsightResponse {
   analysis_id: string;
   title: string;

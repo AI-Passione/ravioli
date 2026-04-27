@@ -120,9 +120,9 @@ def update_analysis(analysis_id: UUID, analysis_in: schemas.AnalysisUpdate, db: 
     return db_analysis
 
 @router.post("/{analysis_id}/approve", response_model=schemas.Analysis)
-def approve_analysis(analysis_id: UUID, db: Session = Depends(get_db)):
+def approve_analysis(analysis_id: UUID, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
-    Mark an analysis result as approved, making it surface on the Insights homepage.
+    Mark an analysis result as approved and queue background extraction of individual insights.
     """
     db_analysis = db.query(models.Analysis).filter(models.Analysis.id == analysis_id).first()
     if not db_analysis:
@@ -132,7 +132,48 @@ def approve_analysis(analysis_id: UUID, db: Session = Depends(get_db)):
     db_analysis.analysis_metadata = metadata
     db.commit()
     db.refresh(db_analysis)
+    if db_analysis.result:
+        background_tasks.add_task(
+            extract_and_store_insights,
+            str(analysis_id),
+            db_analysis.result,
+            db_analysis.title,
+        )
     return db_analysis
+
+
+async def extract_and_store_insights(analysis_id: str, result_markdown: str, title: str):
+    """Background task: extract bullet-point insights from an approved analysis result."""
+    from ravioli.backend.core.database import SessionLocal
+    from ravioli.backend.core.ollama import OllamaClient
+    import uuid as _uuid
+
+    db = SessionLocal()
+    try:
+        analysis_uuid = _uuid.UUID(analysis_id)
+        # Skip if insights already extracted for this analysis
+        existing = db.query(models.Insight).filter(models.Insight.analysis_id == analysis_uuid).first()
+        if existing:
+            return
+
+        client = OllamaClient(db)
+        bullets = await client.extract_insights(result_markdown)
+
+        for bullet in bullets:
+            if bullet.strip():
+                db.add(models.Insight(
+                    analysis_id=analysis_uuid,
+                    content=bullet.strip(),
+                    source_label=title,
+                    is_verified=False,
+                    is_published=False,
+                ))
+        db.commit()
+        logger.info("Extracted %d insights from analysis %s", len(bullets), analysis_id)
+    except Exception as e:
+        logger.error("Insight extraction failed for %s: %s", analysis_id, e)
+    finally:
+        db.close()
 
 @router.delete("/{analysis_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_analysis(analysis_id: UUID, db: Session = Depends(get_db)):

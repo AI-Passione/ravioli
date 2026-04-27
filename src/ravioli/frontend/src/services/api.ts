@@ -1,4 +1,4 @@
-import type { Analysis, AnalysisCreate, ExecutionLog, UploadedFile, QuickInsightResponse, WFSLayer } from '../types';
+import type { Analysis, AnalysisCreate, ExecutionLog, UploadedFile, QuickInsightResponse, WFSLayer, Insight, InsightStats, InsightsSummary } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -191,6 +191,41 @@ export const api = {
       throw new Error(errorData.detail || 'Connection test failed');
     }
     return response.json();
+  },
+
+  async getInsightStats(): Promise<InsightStats> {
+    const response = await fetch(`${API_BASE}/insights/stats`);
+    if (!response.ok) throw new Error('Failed to fetch insight stats');
+    return response.json();
+  },
+
+  async getInsightsSummary(days: number): Promise<InsightsSummary> {
+    const response = await fetch(`${API_BASE}/insights/summary?days=${days}`);
+    if (!response.ok) throw new Error('Failed to fetch insights summary');
+    return response.json();
+  },
+
+  async getReviewQueue(): Promise<Insight[]> {
+    const response = await fetch(`${API_BASE}/insights/review-queue`);
+    if (!response.ok) throw new Error('Failed to fetch review queue');
+    return response.json();
+  },
+
+  async getInsightsFeed(days: number = 30): Promise<Insight[]> {
+    const response = await fetch(`${API_BASE}/insights/feed?days=${days}`);
+    if (!response.ok) throw new Error('Failed to fetch insights feed');
+    return response.json();
+  },
+
+  async verifyInsight(id: string): Promise<Insight> {
+    const response = await fetch(`${API_BASE}/insights/${id}/verify`, { method: 'PATCH' });
+    if (!response.ok) throw new Error('Failed to verify insight');
+    return response.json();
+  },
+
+  async rejectInsight(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE}/insights/${id}/reject`, { method: 'PATCH' });
+    if (!response.ok) throw new Error('Failed to reject insight');
   },
 
   async getWFSLayers(url: string): Promise<WFSLayer[]> {
