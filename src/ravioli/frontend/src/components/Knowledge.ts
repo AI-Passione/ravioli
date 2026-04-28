@@ -19,7 +19,11 @@ function sanitizeImageUrl(input: string): string | null {
 
     // Allow root-relative paths only (disallow protocol-relative //example.com)
     if (value.startsWith('/') && !value.startsWith('//')) {
-        return value;
+        try {
+            return new URL(value, window.location.origin).toString();
+        } catch {
+            return null;
+        }
     }
 
     // Allow only http(s) absolute URLs
