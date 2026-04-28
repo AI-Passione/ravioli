@@ -174,6 +174,46 @@ JSON:"""
             print(f"OllamaClient: [WARNING] AI Validation failed: {e}")
             return {"valid": True, "reason": f"AI Validation skipped due to error: {str(e)}"}
 
+    async def suggest_schema_fix(self, sheet_name: str, sample_data: str) -> Dict[str, str]:
+        """
+        Suggest better column names for a dataset.
+        Returns a mapping of {original_name: fixed_name}
+        """
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Analyze the column names of the following Excel sheet "{sheet_name}" and suggest clean, descriptive, and SQL-friendly column names.
+Rules:
+- Use snake_case.
+- Remove special characters and spaces.
+- Keep them concise but meaningful.
+- Map EVERY original column to a fixed name.
+
+Here is a sample of the data (CSV format):
+---
+{sample_data}
+---
+
+Return your response in the following JSON format:
+{{
+  "column_mapping": {{
+    "Original Name": "fixed_name",
+    ...
+  }}
+}}
+JSON:"""
+
+        try:
+            content = await self._generate(prompt, "Schema Fix", temperature=0.1, num_predict=500)
+            # Try to parse JSON from response
+            match = re.search(r'\{.*\}', content, re.DOTALL)
+            if match:
+                data = json.loads(match.group(0))
+                return data.get("column_mapping", {})
+            return {}
+        except Exception as e:
+            # Fallback to no fix if AI fails
+            print(f"OllamaClient: [WARNING] AI Schema Fix failed: {e}")
+            return {}
+
     async def _generate(self, prompt: str, task_name: str, temperature: float = 0.5, num_predict: int = 300) -> str:
         """Helper method to handle the actual API call to Ollama with logging."""
         start_time = time.time()

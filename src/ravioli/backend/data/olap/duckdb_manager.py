@@ -92,10 +92,29 @@ class DuckDBManager:
                 
                 # Load full data for valid sheet
                 df = pd.read_excel(file_path, sheet_name=sheet_name)
+                
+                # AI Schema Fix
+                applied_fix = False
+                if ollama_client:
+                    logger.info(f"Requesting AI Schema Fix for sheet '{sheet_name}'...")
+                    original_cols = df.columns.tolist()
+                    mapping = await ollama_client.suggest_schema_fix(sheet_name, sample_csv)
+                    
+                    # Filter mapping to only include columns that actually exist in the df
+                    filtered_mapping = {k: v for k, v in mapping.items() if k in df.columns}
+                    
+                    if filtered_mapping:
+                        logger.info(f"AI Schema Fix for '{sheet_name}' - INPUT: {original_cols}")
+                        logger.info(f"AI Schema Fix for '{sheet_name}' - OUTPUT: {list(filtered_mapping.values())}")
+                        df = df.rename(columns=filtered_mapping)
+                        applied_fix = True
+                    else:
+                        logger.info(f"AI Schema Fix for '{sheet_name}': No valid mapping returned.")
+                
                 conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM df")
                 
                 count = conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
-                logger.info(f"Sheet '{sheet_name}' successfully ingested into {full_table_name} ({count} rows).")
+                logger.info(f"Sheet '{sheet_name}' successfully ingested into {full_table_name} ({count} rows). Fix applied: {applied_fix}")
                 
                 results.append({
                     "sheet_name": sheet_name,
