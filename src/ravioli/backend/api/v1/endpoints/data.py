@@ -40,8 +40,9 @@ async def upload_file(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(status_code=400, detail="Only CSV files are supported at this moment.")
+    extension = Path(file.filename).suffix.lower()
+    if extension not in ['.csv', '.xlsx']:
+        raise HTTPException(status_code=400, detail="Only CSV and XLSX files are supported at this moment.")
 
     # Generate hash to check for duplicates
     file_hash = await calculate_hash(file)
@@ -61,7 +62,6 @@ async def upload_file(
             pass
 
     file_id = uuid.uuid4()
-    extension = Path(file.filename).suffix
     internal_filename = f"{file_id}{extension}"
     file_path = UPLOAD_DIR / internal_filename
     
@@ -92,7 +92,11 @@ async def upload_file(
         
         # Ingest into DuckDB
         try:
-            row_count = duckdb_manager.ingest_csv(file_path, table_name, schema="s_manual")
+            if extension == '.csv':
+                row_count = duckdb_manager.ingest_csv(file_path, table_name, schema="s_manual")
+            else: # .xlsx
+                row_count = duckdb_manager.ingest_xlsx(file_path, table_name, schema="s_manual")
+                
             db_source.row_count = row_count
             
             # PII Scan

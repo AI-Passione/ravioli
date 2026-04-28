@@ -528,15 +528,20 @@ async def create_quick_insight(
     db: Session = Depends(get_db)
 ):
     """
-    Upload a CSV and get a quick mock insight.
+    Upload a CSV or XLSX and get a quick mock insight.
     """
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(status_code=400, detail="Only CSV files are supported")
+    extension = Path(file.filename).suffix.lower()
+    if extension not in ['.csv', '.xlsx']:
+        raise HTTPException(status_code=400, detail="Only CSV and XLSX files are supported")
 
-    # Read the CSV to get some basic stats and sample data
+    # Read the file to get some basic stats and sample data
     try:
         contents = await file.read()
-        df = pd.read_csv(io.BytesIO(contents))
+        if extension == '.csv':
+            df = pd.read_csv(io.BytesIO(contents))
+        else: # .xlsx
+            df = pd.read_excel(io.BytesIO(contents))
+            
         row_count = len(df)
         col_count = len(df.columns)
         columns = ", ".join(df.columns.tolist()[:5])
@@ -544,7 +549,7 @@ async def create_quick_insight(
         df = prepare_dataframe_for_analysis(df)
         data_profile = create_data_profile(df)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error reading {extension[1:].upper()}: {str(e)}")
 
     # Generate Summary using template and Ollama
     title = f"Quick Insight: {file.filename}"

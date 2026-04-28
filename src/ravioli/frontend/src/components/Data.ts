@@ -75,7 +75,7 @@ export function renderData() {
                           </span>
                         ` : ''}
                       </div>
-                      <span class="text-[10px] text-neutral-500 font-mono mt-0.5">${source.source_type === 'wfs' ? 'WFS API' : 'CSV File'} • ${formatBytes(source.size_bytes)}</span>
+                      <span class="text-[10px] text-neutral-500 font-mono mt-0.5">${source.source_type === 'wfs' ? 'WFS API' : 'Flat File'} • ${formatBytes(source.size_bytes)}</span>
                     </div>
                   </td>
                   <td class="px-8 py-5">
@@ -171,7 +171,7 @@ export function renderData() {
                 <span class="material-symbols-outlined text-primary text-4xl">upload_file</span>
               </div>
               <h3 class="text-lg font-medium text-neutral-100 mb-2">Flat File</h3>
-              <p class="text-sm text-neutral-500">Upload CSV files from your local machine</p>
+              <p class="text-sm text-neutral-500">Upload CSV or XLSX files from your local machine</p>
             </div>
           </div>
 
@@ -204,14 +204,14 @@ export function renderData() {
                 <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <span class="material-symbols-outlined text-primary text-3xl">upload_file</span>
                 </div>
-                <h3 class="text-xl font-medium text-neutral-200 mb-2">Drop your CSV here</h3>
-                <p class="text-neutral-500 text-sm">or click to browse your files</p>
+                <h3 class="text-xl font-medium text-neutral-200 mb-2">Drop your file here</h3>
+                <p class="text-neutral-500 text-sm">or click to browse CSV / XLSX</p>
               </div>
               <div id="drop-zone-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-container/90 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 z-10">
                 <span class="material-symbols-outlined animate-spin text-primary text-4xl mb-4">sync</span>
                 <p class="text-neutral-200 font-medium animate-pulse">Processing...</p>
               </div>
-              <input type="file" id="file-input" class="hidden" accept=".csv">
+              <input type="file" id="file-input" class="hidden" accept=".csv,.xlsx">
             </div>
             <button class="btn-back mt-8 text-neutral-500 hover:text-neutral-300 flex items-center gap-2 text-sm transition-colors">
               <span class="material-symbols-outlined text-lg">arrow_back</span>
@@ -261,7 +261,7 @@ export function renderData() {
     
     if (step === 'selection') stepSubtitle.textContent = 'Select ingestion method';
     else if (step === 'wfs') stepSubtitle.textContent = 'Configure WFS API Source';
-    else if (step === 'csv') stepSubtitle.textContent = 'Upload CSV Data';
+    else if (step === 'csv') stepSubtitle.textContent = 'Upload Flat File (CSV / XLSX)';
   };
 
   btnAddSource?.addEventListener('click', () => {

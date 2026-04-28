@@ -40,6 +40,31 @@ class DuckDBManager:
         # Get row count
         count = conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
         return count
+
+    def ingest_xlsx(self, file_path: Path, table_name: str, schema: str = "main") -> int:
+        """
+        Ingest an XLSX file into a DuckDB table using pandas.
+        If the table exists, it will be replaced.
+        Returns the row count.
+        """
+        import pandas as pd
+        conn = self.connection
+        
+        # Create schema if it doesn't exist
+        conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+        
+        full_table_name = f'"{schema}"."{table_name}"'
+        
+        # Read Excel using pandas
+        df = pd.read_excel(file_path)
+        
+        # Register the dataframe as a virtual table and create a real table from it
+        # DuckDB can directly query pandas DataFrames in the same process
+        conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM df")
+        
+        # Get row count
+        count = conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
+        return count
         
     def query(self, sql: str):
         """
