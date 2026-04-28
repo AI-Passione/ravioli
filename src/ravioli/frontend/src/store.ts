@@ -1,4 +1,4 @@
-import type { Analysis, AnalysisLog, DataSource } from './types';
+import type { Analysis, AnalysisLog, DataSource, KnowledgePage } from './types';
 
 type Listener = () => void;
 
@@ -7,6 +7,7 @@ class Store {
   private activeAnalysisId?: string;
   private logs: AnalysisLog[] = [];
   private dataSources: DataSource[] = [];
+  private knowledgePages: KnowledgePage[] = [];
   private currentView: 'insights' | 'dashboard' | 'create-analysis' | 'knowledge' | 'data' | 'settings' | 'governance' = 'insights';
   private listeners: Listener[] = [];
 
@@ -66,6 +67,13 @@ class Store {
   }
 
   getDataSources() { return this.dataSources; }
+
+  setKnowledgePages(pages: KnowledgePage[]) {
+    this.knowledgePages = pages;
+    this.notify();
+  }
+
+  getKnowledgePages() { return this.knowledgePages; }
 }
 
 export const store = new Store();

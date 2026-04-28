@@ -133,3 +133,28 @@ class SystemSetting(Base):
     value: Mapped[dict] = mapped_column(JSON, nullable=False)
     
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+
+
+class KnowledgePage(Base):
+    """
+    User-created documentation or external integrations representing domain knowledge.
+    Stored in the 'app' schema.
+    """
+    __tablename__ = "knowledge_pages"
+    __table_args__ = {"schema": "app"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    
+    # ownership: 'individual' or 'team'
+    ownership_type: Mapped[str] = mapped_column(String(50), default="individual")
+    # owner_id would be user_id or team_id in a real system with auth
+    owner_id: Mapped[Optional[str]] = mapped_column(String(255)) 
+    
+    # source: 'manual', 'notion', 'google_docs', etc.
+    source: Mapped[str] = mapped_column(String(50), default="manual")
+    source_id: Mapped[Optional[str]] = mapped_column(String(255))
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))

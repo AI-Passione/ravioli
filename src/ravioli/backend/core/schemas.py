@@ -145,3 +145,30 @@ class SystemSetting(SystemSettingBase):
     updated_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
+
+
+# --- Knowledge Page Schemas ---
+
+class KnowledgePageBase(BaseModel):
+    title: str
+    content: str
+    ownership_type: str = "individual"
+    owner_id: Optional[str] = None
+    source: str = "manual"
+    source_id: Optional[str] = None
+
+class KnowledgePageCreate(KnowledgePageBase):
+    pass
+
+class KnowledgePageUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    ownership_type: Optional[str] = None
+    owner_id: Optional[str] = None
+
+class KnowledgePage(KnowledgePageBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

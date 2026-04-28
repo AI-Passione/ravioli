@@ -17,6 +17,7 @@ from ravioli.backend.data.oltp.session import ensure_schema
 # Create tables in the specified schemas
 # Note: schemas must exist before create_all is called for tables in those schemas
 def init_db():
+    from ravioli.backend.core import models # Ensure models are registered
     try:
         # Ensure 'app' schema exists
         ensure_schema("app")

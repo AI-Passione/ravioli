@@ -1,4 +1,4 @@
-import type { Analysis, AnalysisCreate, AnalysisLog, DataSource, QuickInsightResponse, WFSLayer, Insight, InsightStats, InsightsSummary } from '../types';
+import type { Analysis, AnalysisCreate, AnalysisLog, DataSource, QuickInsightResponse, WFSLayer, Insight, InsightStats, InsightsSummary, KnowledgePage, KnowledgePageCreate, KnowledgePageUpdate } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -242,5 +242,44 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to ingest WFS layer');
     return response.json();
+  },
+  
+  async listKnowledgePages(): Promise<KnowledgePage[]> {
+    const response = await fetch(`${API_BASE}/knowledge/`);
+    if (!response.ok) throw new Error('Failed to fetch knowledge pages');
+    return response.json();
+  },
+
+  async getKnowledgePage(id: string): Promise<KnowledgePage> {
+    const response = await fetch(`${API_BASE}/knowledge/${id}`);
+    if (!response.ok) throw new Error('Failed to fetch knowledge page');
+    return response.json();
+  },
+
+  async createKnowledgePage(data: KnowledgePageCreate): Promise<KnowledgePage> {
+    const response = await fetch(`${API_BASE}/knowledge/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to create knowledge page');
+    return response.json();
+  },
+
+  async updateKnowledgePage(id: string, data: KnowledgePageUpdate): Promise<KnowledgePage> {
+    const response = await fetch(`${API_BASE}/knowledge/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to update knowledge page');
+    return response.json();
+  },
+
+  async deleteKnowledgePage(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE}/knowledge/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete knowledge page');
   }
 };

@@ -102,3 +102,29 @@ export interface QuickInsightResponse {
   stats: Record<string, number>;
   followup_questions: string[];
 }
+
+export interface KnowledgePage {
+  id: string;
+  title: string;
+  content: string;
+  ownership_type: 'individual' | 'team';
+  owner_id?: string;
+  source: string;
+  source_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgePageCreate {
+  title: string;
+  content: string;
+  ownership_type: 'individual' | 'team';
+  owner_id?: string;
+}
+
+export interface KnowledgePageUpdate {
+  title?: string;
+  content?: string;
+  ownership_type?: 'individual' | 'team';
+  owner_id?: string;
+}
