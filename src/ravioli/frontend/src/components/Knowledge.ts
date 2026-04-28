@@ -17,6 +17,11 @@ function sanitizeImageUrl(input: string): string | null {
   const value = input.trim();
   if (!value) return null;
 
+  // Reject characters that can break attribute contexts or indicate malformed input.
+  if (/[<>"'\u0000-\u001F\u007F\s]/.test(value)) {
+    return null;
+  }
+
   // Allow root-relative paths only (disallow protocol-relative //example.com)
   if (value.startsWith('/') && !value.startsWith('//')) {
     return value;
