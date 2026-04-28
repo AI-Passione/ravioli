@@ -13,6 +13,28 @@ function escapeHTML(str: string): string {
         .replace(/'/g, '&#039;');
 }
 
+function sanitizeImageUrl(input: string): string | null {
+    const value = input.trim();
+    if (!value) return null;
+
+    // Allow root-relative paths only (disallow protocol-relative //example.com)
+    if (value.startsWith('/') && !value.startsWith('//')) {
+        return value;
+    }
+
+    // Allow only http(s) absolute URLs
+    try {
+        const parsed = new URL(value);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            return parsed.toString();
+        }
+    } catch {
+        // Invalid URL
+    }
+
+    return null;
+}
+
 // --- Notion compatibility helpers ---
 function getBlocksPreview(blocks?: any[]): string {
     if (!blocks || blocks.length === 0) return 'No content codified.';
@@ -266,18 +288,18 @@ function renderKnowledgeEditor(id?: string) {
     const toggles = modal.querySelectorAll('.ownership-toggle');
     const hiddenOwnershipInput = modal.querySelector('input[name="ownership_type"]') as HTMLInputElement;
     const coverInput = modal.querySelector('#cover-input') as HTMLInputElement;
-    const iconInput = modal.querySelector('#icon-input') as HTMLInputElement;
     const coverPreview = modal.querySelector('#editor-cover-preview');
 
     // Live Cover Update
     coverInput.addEventListener('input', () => {
         const val = coverInput.value;
+        const safeUrl = sanitizeImageUrl(val);
         const img = coverPreview!.querySelector('img');
-        if (val && (val.startsWith('http') || val.startsWith('/'))) {
-            if (img) img.src = val;
+        if (safeUrl) {
+            if (img) img.src = safeUrl;
             else {
                 const newImg = document.createElement('img');
-                newImg.src = val;
+                newImg.src = safeUrl;
                 newImg.className = 'w-full h-full object-cover';
                 coverPreview!.prepend(newImg);
                 coverPreview!.querySelector('.bg-gradient-to-br')?.remove();
