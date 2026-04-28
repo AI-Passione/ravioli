@@ -14,16 +14,16 @@ export function renderKnowledge() {
       <div class="space-y-2">
         <div class="flex items-center gap-3 mb-2">
           <div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-          <span class="text-[10px] uppercase tracking-[0.3em] text-primary font-medium">Domain Intelligence</span>
+          <span class="text-[10px] uppercase tracking-[0.3em] text-primary font-medium">Intelligence Repository</span>
         </div>
         <h1 class="text-5xl font-headline-lg text-white tracking-tight">Knowledge Base</h1>
         <p class="text-on-surface-variant font-body-lg max-w-2xl">
-          The sanctuary for codified domain expertise. Establish your analytical foundation by documentating unique business contexts and strategic frameworks.
+          Codified domain expertise, strategic frameworks, and business context structured for AI-driven analysis.
         </p>
       </div>
       <button id="add-knowledge-btn" class="px-8 py-4 rounded-2xl bg-primary text-on-primary font-headline-sm hover:brightness-110 hover:scale-[1.02] transition-all flex items-center gap-3 shadow-2xl shadow-primary/20 active:scale-[0.98]">
         <span class="material-symbols-outlined">add_circle</span>
-        Codify Intelligence
+        New Intelligence
       </button>
     </div>
   `;
@@ -39,38 +39,52 @@ export function renderKnowledge() {
     </div>
   ` : `
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10 pb-20">
-      ${pages.map((page, index) => `
-        <div class="glass-panel p-8 rounded-[2.5rem] border-primary/5 hover:border-primary/20 transition-all duration-500 group cursor-pointer flex flex-col hover:shadow-2xl hover:shadow-primary/5 animate-reveal" style="animation-delay: ${index * 0.05}s" data-id="${page.id}">
-          <div class="flex items-start justify-between mb-6">
-            <div class="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-all duration-500">
-              <span class="material-symbols-outlined">${page.source === 'manual' ? 'edit_note' : 'link'}</span>
+      ${pages.map((page, index) => {
+        const coverStyle = page.cover_image 
+          ? `background-image: url('${page.cover_image}'); background-size: cover; background-position: center;` 
+          : `background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.1) 0%, rgba(var(--tertiary-rgb), 0.05) 100%);`;
+        
+        return `
+          <div class="glass-panel rounded-[2.5rem] border-primary/5 hover:border-primary/20 transition-all duration-500 group cursor-pointer flex flex-col hover:shadow-2xl hover:shadow-primary/5 animate-reveal overflow-hidden" style="animation-delay: ${index * 0.05}s" data-id="${page.id}">
+            <!-- Cover Image -->
+            <div class="h-32 w-full relative" style="${coverStyle}">
+              <div class="absolute inset-0 bg-gradient-to-t from-surface/80 to-transparent"></div>
+              <div class="absolute top-4 right-4">
+                <span class="px-3 py-1 rounded-full bg-surface/40 backdrop-blur-md text-[9px] font-bold uppercase tracking-widest text-white border border-white/10">
+                  ${page.ownership_type}
+                </span>
+              </div>
             </div>
-            <div class="flex items-center gap-2">
-               <span class="px-3 py-1 rounded-full bg-surface-container-high text-[9px] font-bold uppercase tracking-widest text-on-surface-variant border border-outline-variant/30 group-hover:border-primary/30 transition-colors">
-                ${page.ownership_type}
-              </span>
+
+            <!-- Content Area -->
+            <div class="p-8 pt-0 -mt-6 relative z-10 flex-1 flex flex-col">
+              <!-- Icon -->
+              <div class="w-14 h-14 rounded-2xl bg-surface-container-high border border-outline-variant/20 text-3xl flex items-center justify-center mb-4 shadow-xl group-hover:scale-110 transition-transform duration-500">
+                ${page.icon || (page.source === 'manual' ? '📄' : '🔗')}
+              </div>
+
+              <h3 class="text-2xl font-headline-md text-white mb-3 group-hover:text-primary transition-colors duration-300">${page.title}</h3>
+              <p class="text-on-surface-variant line-clamp-3 text-sm leading-relaxed mb-8 flex-1 group-hover:text-on-surface transition-colors">${page.content}</p>
+              
+              <div class="flex items-center justify-between mt-auto pt-6 border-t border-outline-variant/10 text-[10px] text-outline uppercase tracking-[0.2em] font-medium">
+                <span class="flex items-center gap-2">
+                  <span class="w-1 h-1 rounded-full bg-outline/30"></span>
+                  ${format(new Date(page.updated_at), 'MMM d')}
+                </span>
+                <div class="flex gap-4">
+                  <button class="edit-page text-primary hover:text-white transition-colors flex items-center gap-1" data-id="${page.id}">
+                    <span class="material-symbols-outlined text-sm">edit</span>
+                    Edit
+                  </button>
+                  <button class="delete-page text-error/60 hover:text-error transition-colors flex items-center gap-1" data-id="${page.id}">
+                    <span class="material-symbols-outlined text-sm">delete</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-          <h3 class="text-2xl font-headline-md text-white mb-3 group-hover:text-primary transition-colors duration-300">${page.title}</h3>
-          <p class="text-on-surface-variant line-clamp-4 text-sm leading-relaxed mb-8 flex-1 group-hover:text-on-surface transition-colors">${page.content}</p>
-          <div class="flex items-center justify-between mt-auto pt-6 border-t border-outline-variant/10 text-[10px] text-outline uppercase tracking-[0.2em] font-medium">
-            <span class="flex items-center gap-2">
-              <span class="w-1 h-1 rounded-full bg-outline/30"></span>
-              ${format(new Date(page.updated_at), 'MMM d, yyyy')}
-            </span>
-            <div class="flex gap-4">
-              <button class="edit-page text-primary hover:text-white transition-colors flex items-center gap-1" data-id="${page.id}">
-                <span class="material-symbols-outlined text-sm">edit</span>
-                Edit
-              </button>
-              <button class="delete-page text-error/60 hover:text-error transition-colors flex items-center gap-1" data-id="${page.id}">
-                <span class="material-symbols-outlined text-sm">delete</span>
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>
-      `).join('')}
+        `;
+      }).join('')}
     </div>
   `;
 
@@ -107,7 +121,7 @@ export function renderKnowledge() {
     btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const id = btn.getAttribute('data-id');
-        if (id && confirm('Are you sure you want to remove this intelligence from the knowledge base?')) {
+        if (id && confirm('Are you sure you want to remove this intelligence?')) {
             try {
                 await api.deleteKnowledgePage(id);
                 const pages = await api.listKnowledgePages();
@@ -124,53 +138,80 @@ export function renderKnowledge() {
 
 function renderKnowledgeEditor(id?: string) {
     const existing = id ? store.getKnowledgePages().find(p => p.id === id) : null;
+    const allPages = store.getKnowledgePages().filter(p => p.id !== id);
     
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-in fade-in duration-500';
     
     modal.innerHTML = `
-        <div class="glass-panel w-full max-w-3xl rounded-[3.5rem] border-primary/20 p-12 overflow-hidden relative animate-in zoom-in slide-in-from-bottom-12 duration-700 ease-out shadow-[0_0_100px_rgba(var(--primary-rgb),0.1)]">
-             <div class="flex items-center justify-between mb-10">
-                <div class="space-y-1">
-                  <h2 class="text-4xl font-headline-lg text-white">${id ? 'Edit Intelligence' : 'Codify Intelligence'}</h2>
-                  <p class="text-on-surface-variant text-sm">Refine the domain context for your analyses.</p>
-                </div>
-                <button id="close-modal" class="w-12 h-12 rounded-2xl bg-surface-container-high flex items-center justify-center hover:bg-error/20 hover:text-error transition-all duration-300 group">
-                    <span class="material-symbols-outlined text-white group-hover:text-error transition-colors">close</span>
-                </button>
-            </div>
-
-            <form id="knowledge-form" class="space-y-8">
-                <div class="grid grid-cols-2 gap-6">
-                  <div class="space-y-3">
-                      <label class="text-[10px] uppercase tracking-[0.3em] text-primary font-bold ml-2">Intelligence Title</label>
-                      <input type="text" name="title" value="${existing?.title || ''}" placeholder="e.g., Strategic Objectives 2024" 
-                          class="w-full bg-surface-container-high border border-outline-variant/20 rounded-2xl px-6 py-4 text-white placeholder:text-outline/30 focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all outline-none" required>
-                  </div>
-
-                  <div class="space-y-3">
-                      <label class="text-[10px] uppercase tracking-[0.3em] text-primary font-bold ml-2">Context Ownership</label>
-                      <div class="flex gap-2 p-1.5 bg-surface-container-high border border-outline-variant/20 rounded-2xl w-full">
-                          <button type="button" data-value="individual" class="ownership-toggle flex-1 py-3 rounded-xl transition-all font-headline-sm ${(!existing || existing.ownership_type === 'individual') ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-outline/50 hover:text-white'}">Individual</button>
-                          <button type="button" data-value="team" class="ownership-toggle flex-1 py-3 rounded-xl transition-all font-headline-sm ${existing?.ownership_type === 'team' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-outline/50 hover:text-white'}">Team</button>
-                          <input type="hidden" name="ownership_type" value="${existing?.ownership_type || 'individual'}">
-                      </div>
-                  </div>
-                </div>
-
-                <div class="space-y-3">
-                    <label class="text-[10px] uppercase tracking-[0.3em] text-primary font-bold ml-2">Intelligence Content (Markdown supported)</label>
-                    <textarea name="content" rows="12" placeholder="Codify the domain context here. This information will be used to ground AI agents during analysis..." 
-                        class="w-full bg-surface-container-high border border-outline-variant/20 rounded-[2.5rem] px-8 py-8 text-white placeholder:text-outline/30 focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all outline-none resize-none custom-scrollbar" required>${existing?.content || ''}</textarea>
-                </div>
-
-                <div class="flex gap-4 pt-4">
-                    <button type="submit" class="flex-1 bg-primary text-on-primary py-5 rounded-2xl font-headline-md hover:brightness-110 hover:scale-[1.01] transition-all shadow-2xl shadow-primary/20 active:scale-[0.99] flex items-center justify-center gap-3">
-                        <span class="material-symbols-outlined">${id ? 'save' : 'auto_fix'}</span>
-                        ${id ? 'Save Changes' : 'Codify Intelligence'}
+        <div class="glass-panel w-full max-w-4xl rounded-[3.5rem] border-primary/20 overflow-hidden relative animate-in zoom-in slide-in-from-bottom-12 duration-700 ease-out shadow-[0_0_100px_rgba(var(--primary-rgb),0.1)] flex flex-col max-h-[90vh]">
+             <!-- Editor Header with Cover Preview -->
+             <div class="h-48 w-full relative bg-surface-container-high overflow-hidden" id="editor-cover-preview">
+                ${existing?.cover_image ? `<img src="${existing.cover_image}" class="w-full h-full object-cover">` : '<div class="w-full h-full bg-gradient-to-br from-primary/10 to-tertiary/5"></div>'}
+                <div class="absolute inset-0 bg-gradient-to-t from-surface via-transparent to-transparent"></div>
+                <div class="absolute top-8 right-8 flex gap-3">
+                    <button id="close-modal" class="w-12 h-12 rounded-2xl bg-surface/40 backdrop-blur-md flex items-center justify-center hover:bg-error/20 hover:text-error transition-all duration-300 group">
+                        <span class="material-symbols-outlined text-white group-hover:text-error transition-colors">close</span>
                     </button>
                 </div>
-            </form>
+                <div class="absolute bottom-0 left-12 transform translate-y-1/2">
+                   <div class="relative group">
+                    <input type="text" id="icon-input" name="icon" value="${existing?.icon || '📄'}" 
+                        class="w-20 h-20 rounded-3xl bg-surface-container-highest border-2 border-primary/20 text-4xl flex items-center justify-center text-center outline-none focus:border-primary transition-all shadow-2xl cursor-pointer">
+                    <div class="absolute inset-0 flex items-center justify-center bg-black/40 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <span class="material-symbols-outlined text-white text-sm">edit</span>
+                    </div>
+                   </div>
+                </div>
+             </div>
+
+             <div class="p-12 pt-16 overflow-y-auto custom-scrollbar flex-1">
+                <form id="knowledge-form" class="space-y-10">
+                    <div class="grid grid-cols-12 gap-8">
+                        <div class="col-span-8 space-y-3">
+                            <label class="text-[10px] uppercase tracking-[0.3em] text-primary font-bold ml-2">Intelligence Title</label>
+                            <input type="text" name="title" value="${existing?.title || ''}" placeholder="Untitled Intelligence" 
+                                class="w-full bg-transparent border-none text-5xl font-headline-lg text-white placeholder:text-outline/20 focus:ring-0 transition-all outline-none p-0" required>
+                        </div>
+                        <div class="col-span-4 space-y-3">
+                             <label class="text-[10px] uppercase tracking-[0.3em] text-primary font-bold ml-2">Context Ownership</label>
+                             <div class="flex gap-2 p-1.5 bg-surface-container-high border border-outline-variant/20 rounded-2xl w-full">
+                                <button type="button" data-value="individual" class="ownership-toggle flex-1 py-3 rounded-xl transition-all font-headline-sm ${(!existing || existing.ownership_type === 'individual') ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-outline/50 hover:text-white'}">Individual</button>
+                                <button type="button" data-value="team" class="ownership-toggle flex-1 py-3 rounded-xl transition-all font-headline-sm ${existing?.ownership_type === 'team' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-outline/50 hover:text-white'}">Team</button>
+                                <input type="hidden" name="ownership_type" value="${existing?.ownership_type || 'individual'}">
+                             </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-8">
+                        <div class="space-y-3">
+                            <label class="text-[10px] uppercase tracking-[0.3em] text-outline font-bold ml-2">Cover Image URL</label>
+                            <input type="text" id="cover-input" name="cover_image" value="${existing?.cover_image || ''}" placeholder="https://images.unsplash.com/..." 
+                                class="w-full bg-surface-container-high border border-outline-variant/20 rounded-2xl px-6 py-4 text-white placeholder:text-outline/30 focus:border-primary/50 transition-all outline-none">
+                        </div>
+                        <div class="space-y-3">
+                            <label class="text-[10px] uppercase tracking-[0.3em] text-outline font-bold ml-2">Parent Intelligence</label>
+                            <select name="parent_id" class="w-full bg-surface-container-high border border-outline-variant/20 rounded-2xl px-6 py-4 text-white appearance-none outline-none focus:border-primary/50 transition-all">
+                                <option value="">None (Root)</option>
+                                ${allPages.map(p => `<option value="${p.id}" ${existing?.parent_id === p.id ? 'selected' : ''}>${p.title}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <label class="text-[10px] uppercase tracking-[0.3em] text-primary font-bold ml-2">Codification Content</label>
+                        <textarea name="content" rows="12" placeholder="Start typing your domain context... Markdown is fully supported." 
+                            class="w-full bg-transparent border-none text-xl leading-relaxed text-on-surface-variant placeholder:text-outline/20 focus:ring-0 transition-all outline-none resize-none min-h-[300px]" required>${existing?.content || ''}</textarea>
+                    </div>
+
+                    <div class="flex gap-4 pt-8 sticky bottom-0 bg-surface/80 backdrop-blur-md pb-4">
+                        <button type="submit" class="flex-1 bg-primary text-on-primary py-5 rounded-3xl font-headline-md hover:brightness-110 hover:scale-[1.01] transition-all shadow-2xl shadow-primary/20 active:scale-[0.99] flex items-center justify-center gap-3">
+                            <span class="material-symbols-outlined">${id ? 'save' : 'auto_fix'}</span>
+                            ${id ? 'Codify Intelligence' : 'Establish Intelligence'}
+                        </button>
+                    </div>
+                </form>
+             </div>
         </div>
     `;
 
@@ -179,12 +220,40 @@ function renderKnowledgeEditor(id?: string) {
     const form = modal.querySelector('#knowledge-form') as HTMLFormElement;
     const closeBtn = modal.querySelector('#close-modal');
     const toggles = modal.querySelectorAll('.ownership-toggle');
-    const hiddenInput = modal.querySelector('input[name="ownership_type"]') as HTMLInputElement;
+    const hiddenOwnershipInput = modal.querySelector('input[name="ownership_type"]') as HTMLInputElement;
+    const coverInput = modal.querySelector('#cover-input') as HTMLInputElement;
+    const iconInput = modal.querySelector('#icon-input') as HTMLInputElement;
+    const coverPreview = modal.querySelector('#editor-cover-preview');
+
+    // Live Cover Preview
+    coverInput.addEventListener('input', () => {
+        const val = coverInput.value;
+        if (val && (val.startsWith('http') || val.startsWith('/'))) {
+            coverPreview!.innerHTML = `
+                <img src="${val}" class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-surface via-transparent to-transparent"></div>
+                <div class="absolute top-8 right-8 flex gap-3">
+                    <button id="close-modal-dynamic" class="w-12 h-12 rounded-2xl bg-surface/40 backdrop-blur-md flex items-center justify-center hover:bg-error/20 hover:text-error transition-all duration-300 group">
+                        <span class="material-symbols-outlined text-white group-hover:text-error transition-colors">close</span>
+                    </button>
+                </div>
+                <div class="absolute bottom-0 left-12 transform translate-y-1/2">
+                   <div class="relative group">
+                    <div id="icon-preview-dynamic" class="w-20 h-20 rounded-3xl bg-surface-container-highest border-2 border-primary/20 text-4xl flex items-center justify-center text-center shadow-2xl">
+                        ${iconInput.value || '📄'}
+                    </div>
+                   </div>
+                </div>
+            `;
+            // Re-bind close button
+            coverPreview!.querySelector('#close-modal-dynamic')?.addEventListener('click', closeModal);
+        }
+    });
 
     toggles.forEach(t => {
         t.addEventListener('click', () => {
             const val = t.getAttribute('data-value')!;
-            hiddenInput.value = val;
+            hiddenOwnershipInput.value = val;
             toggles.forEach(btn => {
                 if (btn === t) {
                     btn.classList.add('bg-primary', 'text-on-primary', 'shadow-lg', 'shadow-primary/20');
@@ -219,7 +288,10 @@ function renderKnowledgeEditor(id?: string) {
         const data = {
             title: formData.get('title') as string,
             content: formData.get('content') as string,
+            icon: formData.get('icon') as string,
+            cover_image: formData.get('cover_image') as string,
             ownership_type: formData.get('ownership_type') as 'individual' | 'team',
+            parent_id: (formData.get('parent_id') as string) || undefined,
         };
 
         try {
@@ -235,7 +307,7 @@ function renderKnowledgeEditor(id?: string) {
             console.error('Failed to save knowledge', err);
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalContent;
-            alert('Failed to save knowledge. Please verify your connection to the intelligence core.');
+            alert('Failed to save knowledge. Connection to intelligence core lost.');
         }
     });
 }

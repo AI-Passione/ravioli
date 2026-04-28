@@ -36,6 +36,10 @@ def _migrate_columns():
         "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS assumptions TEXT",
         "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS limitations TEXT",
         "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS insight_metadata JSONB",
+        "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS icon TEXT",
+        "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS cover_image TEXT",
+        "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS properties JSONB",
+        "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES app.knowledge_pages(id)",
     ]
     with engine.begin() as conn:
         for stmt in migrations:

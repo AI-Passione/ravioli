@@ -152,8 +152,12 @@ class SystemSetting(SystemSettingBase):
 class KnowledgePageBase(BaseModel):
     title: str
     content: str
+    icon: Optional[str] = None
+    cover_image: Optional[str] = None
+    properties: Optional[dict] = None
     ownership_type: str = "individual"
     owner_id: Optional[str] = None
+    parent_id: Optional[UUID] = None
     source: str = "manual"
     source_id: Optional[str] = None
 
@@ -163,8 +167,12 @@ class KnowledgePageCreate(KnowledgePageBase):
 class KnowledgePageUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
+    icon: Optional[str] = None
+    cover_image: Optional[str] = None
+    properties: Optional[dict] = None
     ownership_type: Optional[str] = None
     owner_id: Optional[str] = None
+    parent_id: Optional[UUID] = None
 
 class KnowledgePage(KnowledgePageBase):
     id: UUID

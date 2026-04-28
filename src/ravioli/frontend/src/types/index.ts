@@ -107,8 +107,12 @@ export interface KnowledgePage {
   id: string;
   title: string;
   content: string;
+  icon?: string;
+  cover_image?: string;
+  properties?: Record<string, any>;
   ownership_type: 'individual' | 'team';
   owner_id?: string;
+  parent_id?: string;
   source: string;
   source_id?: string;
   created_at: string;
@@ -118,13 +122,21 @@ export interface KnowledgePage {
 export interface KnowledgePageCreate {
   title: string;
   content: string;
+  icon?: string;
+  cover_image?: string;
+  properties?: Record<string, any>;
   ownership_type: 'individual' | 'team';
   owner_id?: string;
+  parent_id?: string;
 }
 
 export interface KnowledgePageUpdate {
   title?: string;
   content?: string;
+  icon?: string;
+  cover_image?: string;
+  properties?: Record<string, any>;
   ownership_type?: 'individual' | 'team';
   owner_id?: string;
+  parent_id?: string;
 }
