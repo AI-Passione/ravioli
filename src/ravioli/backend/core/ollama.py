@@ -139,16 +139,20 @@ Description:"""
     async def validate_sheet_content(self, sheet_name: str, sample_data: str) -> Dict[str, Any]:
         """
         Validate if the sheet content is suitable for DuckDB ingestion and determine the handling strategy.
-        Returns {"verdict": "ready" | "needs_fix" | "reject", "reason": str}
+        Returns {"verdict": "ready" | "needs_fix" | "reject", "reason": str, "header_row": int}
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Task: Evaluate the following Excel sheet "{sheet_name}" for database ingestion.
-Criteria:
-- "ready": The sheet is tabular, has clean/descriptive headers, and is ready for direct ingestion.
-- "needs_fix": The data is tabular and valuable, but headers are messy, inconsistent, or non-SQL-friendly (spaces, special chars).
-- "reject": The sheet is empty, purely decorative, a summary with no clear table structure, or otherwise unusable.
+Task: Evaluate the structural integrity of Excel sheet "{sheet_name}" for database ingestion.
 
-Here is a sample of the data (CSV format):
+Context: Excel files often contain "garbage" at the top (summary text, titles, empty rows) before the actual table starts.
+Your job is to identify the EXACT row where the tabular data headers begin.
+
+Criteria:
+- "ready": Tabular data with clean headers.
+- "needs_fix": Tabular data exists, but either headers are messy OR there is summary text at the top that must be skipped.
+- "reject": No structured table found.
+
+Sample Data (First 10 rows):
 ---
 {sample_data}
 ---
@@ -156,21 +160,22 @@ Here is a sample of the data (CSV format):
 Return your response in the following JSON format:
 {{
   "verdict": "ready" or "needs_fix" or "reject",
-  "reason": "Explicit explanation of your verdict"
+  "header_row": 0, // 0-indexed row number where the actual column headers are located
+  "reason": "Explicit explanation of your verdict and why you chose that header_row"
 }}
 JSON:"""
 
         try:
-            content = await self._generate(prompt, "Sheet Validation", temperature=0.1, num_predict=200)
+            content = await self._generate(prompt, "Sheet Validation", temperature=0.1, num_predict=250)
             # Try to parse JSON from response
             match = re.search(r'\{.*\}', content, re.DOTALL)
             if match:
                 return json.loads(match.group(0))
-            return {"verdict": "reject", "reason": "Failed to parse AI validation response."}
+            return {"verdict": "reject", "header_row": 0, "reason": "Failed to parse AI validation response."}
         except Exception as e:
             # Fallback to ready if AI fails, but log it
             print(f"OllamaClient: [WARNING] AI Validation failed: {e}")
-            return {"verdict": "ready", "reason": f"AI Validation skipped due to error: {str(e)}"}
+            return {"verdict": "ready", "header_row": 0, "reason": f"AI Validation skipped due to error: {str(e)}"}
 
     async def suggest_schema_fix(self, sheet_name: str, sample_data: str) -> Dict[str, str]:
         """

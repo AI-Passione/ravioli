@@ -67,18 +67,20 @@ class DuckDBManager:
                 table_name = f"{base_table_name}_{clean_sheet_name}__xlsx"
                 full_table_name = f'"{schema}"."{table_name}"'
                 
-                # Load a sample for validation
-                df_sample = pd.read_excel(file_path, sheet_name=sheet_name, nrows=10)
-                sample_csv = df_sample.to_csv(index=False)
+                # Load a raw sample for structural analysis (no header)
+                df_raw_sample = pd.read_excel(file_path, sheet_name=sheet_name, nrows=10, header=None)
+                sample_csv = df_raw_sample.to_csv(index=False)
                 
                 # AI Validation & Handling Strategy
                 verdict = "ready"
                 reason = "No AI validation performed."
+                header_row = 0
                 
                 if ollama_client:
                     validation = await ollama_client.validate_sheet_content(sheet_name, sample_csv)
                     verdict = validation.get("verdict", "ready")
                     reason = validation.get("reason", "Accepted by AI.")
+                    header_row = validation.get("header_row", 0)
                 
                 if verdict == "reject":
                     logger.warning(f"Sheet '{sheet_name}' REJECTED for ingestion. Reason: {reason}")
@@ -90,14 +92,20 @@ class DuckDBManager:
                     })
                     continue
                 
-                # Load full data for processing
-                df = pd.read_excel(file_path, sheet_name=sheet_name)
+                # Load full data using the detected header row
+                if header_row > 0:
+                    logger.info(f"Structural Offset detected in '{sheet_name}'. Re-reading with header at row {header_row}...")
+                
+                df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row)
                 applied_fix = False
                 
                 if verdict == "needs_fix" and ollama_client:
                     logger.info(f"Applying AI Schema Fix for sheet '{sheet_name}' (Verdict: needs_fix)...")
                     original_cols = df.columns.tolist()
-                    mapping = await ollama_client.suggest_schema_fix(sheet_name, sample_csv)
+                    
+                    # For schema fix, we use a sample WITH the correct headers
+                    sample_csv_with_headers = df.head(10).to_csv(index=False)
+                    mapping = await ollama_client.suggest_schema_fix(sheet_name, sample_csv_with_headers)
                     
                     # Filter mapping to only include columns that actually exist in the df
                     filtered_mapping = {k: v for k, v in mapping.items() if k in df.columns}
