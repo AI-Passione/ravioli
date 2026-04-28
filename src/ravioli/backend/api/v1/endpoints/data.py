@@ -4,7 +4,10 @@ import uuid
 import hashlib
 from pathlib import Path
 from typing import List, Optional
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
+import json
+import asyncio
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -23,6 +26,20 @@ from ravioli.backend.data.olap.ingestion.dlt_utils import create_ravioli_pipelin
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+class LogCaptureHandler(logging.Handler):
+    def __init__(self, queue: asyncio.Queue):
+        super().__init__()
+        self.queue = queue
+        self.setFormatter(logging.Formatter('%(message)s'))
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            # Use call_soon_threadsafe to safely push to queue from potentially different threads
+            asyncio.get_event_loop().call_soon_threadsafe(self.queue.put_nowait, msg)
+        except:
+            pass
 
 # Ensure upload directory exists
 UPLOAD_DIR = settings.local_data_path / "uploads"
@@ -450,4 +467,57 @@ async def ingest_wfs_layer(
 
     # Return immediately — the client will poll for status updates
     return db_source
+
+@router.post("/upload-stream")
+async def upload_file_stream(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Same as upload_file but returns a StreamingResponse with real-time logs.
+    """
+    log_queue = asyncio.Queue()
+    handler = LogCaptureHandler(log_queue)
+    
+    # Attach handler to root ravioli logger to catch all sub-module logs
+    ingestion_logger = logging.getLogger("ravioli")
+    ingestion_logger.addHandler(handler)
+
+    async def event_generator():
+        try:
+            # We need to run the ingestion logic inside this generator
+            # but in a way that yields logs from the queue.
+            
+            # Start the ingestion task
+            ingestion_task = asyncio.create_task(upload_file(file, db))
+            
+            # While the task is running, yield logs
+            while not ingestion_task.done():
+                try:
+                    # Wait for a log message with a timeout to check task status
+                    msg = await asyncio.wait_for(log_queue.get(), timeout=0.1)
+                    yield f"data: LOG:{msg}\n\n"
+                except asyncio.TimeoutError:
+                    continue
+            
+            # Once done, get result or error
+            try:
+                result = await ingestion_task
+                # Send the final result as a special event
+                # We need to serialize the DataSource model
+                result_dict = {
+                    "id": str(result.id),
+                    "original_filename": result.original_filename,
+                    "status": result.status,
+                    "is_duplicate": getattr(result, "is_duplicate", False),
+                    "error_message": result.error_message
+                }
+                yield f"data: DONE:{json.dumps(result_dict)}\n\n"
+            except Exception as e:
+                yield f"data: ERROR:{str(e)}\n\n"
+                
+        finally:
+            ingestion_logger.removeHandler(handler)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 

@@ -139,18 +139,19 @@ Description:"""
     async def validate_sheet_content(self, sheet_name: str, sample_data: str) -> Dict[str, Any]:
         """
         Validate if the sheet content is suitable for DuckDB ingestion and determine the handling strategy.
-        Returns {"verdict": "ready" | "needs_fix" | "reject", "reason": str, "header_row": int}
+        Returns {"verdict": "ready" | "needs_fix" | "no_headers" | "reject", "reason": str, "header_row": int | None}
         """
         prompt = f"""{KOWALSKI_PERSONA}
 Task: Evaluate the structural integrity of Excel sheet "{sheet_name}" for database ingestion.
 
-Context: Excel files often contain "garbage" at the top (summary text, titles, empty rows) before the actual table starts.
-Your job is to identify the EXACT row where the tabular data headers begin.
+Context: Be extremely resilient. We only want to "reject" if the sheet is truly empty or non-tabular (e.g., a README text, a logo, or a purely decorative summary). 
+If there is any tabular data (rows and columns), we MUST ingest it.
 
-Criteria:
-- "ready": Tabular data with clean headers.
-- "needs_fix": Tabular data exists, but either headers are messy OR there is summary text at the top that must be skipped.
-- "reject": No structured table found.
+Verdicts:
+- "ready": Tabular data with clean, usable headers.
+- "needs_fix": Tabular data exists, but either headers are messy (spaces, special chars) OR there is a structural offset (garbage at the top).
+- "no_headers": Tabular data exists, but there is NO identifiable header row (data starts immediately or headers are unreadable). 
+- "reject": No structured data found at all.
 
 Sample Data (First 10 rows):
 ---
@@ -159,9 +160,9 @@ Sample Data (First 10 rows):
 
 Return your response in the following JSON format:
 {{
-  "verdict": "ready" or "needs_fix" or "reject",
-  "header_row": 0, // 0-indexed row number where the actual column headers are located
-  "reason": "Explicit explanation of your verdict and why you chose that header_row"
+  "verdict": "ready" or "needs_fix" or "no_headers" or "reject",
+  "header_row": 0, // Row index where tabular data begins. For "no_headers", this is where data starts.
+  "reason": "Explicit explanation of your verdict"
 }}
 JSON:"""
 
