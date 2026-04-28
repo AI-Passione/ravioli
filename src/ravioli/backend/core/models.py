@@ -133,3 +133,43 @@ class SystemSetting(Base):
     value: Mapped[dict] = mapped_column(JSON, nullable=False)
     
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+
+
+class KnowledgePage(Base):
+    """
+    User-created documentation or external integrations representing domain knowledge.
+    Stored in the 'app' schema.
+    """
+    __tablename__ = "knowledge_pages"
+    __table_args__ = {"schema": "app"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # 1. Page Properties (Notion-compatible schema)
+    # Includes 'title', 'ownership', and any custom fields
+    properties: Mapped[dict] = mapped_column(JSON, default=dict)
+    
+    # Standard columns for fast access (mirrored from properties or internal)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    
+    # Notion-style aesthetics (top-level in Notion Page object)
+    icon: Mapped[Optional[dict]] = mapped_column(JSON) # {"type": "emoji", "emoji": "..."}
+    cover: Mapped[Optional[dict]] = mapped_column(JSON) # {"type": "external", "external": {"url": "..."}}
+    
+    # 2. Page Content (List of Notion-style blocks)
+    # Each block: {"type": "paragraph", "paragraph": {...}, ...}
+    content: Mapped[Optional[List[dict]]] = mapped_column(JSON)
+    
+    # Meta
+    ownership_type: Mapped[str] = mapped_column(String(50), default="individual")
+    owner_id: Mapped[Optional[str]] = mapped_column(String(255)) 
+    
+    # Hierarchy support
+    parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("app.knowledge_pages.id"))
+    
+    # source tracking
+    source: Mapped[str] = mapped_column(String(50), default="manual")
+    source_id: Mapped[Optional[str]] = mapped_column(String(255))
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))

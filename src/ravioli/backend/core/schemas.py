@@ -1,7 +1,7 @@
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 # --- Analysis Log Schemas ---
 
@@ -144,4 +144,54 @@ class SystemSettingBase(BaseModel):
 class SystemSetting(SystemSettingBase):
     updated_at: Optional[datetime] = None
     
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- Knowledge Page Schemas ---
+
+class KnowledgePageBase(BaseModel):
+    title: str
+    properties: Optional[dict] = {}
+    content: Optional[List[dict]] = None
+    icon: Optional[dict] = None
+    cover: Optional[dict] = None
+    ownership_type: str = "individual"
+    owner_id: Optional[str] = None
+    parent_id: Optional[UUID] = None
+    source: str = "manual"
+    source_id: Optional[str] = None
+
+    @field_validator('properties', 'icon', 'cover', 'content', mode='before')
+    @classmethod
+    def ensure_not_none(cls, v):
+        if v is None:
+            # Return appropriate default for each type
+            # (In practice, properties is usually a dict, content is a list)
+            return {} if isinstance(v, dict) or v is None else v
+        return v
+
+    # Simplified version just for properties to be safe
+    @field_validator('properties', mode='before')
+    @classmethod
+    def validate_properties(cls, v):
+        return v if v is not None else {}
+
+class KnowledgePageCreate(KnowledgePageBase):
+    pass
+
+class KnowledgePageUpdate(BaseModel):
+    title: Optional[str] = None
+    properties: Optional[dict] = None
+    content: Optional[List[dict]] = None
+    icon: Optional[dict] = None
+    cover: Optional[dict] = None
+    ownership_type: Optional[str] = None
+    owner_id: Optional[str] = None
+    parent_id: Optional[UUID] = None
+
+class KnowledgePage(KnowledgePageBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
     model_config = ConfigDict(from_attributes=True)

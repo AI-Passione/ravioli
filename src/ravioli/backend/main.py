@@ -17,6 +17,7 @@ from ravioli.backend.data.oltp.session import ensure_schema
 # Create tables in the specified schemas
 # Note: schemas must exist before create_all is called for tables in those schemas
 def init_db():
+    from ravioli.backend.core import models # Ensure models are registered
     try:
         # Ensure 'app' schema exists
         ensure_schema("app")
@@ -35,6 +36,12 @@ def _migrate_columns():
         "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS assumptions TEXT",
         "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS limitations TEXT",
         "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS insight_metadata JSONB",
+        "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS icon JSONB",
+        "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS cover JSONB",
+        "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS properties JSONB",
+        "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES app.knowledge_pages(id)",
+        # Safe type migration for content: wraps existing text in a paragraph block
+        "ALTER TABLE app.knowledge_pages ALTER COLUMN content TYPE JSONB USING CASE WHEN content IS NULL THEN '[]'::JSONB WHEN content::text ~ '^[\\[\\{]' THEN content::JSONB ELSE jsonb_build_array(jsonb_build_object('type', 'paragraph', 'paragraph', jsonb_build_object('rich_text', jsonb_build_array(jsonb_build_object('type', 'text', 'text', jsonb_build_object('content', content)))))) END",
     ]
     with engine.begin() as conn:
         for stmt in migrations:

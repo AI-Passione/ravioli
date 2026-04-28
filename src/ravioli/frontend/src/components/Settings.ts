@@ -157,6 +157,43 @@ export function renderSettings() {
             </div>
           </div>
         </section>
+        
+        <!-- Documentation Integrations -->
+        <section>
+          <h2 class="text-lg font-bold text-neutral-100 border-b border-outline-variant pb-2 mb-4">Documentations</h2>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <!-- Notion -->
+            <div class="bg-surface-container-low border border-outline-variant/50 rounded-2xl p-6 relative group overflow-hidden">
+              <div class="absolute inset-0 bg-gradient-to-br from-neutral-100/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                  <span class="material-symbols-outlined text-neutral-100 text-2xl">book</span>
+                  <h3 class="text-lg font-medium text-neutral-100">Notion</h3>
+                </div>
+                <span class="text-[10px] bg-primary-fixed-dim/20 text-primary-fixed-dim border border-primary-fixed-dim/30 px-2 py-1 rounded-full font-bold uppercase tracking-wider">Planned</span>
+              </div>
+              <p class="text-sm text-on-surface-variant mb-4">Synchronize structured page content and properties directly from your workspace.</p>
+              <button class="text-sm font-bold text-outline-variant cursor-not-allowed" disabled>Coming Soon</button>
+            </div>
+
+            <!-- Confluence -->
+            <div class="bg-surface-container-low border border-outline-variant/50 rounded-2xl p-6 relative group overflow-hidden">
+              <div class="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                  <span class="material-symbols-outlined text-blue-400 text-2xl">description</span>
+                  <h3 class="text-lg font-medium text-neutral-100">Confluence</h3>
+                </div>
+                <span class="text-[10px] bg-blue-400/20 text-blue-400 border border-blue-400/30 px-2 py-1 rounded-full font-bold uppercase tracking-wider">Planned</span>
+              </div>
+              <p class="text-sm text-on-surface-variant mb-4">Import documentation and enterprise knowledge from Atlassian Confluence.</p>
+              <button class="text-sm font-bold text-outline-variant cursor-not-allowed" disabled>Coming Soon</button>
+            </div>
+
+          </div>
+        </section>
 
         <!-- Data Warehouse Integrations -->
         <section>

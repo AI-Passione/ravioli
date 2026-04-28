@@ -60,6 +60,14 @@ async function init() {
     } catch (err) {
       console.error('Failed to fetch data sources', err);
     }
+
+    // Fetch knowledge pages
+    try {
+      const pages = await api.listKnowledgePages();
+      store.setKnowledgePages(pages);
+    } catch (err) {
+      console.error('Failed to fetch knowledge pages', err);
+    }
   } catch (err) {
     console.error('Initialization failed', err);
   }

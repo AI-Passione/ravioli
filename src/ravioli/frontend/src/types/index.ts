@@ -102,3 +102,50 @@ export interface QuickInsightResponse {
   stats: Record<string, number>;
   followup_questions: string[];
 }
+
+export interface KnowledgePage {
+  id: string;
+  title: string;
+  properties: Record<string, any>;
+  content?: any[]; // List of blocks
+  icon?: {
+    type: 'emoji' | 'external' | 'file';
+    emoji?: string;
+    external?: { url: string };
+    file?: { url: string };
+  };
+  cover?: {
+    type: 'external' | 'file';
+    external?: { url: string };
+    file?: { url: string };
+  };
+  ownership_type: 'individual' | 'team';
+  owner_id?: string;
+  parent_id?: string;
+  source: string;
+  source_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgePageCreate {
+  title: string;
+  properties?: Record<string, any>;
+  content?: any[];
+  icon?: any;
+  cover?: any;
+  ownership_type: 'individual' | 'team';
+  owner_id?: string;
+  parent_id?: string;
+}
+
+export interface KnowledgePageUpdate {
+  title?: string;
+  properties?: Record<string, any>;
+  content?: any[];
+  icon?: any;
+  cover?: any;
+  ownership_type?: 'individual' | 'team';
+  owner_id?: string;
+  parent_id?: string;
+}
