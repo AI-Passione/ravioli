@@ -1,7 +1,11 @@
 import duckdb
 import os
 from pathlib import Path
+import pandas as pd
+import logging
 from ravioli.backend.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 class DuckDBManager:
     _instance = None
@@ -48,10 +52,6 @@ class DuckDBManager:
         and creates tables with __xlsx postfix.
         Returns a list of ingestion results.
         """
-        import pandas as pd
-        import logging
-        logger = logging.getLogger(__name__)
-        
         conn = self.connection
         conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
         

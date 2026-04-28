@@ -4,13 +4,17 @@ import pandas as pd
 import asyncio
 import io
 import logging
-from sqlalchemy.orm import Session
+import uuid
 from typing import List
 from uuid import UUID
-
-from ravioli.backend.core.database import get_db
-from ravioli.backend.core import models, schemas
 from pathlib import Path
+from sqlalchemy.orm import Session
+from sqlalchemy import select
+
+from ravioli.backend.core.database import get_db, SessionLocal
+from ravioli.backend.core import models, schemas
+from ravioli.backend.core.ollama import OllamaClient
+from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
 from ydata_profiling import ProfileReport
 
 
@@ -72,12 +76,12 @@ async def get_suggested_prompts(
         .order_by(models.AnalysisLog.timestamp.desc())\
         .limit(5).all()
     
+    role_map = {"user_query": "Operator", "thought": "Kowalski"}
     context_str = ""
     for log in reversed(previous_logs):
-        role = "Operator" if log.log_type == "user_query" else "Kowalski"
+        role = role_map.get(log.log_type, "Kowalski")
         context_str += f"{role}: {log.content}\n"
         
-    from ravioli.backend.core.ollama import OllamaClient
     client = OllamaClient(db)
     
     try:
@@ -144,13 +148,9 @@ def approve_analysis(analysis_id: UUID, background_tasks: BackgroundTasks, db: S
 
 async def extract_and_store_insights(analysis_id: str, result_markdown: str, title: str):
     """Background task: parse all template sections and store one Insight row per Key Insight bullet."""
-    from ravioli.backend.core.database import SessionLocal
-    from ravioli.backend.core.ollama import OllamaClient
-    import uuid as _uuid
-
     db = SessionLocal()
     try:
-        analysis_uuid = _uuid.UUID(analysis_id)
+        analysis_uuid = UUID(analysis_id)
         # Skip if insights already extracted for this analysis
         if db.query(models.Insight).filter(models.Insight.analysis_id == analysis_uuid).first():
             return
@@ -229,10 +229,6 @@ async def process_analysis_question(analysis_id: str, question: str):
     """
     Background task to generate AI response for a question.
     """
-    from ravioli.backend.core.database import SessionLocal
-    from ravioli.backend.core.ollama import OllamaClient
-    import uuid
-    
     db = SessionLocal()
     try:
         analysis_uuid = uuid.UUID(analysis_id)
@@ -300,9 +296,6 @@ async def stream_question(
     db.commit()
 
     async def event_generator():
-        from ravioli.backend.core.database import SessionLocal
-        from ravioli.backend.core.ollama import OllamaClient
-        
         # Context preparation (same as background task)
         filename = analysis.analysis_metadata.get("filename", "Unknown Dataset")
         summary = analysis.result or "No summary available."
@@ -471,7 +464,6 @@ async def generate_summary(db: Session, filename: str, row_count: int, col_count
         return f"Summary for {filename}: {row_count} rows, {col_count} columns.", []
 
     # Use Ollama for key insights, assumptions, and limitations
-    from ravioli.backend.core.ollama import OllamaClient
     try:
         client = OllamaClient(db)
         # Run in parallel for better performance
@@ -591,10 +583,7 @@ async def create_quick_insight_existing(
     """
     Generate quick insight from an already uploaded file.
     """
-    from ravioli.backend.core.models import DataSource
-    from sqlalchemy import select
-
-    query = select(DataSource).where(DataSource.id == request.file_id)
+    query = select(models.DataSource).where(models.DataSource.id == request.file_id)
     db_source = db.execute(query).scalar_one_or_none()
     
     if not db_source:
@@ -606,7 +595,6 @@ async def create_quick_insight_existing(
     # Get stats and sample data from DuckDB
     row_count = db_source.row_count or 0
     try:
-        from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
         df_cols = duckdb_manager.query(f'DESCRIBE "{db_source.schema_name}"."{db_source.table_name}"')
         col_count = len(df_cols)
         columns = ", ".join([row['column_name'] for row in df_cols[:5]])

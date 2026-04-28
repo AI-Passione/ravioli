@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from ravioli.backend.core import schemas
-from ravioli.backend.core.database import get_db
+from ravioli.backend.core.database import get_db, SessionLocal
 from ravioli.backend.core.config import settings
 from ravioli.backend.core.models import DataSource
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
@@ -18,6 +18,7 @@ from ravioli.backend.data.olap.ingestion.wfs_client import WFSClient
 import logging
 from ravioli.backend.core.ollama import OllamaClient
 from ravioli.backend.data.olap.ingestion.pii_scanner import pii_scanner
+from ravioli.backend.data.olap.ingestion.dlt_utils import create_ravioli_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,6 @@ async def upload_file(
                     
                 db_source.status = "completed"
             else: # .xlsx
-                from ravioli.backend.core.ollama import OllamaClient
                 ollama_client = OllamaClient(db)
                 xlsx_results = await duckdb_manager.ingest_xlsx(file_path, table_name, schema="s_manual", ollama_client=ollama_client)
                 
@@ -289,7 +289,6 @@ async def generate_file_description(
 
     try:
         # Get sample data from DuckDB
-        from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
         full_table_name = f'"{db_source.schema_name}"."{db_source.table_name}"'
         query = f'SELECT * FROM {full_table_name} LIMIT 5'
         df = duckdb_manager.connection.execute(query).fetchdf()
@@ -321,15 +320,12 @@ async def list_wfs_layers(url: str):
 
 async def _run_wfs_ingestion(file_id: uuid.UUID, url: str, layer: Optional[str], table_name: str, schema_name: str):
     """Background task: performs the actual WFS data pull and DuckDB ingestion."""
-    from ravioli.backend.core.database import SessionLocal
     db = SessionLocal()
 
     PROGRESS_FLUSH_EVERY = 5_000  # commit row count to DB every N rows
 
     try:
         db_source = db.execute(select(DataSource).where(DataSource.id == file_id)).scalar_one()
-
-        from ravioli.backend.data.olap.ingestion.dlt_utils import create_ravioli_pipeline
 
         client = WFSClient(url)
 

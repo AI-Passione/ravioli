@@ -1,6 +1,9 @@
 import httpx
 import os
-from typing import Dict, Any
+import json
+import re
+import time
+from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from ravioli.backend.core.models import SystemSetting
 from ravioli.backend.core.config import settings
@@ -161,8 +164,6 @@ JSON:"""
         try:
             content = await self._generate(prompt, "Sheet Validation", temperature=0.1, num_predict=200)
             # Try to parse JSON from response
-            import json
-            import re
             # Find JSON block if model wrapped it
             match = re.search(r'\{.*\}', content, re.DOTALL)
             if match:
@@ -175,7 +176,6 @@ JSON:"""
 
     async def _generate(self, prompt: str, task_name: str, temperature: float = 0.5, num_predict: int = 300) -> str:
         """Helper method to handle the actual API call to Ollama with logging."""
-        import time
         start_time = time.time()
         
         url = f"{self.base_url.rstrip('/')}/api/generate"
@@ -379,7 +379,6 @@ Answer:"""
           - limitations: str     — raw text of the Known Limitations section
           - metadata: dict       — {"basic_stats": str, "appendix": str}
         """
-        import re
 
         sections: dict[str, str] = {}
         current: str | None = None
@@ -499,9 +498,6 @@ Answer:"""
                 "num_predict": 1000
             }
         }
-
-        import httpx
-        import json
         
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
