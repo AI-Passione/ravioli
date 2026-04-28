@@ -2,9 +2,9 @@
 
 ![ravioli](src/ravioli/frontend/public/ravioli-logo.png)
 
-> AI-native, Notebook-style personal Data Warehouse for business-friendly vibe-analytics.
+> AI-Native, Privacy First, Local First, Personal Data Warehouse for "Vibe-Analytics".
 
-**ravioli** is a modern, open-source personal Data Warehouse (DWH) designed for the AI era. It combines the power of a professional data stack with the casual, interactive feel of a notebook. Part of the **AI Passione** ecosystem.
+**Ravioli** is a modern, open-source personal Data Warehouse (DWH) designed for the AI era. It combines the power of a professional data stack with the casual, interactive feel of a notebook. Part of the **AI Passione** ecosystem.
 
 ## 🚀 Vision: Vibe-Analytics for Everyone
 Traditional DWHs are stiff and complex. **ravioli** is different. It's built to be:
