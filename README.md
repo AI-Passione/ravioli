@@ -1,10 +1,10 @@
 # ravioli 🍝
 
-![ravioli](docs/ravioli.png)
+![ravioli](src/ravioli/frontend/public/ravioli-logo.png)
 
-> AI-native, Notebook-style personal Data Warehouse for business-friendly vibe-analytics.
+> AI-Native, Privacy First, Local First, Personal Data Warehouse for "Vibe-Analytics".
 
-**ravioli** is a modern, open-source personal Data Warehouse (DWH) designed for the AI era. It combines the power of a professional data stack with the casual, interactive feel of a notebook. Part of the **AI Passione** ecosystem.
+**Ravioli** is a modern, open-source personal Data Warehouse (DWH) designed for the AI era. It combines the power of a professional data stack with the casual, interactive feel of a notebook. Part of the **AI Passione** ecosystem.
 
 ## 🚀 Vision: Vibe-Analytics for Everyone
 Traditional DWHs are stiff and complex. **ravioli** is different. It's built to be:
@@ -12,40 +12,92 @@ Traditional DWHs are stiff and complex. **ravioli** is different. It's built to 
 - **Notebook-Style**: Interactive, iterative, and visual.
 - **Business-Friendly**: Designed for people who want results, not just queries.
 - **100% Local**: Your data stays on your machine. Privacy by design.
-- **Tool-Agnostic**: Abstractions that let you swap tools while keeping your data architecture intact.
+- **Hybrid Architecture**: Fast metadata in Postgres, blazing-fast analytics in DuckDB.
 
 ---
 
 ## 🛠 Features
-- **Seamless Ingestion**: Python-based ingestors for Apple Health, Spotify, LinkedIn, Substack, and more.
-- **AI-Driven Insights**: Integrated AI agents that understand your data and help you explore it.
+- **Seamless Ingestion**: Python-based ingestors for Apple Health, Spotify, LinkedIn, Substack, and more (powered by `dlt`).
+- **Kowalski AI Agent**: A clinical, evidence-driven AI persona for high-fidelity data analysis and statistical profiling.
+- **Studio Noir UI**: A premium, high-contrast dark-mode interface built with Tailwind CSS v4 and Vite.
+- **Knowledge Base**: Manage domain-specific context to ground AI insights in reality.
 - **Professional Transformation**: Powered by `dbt` for reliable, version-controlled data modeling.
-- **Vibrant Visualization**: Built on Vanilla TypeScript for a premium, interactive analytics experience.
+
+---
+
+## 🏗 System Architecture
+
+```mermaid
+graph TD
+    UI[Frontend: Vite + TS + Tailwind v4] <--> API[Backend: FastAPI]
+    API <--> OLTP[(PostgreSQL: Metadata & Config)]
+    API <--> OLAP[(DuckDB: Analytical Data)]
+    API <--> LLM[AI Agent: Kowalski / Ollama]
+    Ingest[Ingestors: dlt / Python] --> OLAP
+```
 
 ---
 
 ## 🚦 Getting Started
 
-### Launch Everything
+### Prerequisites
+- [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
+- [uv](https://github.com/astral-sh/uv) (Python dependency manager)
+- [Node.js](https://nodejs.org/) (for frontend development)
+
+### Launch Everything (Docker)
 Spin up the database, AI models, and the interface with a single command:
 
 ```bash
-make up
+docker compose up
 ```
 
 This will:
-1.  Start **Postgres** (Docker).
-2.  Launch the **Ravioli** interface at `http://localhost:5173`.
+1.  Start **PostgreSQL** for metadata.
+2.  Launch the **FastAPI** backend at `http://localhost:8000`.
+3.  Launch the **Ravioli** frontend at `http://localhost:5173`.
 
-### Python Setup
-We use [uv](https://github.com/astral-sh/uv) for lightning-fast dependency management.
+---
+
+## 💻 Development Guide
+
+### Project Structure
+```text
+ravioli/
+├── src/
+│   └── ravioli/
+│       ├── backend/     # FastAPI application & API logic
+│       ├── frontend/    # Vite + Tailwind CSS v4 interface
+│       └── ai/          # AI agents & prompt engineering
+├── tests/               # Backend & Frontend test suites
+├── docker-compose.yml   # Orchestration for local development
+└── pyproject.toml       # Python dependencies (managed by uv)
+```
+
+### Backend Development
+We use `uv` for lightning-fast Python dependency management.
 
 ```bash
-# Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
 # Sync environment
 uv sync
+
+# Run backend locally (outside Docker)
+uvicorn src.ravioli.backend.main:app --reload
+
+# Run tests
+pytest
+```
+
+### Frontend Development
+The frontend is a modern TypeScript application using Tailwind CSS v4.
+
+```bash
+cd src/ravioli/frontend
+npm install
+npm run dev
+
+# Run tests
+npm test
 ```
 
 ---
@@ -54,3 +106,4 @@ uv sync
 Ravioli is part of the **AI Passione** suite—rebranded from the ground up to bring "passione" back into data engineering. It's about craft, quality, and the joy of discovery.
 
 *Formerly known as Jimwurst.*
+
