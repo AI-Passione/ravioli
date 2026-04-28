@@ -71,16 +71,16 @@ class DuckDBManager:
                 df_sample = pd.read_excel(file_path, sheet_name=sheet_name, nrows=10)
                 sample_csv = df_sample.to_csv(index=False)
                 
-                # AI Validation
-                is_valid = True
+                # AI Validation & Handling Strategy
+                verdict = "ready"
                 reason = "No AI validation performed."
                 
                 if ollama_client:
                     validation = await ollama_client.validate_sheet_content(sheet_name, sample_csv)
-                    is_valid = validation.get("valid", True)
+                    verdict = validation.get("verdict", "ready")
                     reason = validation.get("reason", "Accepted by AI.")
                 
-                if not is_valid:
+                if verdict == "reject":
                     logger.warning(f"Sheet '{sheet_name}' REJECTED for ingestion. Reason: {reason}")
                     results.append({
                         "sheet_name": sheet_name,
@@ -90,13 +90,12 @@ class DuckDBManager:
                     })
                     continue
                 
-                # Load full data for valid sheet
+                # Load full data for processing
                 df = pd.read_excel(file_path, sheet_name=sheet_name)
-                
-                # AI Schema Fix
                 applied_fix = False
-                if ollama_client:
-                    logger.info(f"Requesting AI Schema Fix for sheet '{sheet_name}'...")
+                
+                if verdict == "needs_fix" and ollama_client:
+                    logger.info(f"Applying AI Schema Fix for sheet '{sheet_name}' (Verdict: needs_fix)...")
                     original_cols = df.columns.tolist()
                     mapping = await ollama_client.suggest_schema_fix(sheet_name, sample_csv)
                     
@@ -109,7 +108,9 @@ class DuckDBManager:
                         df = df.rename(columns=filtered_mapping)
                         applied_fix = True
                     else:
-                        logger.info(f"AI Schema Fix for '{sheet_name}': No valid mapping returned.")
+                        logger.info(f"AI Schema Fix for '{sheet_name}': No valid mapping returned, proceeding with original schema.")
+                else:
+                    logger.info(f"Sheet '{sheet_name}' proceeding with direct ingestion (Verdict: {verdict}).")
                 
                 conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM df")
                 

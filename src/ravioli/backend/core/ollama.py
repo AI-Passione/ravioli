@@ -138,16 +138,15 @@ Description:"""
 
     async def validate_sheet_content(self, sheet_name: str, sample_data: str) -> Dict[str, Any]:
         """
-        Validate if the sheet content is suitable for DuckDB ingestion.
-        Returns {"valid": bool, "reason": str}
+        Validate if the sheet content is suitable for DuckDB ingestion and determine the handling strategy.
+        Returns {"verdict": "ready" | "needs_fix" | "reject", "reason": str}
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Task: Validate if the following Excel sheet "{sheet_name}" is suitable for analytical ingestion into a DuckDB database.
+Task: Evaluate the following Excel sheet "{sheet_name}" for database ingestion.
 Criteria:
-- Must have clear headers.
-- Must not be empty.
-- Must not be a purely decorative or summary-only sheet with no raw data structure.
-- Must contain structured data (tabular).
+- "ready": The sheet is tabular, has clean/descriptive headers, and is ready for direct ingestion.
+- "needs_fix": The data is tabular and valuable, but headers are messy, inconsistent, or non-SQL-friendly (spaces, special chars).
+- "reject": The sheet is empty, purely decorative, a summary with no clear table structure, or otherwise unusable.
 
 Here is a sample of the data (CSV format):
 ---
@@ -156,23 +155,22 @@ Here is a sample of the data (CSV format):
 
 Return your response in the following JSON format:
 {{
-  "valid": true/false,
-  "reason": "Clear explanation of why it was accepted or rejected"
+  "verdict": "ready" or "needs_fix" or "reject",
+  "reason": "Explicit explanation of your verdict"
 }}
 JSON:"""
 
         try:
             content = await self._generate(prompt, "Sheet Validation", temperature=0.1, num_predict=200)
             # Try to parse JSON from response
-            # Find JSON block if model wrapped it
             match = re.search(r'\{.*\}', content, re.DOTALL)
             if match:
                 return json.loads(match.group(0))
-            return {"valid": False, "reason": "Failed to parse AI validation response."}
+            return {"verdict": "reject", "reason": "Failed to parse AI validation response."}
         except Exception as e:
-            # Fallback to true if AI fails, but log it
+            # Fallback to ready if AI fails, but log it
             print(f"OllamaClient: [WARNING] AI Validation failed: {e}")
-            return {"valid": True, "reason": f"AI Validation skipped due to error: {str(e)}"}
+            return {"verdict": "ready", "reason": f"AI Validation skipped due to error: {str(e)}"}
 
     async def suggest_schema_fix(self, sheet_name: str, sample_data: str) -> Dict[str, str]:
         """
