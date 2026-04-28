@@ -111,13 +111,20 @@ export function renderKnowledge() {
   ` : `
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10 pb-20">
       ${pages.map((page, index) => {
-    const coverUrl = getCoverUrl(page.cover);
-    const coverStyle = coverUrl
-      ? `background-image: url('${escapeHTML(coverUrl)}'); background-size: cover; background-position: center;`
-      : `background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.1) 0%, rgba(var(--tertiary-rgb), 0.05) 100%);`;
+        const coverUrl = getCoverUrl(page.cover);
+        const safeCoverUrl = sanitizeImageUrl(coverUrl);
+        const coverStyle = safeCoverUrl
+          ? `background-image: url('${escapeHTML(safeCoverUrl)}'); background-size: cover; background-position: center;`
+          : `background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.1) 0%, rgba(var(--tertiary-rgb), 0.05) 100%);`;
 
-    return `
-          <div class="glass-panel rounded-[2.5rem] border-primary/5 hover:border-primary/20 transition-all duration-500 group cursor-pointer flex flex-col hover:shadow-2xl hover:shadow-primary/5 animate-reveal overflow-hidden" style="animation-delay: ${index * 0.05}s" data-id="${page.id}">
+        const parentIndicator = page.parent_id ? `
+                   <span class="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary backdrop-blur-md" title="Nested Page">
+                    <span class="material-symbols-outlined text-[14px]">account_tree</span>
+                   </span>
+                ` : '';
+
+        return `
+          <div class="glass-panel rounded-[2.5rem] border-primary/5 hover:border-primary/20 transition-all duration-500 group cursor-pointer flex flex-col hover:shadow-2xl hover:shadow-primary/5 animate-reveal overflow-hidden" style="animation-delay: ${index * 0.05}s" data-id="${escapeHTML(page.id)}">
             <!-- Cover -->
             <div class="h-32 w-full relative" style="${coverStyle}">
               <div class="absolute inset-0 bg-gradient-to-t from-surface/80 to-transparent"></div>
@@ -125,11 +132,7 @@ export function renderKnowledge() {
                 <span class="px-3 py-1 rounded-full bg-surface/40 backdrop-blur-md text-[9px] font-bold uppercase tracking-widest text-white border border-white/10">
                   ${escapeHTML(page.ownership_type)}
                 </span>
-                ${page.parent_id ? `
-                   <span class="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary backdrop-blur-md" title="Nested Page">
-                    <span class="material-symbols-outlined text-[14px]">account_tree</span>
-                   </span>
-                ` : ''}
+                ${parentIndicator}
               </div>
             </div>
 
@@ -151,7 +154,7 @@ export function renderKnowledge() {
                   ${format(new Date(page.updated_at), 'MMM d, yyyy')}
                 </span>
                 <div class="flex gap-4">
-                  <button class="edit-page text-primary hover:text-white transition-colors flex items-center gap-1" data-id="${page.id}">
+                  <button class="edit-page text-primary hover:text-white transition-colors flex items-center gap-1" data-id="${escapeHTML(page.id)}">
                     <span class="material-symbols-outlined text-sm">edit_note</span>
                     Details
                   </button>
@@ -204,13 +207,16 @@ function renderKnowledgeEditor(id?: string) {
   modal.className = 'fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-in fade-in duration-500';
 
   const coverUrl = getCoverUrl(existing?.cover);
-  const iconDisplay = getIconDisplay(existing?.icon);
+  const safeCoverUrl = sanitizeImageUrl(coverUrl);
+  const coverHtml = safeCoverUrl 
+      ? `<img src="${escapeHTML(safeCoverUrl)}" class="w-full h-full object-cover">` 
+      : '<div class="w-full h-full bg-gradient-to-br from-primary/10 to-tertiary/5"></div>';
 
   modal.innerHTML = `
         <div class="glass-panel w-full max-w-4xl rounded-[3.5rem] border-primary/20 overflow-hidden relative animate-in zoom-in slide-in-from-bottom-12 duration-700 ease-out shadow-[0_0_100px_rgba(var(--primary-rgb),0.1)] flex flex-col max-h-[90vh]">
              <!-- Page Aesthetics Section -->
              <div class="h-48 w-full relative bg-surface-container-high overflow-hidden" id="editor-cover-preview">
-                ${coverUrl ? `<img src="${escapeHTML(coverUrl)}" class="w-full h-full object-cover">` : '<div class="w-full h-full bg-gradient-to-br from-primary/10 to-tertiary/5"></div>'}
+                ${coverHtml}
                 <div class="absolute inset-0 bg-gradient-to-t from-surface via-transparent to-transparent"></div>
                 <div class="absolute top-8 right-8 flex gap-3">
                     <button id="close-modal" class="w-12 h-12 rounded-2xl bg-surface/40 backdrop-blur-md flex items-center justify-center hover:bg-error/20 hover:text-error transition-all duration-300 group">
@@ -219,7 +225,7 @@ function renderKnowledgeEditor(id?: string) {
                 </div>
                 <div class="absolute bottom-0 left-12 transform translate-y-1/2">
                    <div class="relative group">
-                    <input type="text" id="icon-input" name="icon_emoji" value="${escapeHTML(iconDisplay)}" 
+                    <input type="text" id="icon-input" name="icon_emoji" value="${escapeHTML(getIconDisplay(existing?.icon))}" 
                         class="w-20 h-20 rounded-3xl bg-surface-container-highest border-2 border-primary/20 text-4xl flex items-center justify-center text-center outline-none focus:border-primary transition-all shadow-2xl cursor-pointer">
                     <div class="absolute inset-0 flex items-center justify-center bg-black/40 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                         <span class="material-symbols-outlined text-white text-sm">emoji_emotions</span>
