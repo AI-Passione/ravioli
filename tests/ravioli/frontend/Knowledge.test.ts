@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderKnowledge } from '../../../src/ravioli/frontend/src/components/Knowledge';
-import { api } from '../../../src/ravioli/frontend/src/services/api';
 import { store } from '../../../src/ravioli/frontend/src/store';
 
 vi.mock('../../../src/ravioli/frontend/src/services/api', () => ({
