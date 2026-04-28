@@ -144,21 +144,21 @@ Description:"""
         prompt = f"""{KOWALSKI_PERSONA}
 Task: Evaluate the structural integrity of Excel sheet "{sheet_name}" for database ingestion.
 
-Context: Excel files often have "structural garbage" at the top (summary titles, timestamps, or empty rows). 
-You must find the EXACT row index where the table headers (column names) are located.
+Context: You are looking at a VISUAL GRID representing the first 10 rows of an Excel sheet.
+Column names might not be on the first row. There might be summary titles (e.g. "Monthly Report") or empty rows at the top.
 
 Criteria:
-- "ready": The first row of the data (or identified header_row) contains clean, descriptive headers.
-- "needs_fix": Tabular data exists, but either headers are messy/non-SQL-friendly OR there is summary text at the top that must be skipped to reach the headers.
-- "no_headers": Tabular data is found, but the columns have no identifiable labels (data starts immediately).
-- "reject": No structured data or table found at all.
+- "ready": A clear horizontal header row exists at row 0 (index 0).
+- "needs_fix": A clear horizontal header row exists, but it's at a different row index (e.g. row 2) OR the headers need normalization.
+- "no_headers": The sheet contains data but NO identifiable header labels (data starts immediately).
+- "reject": No structured data (empty sheet, purely decorative, or single-value summary).
 
-Header Identification Strategy:
-1. Scan the sample rows for the first row that contains multiple descriptive, non-numeric strings (e.g., "Date", "ID", "Name").
-2. If row 0 is "Total Followers..." and row 2 is "Date, Value", then header_row is 2.
-3. If row 0 is already "Date, Value", then header_row is 0.
+Identification Rules:
+- A "Header Row" usually contains multiple distinct strings (e.g. "Date", "Post URL", "Views").
+- A "Data Row" usually contains values (dates, numbers, URLs).
+- IGNORE summary titles that span only one or two columns at the very top.
 
-Sample Data (First 10 rows, headerless):
+Sample Grid (Row 0 is the absolute first row in Excel):
 ---
 {sample_data}
 ---
@@ -166,8 +166,8 @@ Sample Data (First 10 rows, headerless):
 Return your response in the following JSON format:
 {{
   "verdict": "ready" or "needs_fix" or "no_headers" or "reject",
-  "header_row": 0, // 0-indexed row number where the actual column headers are located
-  "reason": "Explicit explanation of why you chose this verdict and header_row (mention specific row content)"
+  "header_row": 0, // The 0-indexed row number where the COLUMN NAMES are located.
+  "reason": "Explicit explanation (e.g. 'Found headers Date and Impressions at Row 2, skipping Row 0 summary text')"
 }}
 JSON:"""
 
@@ -185,18 +185,19 @@ JSON:"""
 
     async def suggest_schema_fix(self, sheet_name: str, sample_data: str) -> Dict[str, str]:
         """
-        Suggest better column names for a dataset.
+        Suggest better column names for a dataset based on a visual grid.
         Returns a mapping of {original_name: fixed_name}
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Task: Analyze the column names of the following Excel sheet "{sheet_name}" and suggest clean, descriptive, and SQL-friendly column names.
+Task: Analyze the column names in the following Visual Grid from Excel sheet "{sheet_name}" and suggest clean, descriptive, and SQL-friendly column names.
+
 Rules:
 - Use snake_case.
 - Remove special characters and spaces.
 - Keep them concise but meaningful.
-- Map EVERY original column to a fixed name.
+- Map EVERY original column label to a fixed name.
 
-Here is a sample of the data (CSV format):
+Sample Grid (with detected headers):
 ---
 {sample_data}
 ---

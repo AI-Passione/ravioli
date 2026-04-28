@@ -69,7 +69,14 @@ class DuckDBManager:
                 
                 # Load a raw sample for structural analysis (no header)
                 df_raw_sample = pd.read_excel(file_path, sheet_name=sheet_name, nrows=10, header=None)
-                sample_csv = df_raw_sample.to_csv(index=False)
+                
+                # Create a Visual Grid for the AI to understand the structure
+                grid_lines = []
+                for idx, row in df_raw_sample.iterrows():
+                    # Clean up values for readability
+                    row_vals = [str(val).strip().replace("\n", " ") for val in row.tolist()]
+                    grid_lines.append(f"Row {idx}: | " + " | ".join(row_vals) + " |")
+                sample_grid = "\n".join(grid_lines)
                 
                 # AI Validation & Handling Strategy
                 verdict = "ready"
@@ -77,7 +84,7 @@ class DuckDBManager:
                 header_row = 0
                 
                 if ollama_client:
-                    validation = await ollama_client.validate_sheet_content(sheet_name, sample_csv)
+                    validation = await ollama_client.validate_sheet_content(sheet_name, sample_grid)
                     verdict = validation.get("verdict", "ready")
                     reason = validation.get("reason", "Accepted by AI.")
                     header_row = validation.get("header_row", 0)
@@ -100,22 +107,26 @@ class DuckDBManager:
                 
                 applied_fix = False
                 if verdict == "no_headers":
-                    logger.info(f"No headers detected in '{sheet_name}'. Using generic placeholders (column_1, column_2, ...)")
+                    logger.info(f"No headers detected in '{sheet_name}'. Using generic placeholders (col_1, col_2, ...)")
                     df = pd.read_excel(file_path, sheet_name=sheet_name, header=None, skiprows=header_row)
                     df.columns = [f"col_{i+1}" for i in range(len(df.columns))]
                     applied_fix = True
                 else:
                     df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row)
-                
+
                 if verdict == "needs_fix" and ollama_client:
                     logger.info(f"Applying AI Schema Fix for sheet '{sheet_name}' (Verdict: needs_fix)...")
                     original_cols = df.columns.tolist()
                     
-                    # For schema fix, we use a sample WITH the correct headers
-                    sample_csv_with_headers = df.head(10).to_csv(index=False)
-                    mapping = await ollama_client.suggest_schema_fix(sheet_name, sample_csv_with_headers)
+                    # For schema fix, we use a grid sample WITH the correct headers
+                    fix_grid_lines = []
+                    fix_grid_lines.append("Headers: | " + " | ".join(original_cols) + " |")
+                    for f_idx, f_row in df.head(5).iterrows():
+                        f_vals = [str(val).strip().replace("\n", " ") for val in f_row.tolist()]
+                        fix_grid_lines.append(f"Row {f_idx}: | " + " | ".join(f_vals) + " |")
+                    sample_grid_fix = "\n".join(fix_grid_lines)
                     
-                    # Filter mapping to only include columns that actually exist in the df
+                    mapping = await ollama_client.suggest_schema_fix(sheet_name, sample_grid_fix)
                     filtered_mapping = {k: v for k, v in mapping.items() if k in df.columns}
                     
                     if filtered_mapping:
@@ -124,7 +135,7 @@ class DuckDBManager:
                         df = df.rename(columns=filtered_mapping)
                         applied_fix = True
                     else:
-                        logger.info(f"AI Schema Fix for '{sheet_name}': No valid mapping returned, proceeding with original schema.")
+                        logger.info(f"AI Schema Fix for '{sheet_name}': No valid mapping returned.")
                 elif verdict != "no_headers":
                     logger.info(f"Sheet '{sheet_name}' proceeding with direct ingestion (Verdict: {verdict}).")
                 
