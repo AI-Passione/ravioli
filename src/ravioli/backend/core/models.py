@@ -144,26 +144,30 @@ class KnowledgePage(Base):
     __table_args__ = {"schema": "app"}
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # 1. Page Properties (Notion-compatible schema)
+    # Includes 'title', 'ownership', and any custom fields
+    properties: Mapped[dict] = mapped_column(JSON, default=dict)
+    
+    # Standard columns for fast access (mirrored from properties or internal)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    # Content (Notion-compatible blocks or markdown)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
     
-    # Notion-style aesthetics
-    icon: Mapped[Optional[str]] = mapped_column(String(255)) # Emoji or URL
-    cover_image: Mapped[Optional[str]] = mapped_column(String(1024))
+    # Notion-style aesthetics (top-level in Notion Page object)
+    icon: Mapped[Optional[dict]] = mapped_column(JSON) # {"type": "emoji", "emoji": "..."}
+    cover: Mapped[Optional[dict]] = mapped_column(JSON) # {"type": "external", "external": {"url": "..."}}
     
-    # Metadata properties (Notion-compatible flexible properties)
-    properties: Mapped[Optional[dict]] = mapped_column(JSON)
+    # 2. Page Content (List of Notion-style blocks)
+    # Each block: {"type": "paragraph", "paragraph": {...}, ...}
+    content: Mapped[Optional[List[dict]]] = mapped_column(JSON)
     
-    # ownership: 'individual' or 'team'
+    # Meta
     ownership_type: Mapped[str] = mapped_column(String(50), default="individual")
-    # owner_id would be user_id or team_id in a real system with auth
     owner_id: Mapped[Optional[str]] = mapped_column(String(255)) 
     
     # Hierarchy support
     parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("app.knowledge_pages.id"))
     
-    # source: 'manual', 'notion', 'google_docs', etc.
+    # source tracking
     source: Mapped[str] = mapped_column(String(50), default="manual")
     source_id: Mapped[Optional[str]] = mapped_column(String(255))
     

@@ -106,10 +106,19 @@ export interface QuickInsightResponse {
 export interface KnowledgePage {
   id: string;
   title: string;
-  content: string;
-  icon?: string;
-  cover_image?: string;
-  properties?: Record<string, any>;
+  properties: Record<string, any>;
+  content?: any[]; // List of blocks
+  icon?: {
+    type: 'emoji' | 'external' | 'file';
+    emoji?: string;
+    external?: { url: string };
+    file?: { url: string };
+  };
+  cover?: {
+    type: 'external' | 'file';
+    external?: { url: string };
+    file?: { url: string };
+  };
   ownership_type: 'individual' | 'team';
   owner_id?: string;
   parent_id?: string;
@@ -121,10 +130,10 @@ export interface KnowledgePage {
 
 export interface KnowledgePageCreate {
   title: string;
-  content: string;
-  icon?: string;
-  cover_image?: string;
   properties?: Record<string, any>;
+  content?: any[];
+  icon?: any;
+  cover?: any;
   ownership_type: 'individual' | 'team';
   owner_id?: string;
   parent_id?: string;
@@ -132,10 +141,10 @@ export interface KnowledgePageCreate {
 
 export interface KnowledgePageUpdate {
   title?: string;
-  content?: string;
-  icon?: string;
-  cover_image?: string;
   properties?: Record<string, any>;
+  content?: any[];
+  icon?: any;
+  cover?: any;
   ownership_type?: 'individual' | 'team';
   owner_id?: string;
   parent_id?: string;
