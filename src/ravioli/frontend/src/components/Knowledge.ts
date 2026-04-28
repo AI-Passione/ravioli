@@ -17,27 +17,35 @@ function sanitizeImageUrl(input: string): string | null {
   const value = input.trim();
   if (!value) return null;
 
-  // Reject characters that can break attribute contexts or indicate malformed input.
-  if (/[<>"'\u0000-\u001F\u007F\s]/.test(value)) {
+  // Reject obvious unsafe/meta characters and control chars.
+  if (/[<>"'\u0000-\u001F\u007F]/.test(value)) {
     return null;
   }
 
-  // Allow root-relative paths only (disallow protocol-relative //example.com)
-  if (value.startsWith('/') && !value.startsWith('//')) {
-    return value;
-  }
-
-  // Allow only http(s) absolute URLs
   try {
-    const parsed = new URL(value);
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-      return parsed.toString();
+    // Parse relative URLs against current origin so we can validate uniformly.
+    const parsed = new URL(value, window.location.origin);
+
+    // Disallow protocol-relative input explicitly.
+    if (value.startsWith('//')) {
+      return null;
     }
+
+    // Only allow http(s) URLs.
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+
+    // Preserve existing behavior: allow root-relative paths and absolute http(s).
+    if (value.startsWith('/')) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+
+    return parsed.toString();
   } catch {
     // Invalid URL
+    return null;
   }
-
-  return null;
 }
 
 // --- Notion compatibility helpers ---
