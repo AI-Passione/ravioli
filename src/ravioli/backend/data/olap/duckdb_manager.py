@@ -96,6 +96,7 @@ class DuckDBManager:
                 if header_row > 0:
                     logger.info(f"Structural Offset detected in '{sheet_name}'. Re-reading with header at row {header_row}...")
                 
+                applied_fix = False
                 if verdict == "no_headers":
                     logger.info(f"No headers detected in '{sheet_name}'. Using generic placeholders (column_1, column_2, ...)")
                     df = pd.read_excel(file_path, sheet_name=sheet_name, header=None, skiprows=header_row)
@@ -103,8 +104,6 @@ class DuckDBManager:
                     applied_fix = True
                 else:
                     df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row)
-                
-                applied_fix = applied_fix or False # keep track
                 
                 if verdict == "needs_fix" and ollama_client:
                     logger.info(f"Applying AI Schema Fix for sheet '{sheet_name}' (Verdict: needs_fix)...")
