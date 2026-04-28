@@ -2,6 +2,17 @@ import { store } from '../store';
 import { api } from '../services/api';
 import { format } from 'date-fns';
 
+// --- Safety Helpers ---
+function escapeHTML(str: string): string {
+    if (!str) return '';
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // --- Notion compatibility helpers ---
 function getBlocksPreview(blocks?: any[]): string {
     if (!blocks || blocks.length === 0) return 'No content codified.';
@@ -100,9 +111,9 @@ export function renderKnowledge() {
                 ${getIconDisplay(page.icon)}
               </div>
 
-              <h3 class="text-2xl font-headline-md text-white mb-3 group-hover:text-primary transition-colors duration-300">${page.title}</h3>
+              <h3 class="text-2xl font-headline-md text-white mb-3 group-hover:text-primary transition-colors duration-300">${escapeHTML(page.title)}</h3>
               <p class="text-on-surface-variant line-clamp-3 text-sm leading-relaxed mb-8 flex-1 group-hover:text-on-surface transition-colors">
-                ${getBlocksPreview(page.content)}
+                ${escapeHTML(getBlocksPreview(page.content))}
               </p>
               
               <div class="flex items-center justify-between mt-auto pt-6 border-t border-outline-variant/10 text-[10px] text-outline uppercase tracking-[0.2em] font-medium">
@@ -179,7 +190,7 @@ function renderKnowledgeEditor(id?: string) {
                 </div>
                 <div class="absolute bottom-0 left-12 transform translate-y-1/2">
                    <div class="relative group">
-                    <input type="text" id="icon-input" name="icon_emoji" value="${iconDisplay}" 
+                    <input type="text" id="icon-input" name="icon_emoji" value="${escapeHTML(iconDisplay)}" 
                         class="w-20 h-20 rounded-3xl bg-surface-container-highest border-2 border-primary/20 text-4xl flex items-center justify-center text-center outline-none focus:border-primary transition-all shadow-2xl cursor-pointer">
                     <div class="absolute inset-0 flex items-center justify-center bg-black/40 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                         <span class="material-symbols-outlined text-white text-sm">emoji_emotions</span>
@@ -195,7 +206,7 @@ function renderKnowledgeEditor(id?: string) {
                         <div class="grid grid-cols-12 gap-8">
                             <div class="col-span-8 space-y-3">
                                 <label class="text-[10px] uppercase tracking-[0.3em] text-primary font-bold ml-2">Page Title</label>
-                                <input type="text" name="title" value="${existing?.title || ''}" placeholder="Untitled" 
+                                <input type="text" name="title" value="${escapeHTML(existing?.title || '')}" placeholder="Untitled" 
                                     class="w-full bg-transparent border-none text-5xl font-headline-lg text-white placeholder:text-outline/20 focus:ring-0 transition-all outline-none p-0" required>
                             </div>
                             <div class="col-span-4 space-y-3">
@@ -218,7 +229,7 @@ function renderKnowledgeEditor(id?: string) {
                                 <label class="text-[10px] uppercase tracking-[0.3em] text-outline font-bold ml-2">Parent Page</label>
                                 <select name="parent_id" class="w-full bg-surface-container-high border border-outline-variant/20 rounded-2xl px-6 py-4 text-white appearance-none outline-none focus:border-primary/50 transition-all">
                                     <option value="">No Parent</option>
-                                    ${allPages.map(p => `<option value="${p.id}" ${existing?.parent_id === p.id ? 'selected' : ''}>${p.title}</option>`).join('')}
+                                    ${allPages.map(p => `<option value="${p.id}" ${existing?.parent_id === p.id ? 'selected' : ''}>${escapeHTML(p.title)}</option>`).join('')}
                                 </select>
                             </div>
                         </div>
@@ -228,7 +239,7 @@ function renderKnowledgeEditor(id?: string) {
                     <div class="space-y-3 pt-6 border-t border-outline-variant/10">
                         <label class="text-[10px] uppercase tracking-[0.3em] text-primary font-bold ml-2">Page Content (Blocks Preview)</label>
                         <textarea name="raw_content" rows="12" placeholder="Start typing page content here... This will be codified into blocks." 
-                            class="w-full bg-transparent border-none text-xl leading-relaxed text-on-surface-variant placeholder:text-outline/20 focus:ring-0 transition-all outline-none resize-none min-h-[300px]" required>${getBlocksPreview(existing?.content)}</textarea>
+                            class="w-full bg-transparent border-none text-xl leading-relaxed text-on-surface-variant placeholder:text-outline/20 focus:ring-0 transition-all outline-none resize-none min-h-[300px]" required>${escapeHTML(getBlocksPreview(existing?.content))}</textarea>
                     </div>
 
                     <div class="flex gap-4 pt-8 sticky bottom-0 bg-surface/80 backdrop-blur-md pb-4">
