@@ -116,7 +116,7 @@ class DuckDBManager:
 
                 if verdict == "needs_fix" and ollama_client:
                     logger.info(f"Applying AI Schema Fix for sheet '{sheet_name}' (Verdict: needs_fix)...")
-                    original_cols = df.columns.tolist()
+                    original_cols = [str(c) for c in df.columns.tolist()]
                     
                     # For schema fix, we use a grid sample WITH the correct headers
                     fix_grid_lines = []
@@ -127,6 +127,7 @@ class DuckDBManager:
                     sample_grid_fix = "\n".join(fix_grid_lines)
                     
                     mapping = await ollama_client.suggest_schema_fix(sheet_name, sample_grid_fix)
+                    # Use original column objects for mapping to avoid type mismatch in rename
                     filtered_mapping = {k: v for k, v in mapping.items() if k in df.columns}
                     
                     if filtered_mapping:
