@@ -92,6 +92,8 @@ class DuckDBManager:
                     })
                     continue
                 
+                logger.info(f"AI Verdict for '{sheet_name}': {verdict} (Header Row: {header_row}). Reason: {reason}")
+                
                 # Load full data using the detected header row
                 if header_row > 0:
                     logger.info(f"Structural Offset detected in '{sheet_name}'. Re-reading with header at row {header_row}...")

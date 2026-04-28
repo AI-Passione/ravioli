@@ -144,16 +144,21 @@ Description:"""
         prompt = f"""{KOWALSKI_PERSONA}
 Task: Evaluate the structural integrity of Excel sheet "{sheet_name}" for database ingestion.
 
-Context: Be extremely resilient. We only want to "reject" if the sheet is truly empty or non-tabular (e.g., a README text, a logo, or a purely decorative summary). 
-If there is any tabular data (rows and columns), we MUST ingest it.
+Context: Excel files often have "structural garbage" at the top (summary titles, timestamps, or empty rows). 
+You must find the EXACT row index where the table headers (column names) are located.
 
-Verdicts:
-- "ready": Tabular data with clean, usable headers.
-- "needs_fix": Tabular data exists, but either headers are messy (spaces, special chars) OR there is a structural offset (garbage at the top).
-- "no_headers": Tabular data exists, but there is NO identifiable header row (data starts immediately or headers are unreadable). 
-- "reject": No structured data found at all.
+Criteria:
+- "ready": The first row of the data (or identified header_row) contains clean, descriptive headers.
+- "needs_fix": Tabular data exists, but either headers are messy/non-SQL-friendly OR there is summary text at the top that must be skipped to reach the headers.
+- "no_headers": Tabular data is found, but the columns have no identifiable labels (data starts immediately).
+- "reject": No structured data or table found at all.
 
-Sample Data (First 10 rows):
+Header Identification Strategy:
+1. Scan the sample rows for the first row that contains multiple descriptive, non-numeric strings (e.g., "Date", "ID", "Name").
+2. If row 0 is "Total Followers..." and row 2 is "Date, Value", then header_row is 2.
+3. If row 0 is already "Date, Value", then header_row is 0.
+
+Sample Data (First 10 rows, headerless):
 ---
 {sample_data}
 ---
@@ -161,8 +166,8 @@ Sample Data (First 10 rows):
 Return your response in the following JSON format:
 {{
   "verdict": "ready" or "needs_fix" or "no_headers" or "reject",
-  "header_row": 0, // Row index where tabular data begins. For "no_headers", this is where data starts.
-  "reason": "Explicit explanation of your verdict"
+  "header_row": 0, // 0-indexed row number where the actual column headers are located
+  "reason": "Explicit explanation of why you chose this verdict and header_row (mention specific row content)"
 }}
 JSON:"""
 
