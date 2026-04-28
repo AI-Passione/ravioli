@@ -40,7 +40,9 @@ function getBlocksPreview(blocks?: any[]): string {
     if (!blocks || blocks.length === 0) return 'No content codified.';
     const firstBlock = blocks.find(b => b.type === 'paragraph');
     if (!firstBlock) return 'Abstract block data...';
-    return firstBlock.paragraph?.rich_text?.[0]?.plain_text || 'Empty block...';
+    const rt = firstBlock.paragraph?.rich_text?.[0];
+    if (!rt) return 'Empty block...';
+    return rt.plain_text || rt.text?.content || 'Empty block...';
 }
 
 function textToBlocks(text: string): any[] {
