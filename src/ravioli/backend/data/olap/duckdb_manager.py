@@ -41,30 +41,75 @@ class DuckDBManager:
         count = conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
         return count
 
-    def ingest_xlsx(self, file_path: Path, table_name: str, schema: str = "main") -> int:
+    async def ingest_xlsx(self, file_path: Path, base_table_name: str, schema: str = "main", ollama_client=None) -> list:
         """
-        Ingest an XLSX file into a DuckDB table using pandas.
-        If the table exists, it will be replaced.
-        Returns the row count.
+        Ingest an XLSX file into DuckDB.
+        Loops through all worksheets, validates content with AI if client provided,
+        and creates tables with __xlsx postfix.
+        Returns a list of ingestion results.
         """
         import pandas as pd
-        conn = self.connection
+        import logging
+        logger = logging.getLogger(__name__)
         
-        # Create schema if it doesn't exist
+        conn = self.connection
         conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
         
-        full_table_name = f'"{schema}"."{table_name}"'
-        
-        # Read Excel using pandas
-        df = pd.read_excel(file_path)
-        
-        # Register the dataframe as a virtual table and create a real table from it
-        # DuckDB can directly query pandas DataFrames in the same process
-        conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM df")
-        
-        # Get row count
-        count = conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
-        return count
+        results = []
+        try:
+            excel_file = pd.ExcelFile(file_path)
+            sheet_names = excel_file.sheet_names
+            logger.info(f"Scanning XLSX file: {file_path.name}. Found {len(sheet_names)} sheets: {sheet_names}")
+            
+            for sheet_name in sheet_names:
+                # Clean sheet name for table naming
+                clean_sheet_name = "".join(c if c.isalnum() else "_" for c in sheet_name).lower()
+                table_name = f"{base_table_name}_{clean_sheet_name}__xlsx"
+                full_table_name = f'"{schema}"."{table_name}"'
+                
+                # Load a sample for validation
+                df_sample = pd.read_excel(file_path, sheet_name=sheet_name, nrows=10)
+                sample_csv = df_sample.to_csv(index=False)
+                
+                # AI Validation
+                is_valid = True
+                reason = "No AI validation performed."
+                
+                if ollama_client:
+                    validation = await ollama_client.validate_sheet_content(sheet_name, sample_csv)
+                    is_valid = validation.get("valid", True)
+                    reason = validation.get("reason", "Accepted by AI.")
+                
+                if not is_valid:
+                    logger.warning(f"Sheet '{sheet_name}' REJECTED for ingestion. Reason: {reason}")
+                    results.append({
+                        "sheet_name": sheet_name,
+                        "table_name": table_name,
+                        "status": "failed",
+                        "error": reason
+                    })
+                    continue
+                
+                # Load full data for valid sheet
+                df = pd.read_excel(file_path, sheet_name=sheet_name)
+                conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM df")
+                
+                count = conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
+                logger.info(f"Sheet '{sheet_name}' successfully ingested into {full_table_name} ({count} rows).")
+                
+                results.append({
+                    "sheet_name": sheet_name,
+                    "table_name": table_name,
+                    "status": "completed",
+                    "row_count": count,
+                    "reason": reason
+                })
+                
+        except Exception as e:
+            logger.error(f"Failed to process XLSX file {file_path}: {e}")
+            raise e
+            
+        return results
         
     def query(self, sql: str):
         """

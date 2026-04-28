@@ -133,6 +133,46 @@ Description:"""
         except Exception as e:
             raise Exception(f"Ollama generation failed: {str(e)}")
 
+    async def validate_sheet_content(self, sheet_name: str, sample_data: str) -> Dict[str, Any]:
+        """
+        Validate if the sheet content is suitable for DuckDB ingestion.
+        Returns {"valid": bool, "reason": str}
+        """
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Validate if the following Excel sheet "{sheet_name}" is suitable for analytical ingestion into a DuckDB database.
+Criteria:
+- Must have clear headers.
+- Must not be empty.
+- Must not be a purely decorative or summary-only sheet with no raw data structure.
+- Must contain structured data (tabular).
+
+Here is a sample of the data (CSV format):
+---
+{sample_data}
+---
+
+Return your response in the following JSON format:
+{{
+  "valid": true/false,
+  "reason": "Clear explanation of why it was accepted or rejected"
+}}
+JSON:"""
+
+        try:
+            content = await self._generate(prompt, "Sheet Validation", temperature=0.1, num_predict=200)
+            # Try to parse JSON from response
+            import json
+            import re
+            # Find JSON block if model wrapped it
+            match = re.search(r'\{.*\}', content, re.DOTALL)
+            if match:
+                return json.loads(match.group(0))
+            return {"valid": False, "reason": "Failed to parse AI validation response."}
+        except Exception as e:
+            # Fallback to true if AI fails, but log it
+            print(f"OllamaClient: [WARNING] AI Validation failed: {e}")
+            return {"valid": True, "reason": f"AI Validation skipped due to error: {str(e)}"}
+
     async def _generate(self, prompt: str, task_name: str, temperature: float = 0.5, num_predict: int = 300) -> str:
         """Helper method to handle the actual API call to Ollama with logging."""
         import time

@@ -2,7 +2,7 @@ import uuid
 import io
 import pytest
 import pandas as pd
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 from ravioli.backend.core.models import DataSource
 
 @pytest.mark.anyio
@@ -22,10 +22,36 @@ async def test_upload_xlsx(client, session, mocker):
     
     # Mocking DuckDB ingestion
     mock_duckdb = mocker.patch("ravioli.backend.api.v1.endpoints.data.duckdb_manager")
-    mock_duckdb.ingest_xlsx.return_value = 100
+    mock_duckdb.ingest_xlsx = AsyncMock(return_value=[{
+        "sheet_name": "Sheet1",
+        "table_name": "test_sheet1__xlsx",
+        "status": "completed",
+        "row_count": 100
+    }])
     
     # Mocking PII scan
     mocker.patch("ravioli.backend.api.v1.endpoints.data.pii_scanner.scan_dataframe", return_value=False)
+    
+    # Mocking OllamaClient to avoid DB config issues
+    mock_ollama_cls = mocker.patch("ravioli.backend.api.v1.endpoints.data.OllamaClient")
+    mock_ollama = mock_ollama_cls.return_value
+    
+    # Mocking model instantiation to provide an ID
+    from ravioli.backend.core.models import DataSource
+    import datetime
+    mock_datasource = DataSource(
+        id=uuid.uuid4(), 
+        original_filename="test.xlsx", 
+        status="completed", 
+        row_count=100,
+        filename="internal.xlsx",
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        size_bytes=1024,
+        table_name="test_sheet1__xlsx",
+        created_at=datetime.datetime.now(),
+        updated_at=datetime.datetime.now()
+    )
+    mocker.patch("ravioli.backend.api.v1.endpoints.data.DataSource", return_value=mock_datasource)
     
     # Mocking refresh to do nothing so it doesn't clear our attributes
     session.refresh.side_effect = lambda x: x

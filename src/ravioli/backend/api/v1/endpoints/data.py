@@ -94,21 +94,67 @@ async def upload_file(
         try:
             if extension == '.csv':
                 row_count = duckdb_manager.ingest_csv(file_path, table_name, schema="s_manual")
+                db_source.row_count = row_count
+                
+                # PII Scan
+                try:
+                    full_table_name = f'"s_manual"."{table_name}"'
+                    df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 100').fetchdf()
+                    db_source.has_pii = pii_scanner.scan_dataframe(df_sample)
+                except Exception as e:
+                    logger.warning("PII scan failed for table %s: %s", table_name, e)
+                    db_source.has_pii = False
+                    
+                db_source.status = "completed"
             else: # .xlsx
-                row_count = duckdb_manager.ingest_xlsx(file_path, table_name, schema="s_manual")
+                from ravioli.backend.core.ollama import OllamaClient
+                ollama_client = OllamaClient(db)
+                xlsx_results = await duckdb_manager.ingest_xlsx(file_path, table_name, schema="s_manual", ollama_client=ollama_client)
                 
-            db_source.row_count = row_count
-            
-            # PII Scan
-            try:
-                full_table_name = f'"s_manual"."{table_name}"'
-                df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 100').fetchdf()
-                db_source.has_pii = pii_scanner.scan_dataframe(df_sample)
-            except Exception as e:
-                logger.warning("PII scan failed for table %s: %s", table_name, e)
-                db_source.has_pii = False
+                valid_results = [r for r in xlsx_results if r["status"] == "completed"]
                 
-            db_source.status = "completed"
+                if not valid_results:
+                    failures = [f"Sheet '{r['sheet_name']}': {r['error']}" for r in xlsx_results if r["status"] == "failed"]
+                    db_source.status = "failed"
+                    db_source.error_message = " | ".join(failures) if failures else "No valid data sheets found."
+                else:
+                    # Update primary record with first valid sheet
+                    first = valid_results[0]
+                    db_source.table_name = first["table_name"]
+                    db_source.row_count = first["row_count"]
+                    db_source.original_filename = f"{file.filename} [{first['sheet_name']}]"
+                    db_source.status = "completed"
+                    
+                    # PII Scan for primary
+                    try:
+                        full_table_name = f'"s_manual"."{db_source.table_name}"'
+                        df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 100').fetchdf()
+                        db_source.has_pii = pii_scanner.scan_dataframe(df_sample)
+                    except Exception as e:
+                        logger.warning("PII scan failed for table %s: %s", db_source.table_name, e)
+                    
+                    # Create records for other valid sheets
+                    for other in valid_results[1:]:
+                        other_source = DataSource(
+                            id=uuid.uuid4(),
+                            filename=internal_filename,
+                            original_filename=f"{file.filename} [{other['sheet_name']}]",
+                            content_type=file.content_type,
+                            size_bytes=file_path.stat().st_size,
+                            table_name=other["table_name"],
+                            schema_name="s_manual",
+                            file_hash=file_hash,
+                            status="completed",
+                            row_count=other["row_count"]
+                        )
+                        # PII Scan for other
+                        try:
+                            full_table_name = f'"s_manual"."{other["table_name"]}"'
+                            df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 100').fetchdf()
+                            other_source.has_pii = pii_scanner.scan_dataframe(df_sample)
+                        except:
+                            pass
+                        db.add(other_source)
         except Exception as e:
             db_source.status = "failed"
             db_source.error_message = str(e)
