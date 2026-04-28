@@ -1,6 +1,6 @@
 # ravioli 🍝
 
-![ravioli](docs/ravioli.png)
+![ravioli](src/ravioli/frontend/public/ravioli-logo.png)
 
 > AI-native, Notebook-style personal Data Warehouse for business-friendly vibe-analytics.
 
