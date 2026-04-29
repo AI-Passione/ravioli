@@ -157,6 +157,7 @@ Criteria for JSON response:
 2. `header_row`: The 0-indexed row number containing the primary COLUMN NAMES.
 3. `data_start_row`: The 0-indexed row number where the first record of actual data begins.
 4. `is_split`: Boolean. True if the sheet contains side-by-side duplicate table structures.
+   - **DETECTION**: If you see the SAME column headers (e.g., "Post URL", "Date") appearing twice in the same row (e.g., once in Col A-C and again in Col E-G), this is a split table.
 5. `split_offsets`: If `is_split` is true, a LIST of 0-indexed column numbers where each subsequent block starts (e.g. [4, 8, 12]).
 6. `column_mapping`: A dictionary mapping original header names to clean names.
    - **CRITICAL**: Detect if the sheet is a **SUMMARY** sheet (a vertical list of metrics like "Impressions | 100").
