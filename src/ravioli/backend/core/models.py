@@ -58,9 +58,25 @@ class AnalysisLog(Base):
     data: Mapped[Optional[dict]] = mapped_column(JSON)
     
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
-
+    
     # Relationships
     analysis: Mapped["Analysis"] = relationship("Analysis", back_populates="logs")
+
+class User(Base):
+    """
+    Represents a system user.
+    Stored in the 'app' schema.
+    """
+    __tablename__ = "users"
+    __table_args__ = {"schema": "app"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+
+    # Relationships
+    data_sources: Mapped[List["DataSource"]] = relationship("DataSource", back_populates="owner")
 
 class DataSource(Base):
     """
@@ -97,6 +113,9 @@ class DataSource(Base):
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    
+    owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("app.users.id"))
+    owner: Mapped[Optional["User"]] = relationship("User", back_populates="data_sources")
 
 class Insight(Base):
     """

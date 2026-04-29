@@ -91,6 +91,21 @@ class InsightStats(BaseModel):
     analyses_count: int
     contributors_count: int
 
+# --- User Schemas ---
+
+class UserBase(BaseModel):
+    name: str
+    email: str
+
+class UserCreate(UserBase):
+    pass
+
+class User(UserBase):
+    id: UUID
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
 # --- Data Source Schemas ---
 
 class DataSourceBase(BaseModel):
@@ -108,12 +123,16 @@ class DataSourceBase(BaseModel):
     source_type: str = "file"
     source_url: Optional[str] = None
     has_pii: bool = False
+    owner_id: Optional[UUID] = None
 
 class DataSource(DataSourceBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
     is_duplicate: bool = False
+    
+    # Optional nested owner for detail views
+    owner: Optional[User] = None
 
     model_config = ConfigDict(from_attributes=True)
 

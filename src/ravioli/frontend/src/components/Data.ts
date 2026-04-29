@@ -1,6 +1,6 @@
 import { store } from '../store';
 import { api } from '../services/api';
-import { formatBytes } from '../utils/formatters';
+import { formatBytes, formatDateTime } from '../utils/formatters';
 
 export function renderData() {
   const container = document.createElement('main');
@@ -35,16 +35,17 @@ export function renderData() {
                 <th class="px-8 py-4 font-medium">Type</th>
                 <th class="px-8 py-4 font-medium">Asset Name</th>
                 <th class="px-8 py-4 font-medium">Description</th>
-                <th class="px-8 py-4 font-medium">DuckDB Table</th>
                 <th class="px-8 py-4 font-medium">Rows</th>
                 <th class="px-8 py-4 font-medium">Status</th>
+                <th class="px-8 py-4 font-medium">Timeline</th>
+                <th class="px-8 py-4 font-medium">Author</th>
                 <th class="px-8 py-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-outline/5">
               ${sources.length === 0 ? `
                 <tr>
-                  <td colspan="7" class="px-8 py-20 text-center">
+                  <td colspan="9" class="px-8 py-20 text-center">
                     <div class="flex flex-col items-center justify-center">
                       <div class="w-16 h-16 rounded-2xl bg-surface-container-highest flex items-center justify-center mb-4 opacity-50">
                         <span class="material-symbols-outlined text-3xl">database_off</span>
@@ -92,9 +93,6 @@ export function renderData() {
                       </div>
                     </div>
                   </td>
-                  <td class="px-8 py-5">
-                    <code class="px-2 py-1 rounded bg-surface-container-highest text-primary-fixed-dim text-xs font-mono border border-outline/5">${source.schema_name}.${source.table_name}</code>
-                  </td>
                   <td class="px-8 py-5 text-neutral-300 font-medium">
                     ${source.status === 'pending'
                       ? `<span class="flex items-center gap-1.5">
@@ -125,6 +123,28 @@ export function renderData() {
                         source.status === 'completed' ? 'Completed'   :
                         source.status === 'failed'    ? 'Failed'      : source.status}
                     </span>
+                  </td>
+                  <td class="px-8 py-5">
+                    <div class="flex flex-col gap-0.5 whitespace-nowrap">
+                      <div class="flex items-center gap-1.5 text-[11px] text-neutral-300">
+                        <span class="material-symbols-outlined text-[14px] opacity-50">event</span>
+                        ${formatDateTime(source.created_at)}
+                      </div>
+                      ${source.updated_at !== source.created_at ? `
+                        <div class="flex items-center gap-1.5 text-[9px] text-neutral-500 italic">
+                          <span class="material-symbols-outlined text-[12px] opacity-30">update</span>
+                          Updated ${formatDateTime(source.updated_at)}
+                        </div>
+                      ` : ''}
+                    </div>
+                  </td>
+                  <td class="px-8 py-5">
+                    <div class="flex items-center gap-2">
+                      <div class="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center border border-primary/20">
+                        <span class="text-[10px] font-bold text-primary">${source.owner?.name?.[0] || 'A'}</span>
+                      </div>
+                      <span class="text-xs text-neutral-400 font-medium">${source.owner?.name || 'Admin'}</span>
+                    </div>
                   </td>
                   <td class="px-8 py-5 text-right flex justify-end gap-2">
                     <button class="btn-inspect p-2 rounded-lg hover:bg-primary/10 text-neutral-400 hover:text-primary transition-all" data-table="${source.schema_name}.${source.table_name}" data-filename="${source.original_filename}" title="Preview">
@@ -199,21 +219,34 @@ export function renderData() {
 
           <!-- Step 2: CSV Form -->
           <div id="step-csv" class="hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div class="space-y-4 mb-6">
+              <div class="relative group">
+                <label class="text-[10px] uppercase tracking-widest text-neutral-500 mb-2 block group-focus-within:text-primary transition-colors">Upload Context (Optional)</label>
+                <div class="relative">
+                  <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500 group-focus-within:text-primary transition-colors text-lg">info</span>
+                  <input type="text" id="upload-context" placeholder="e.g. Substack export data for April..." 
+                    class="w-full bg-surface-container-highest border border-outline/20 rounded-2xl pl-12 pr-6 py-4 text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all" />
+                </div>
+                <p class="text-[9px] text-neutral-600 mt-2 ml-1">This context helps the AI generate more accurate descriptions for your assets.</p>
+              </div>
+            </div>
+            
             <div id="drop-zone" class="border-2 border-dashed border-outline/20 rounded-3xl p-12 flex flex-col items-center justify-center bg-surface-container-highest hover:bg-surface-container hover:border-primary/50 transition-all cursor-pointer group relative overflow-hidden">
               <div id="drop-zone-content" class="flex flex-col items-center justify-center transition-opacity duration-300">
                 <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <span class="material-symbols-outlined text-primary text-3xl">upload_file</span>
                 </div>
-                <h3 class="text-xl font-medium text-neutral-200 mb-2">Drop your file here</h3>
+                <h3 class="text-xl font-medium text-neutral-200 mb-2">Drop files or folders here</h3>
                 <p class="text-neutral-500 text-sm">or click to browse CSV / XLSX</p>
               </div>
               <div id="drop-zone-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-container/90 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 z-10 p-6">
                 <span class="material-symbols-outlined animate-spin text-primary text-4xl mb-4">sync</span>
-                <p class="text-neutral-200 font-medium animate-pulse">Ingestion in Progress...</p>
+                <p id="ingestion-status" class="text-neutral-200 font-medium animate-pulse text-center">Ingestion in Progress...</p>
+                <p id="queue-status" class="text-[10px] text-primary/70 mt-1 uppercase tracking-[0.2em] font-bold"></p>
                 
-                <div id="ingestion-console" class="mt-6 w-full max-w-md bg-black/40 rounded-xl p-4 font-mono text-[10px] text-neutral-400 overflow-y-auto max-h-40 border border-outline/10 text-left">
+                <div id="ingestion-console" class="mt-6 w-full max-w-md bg-black/40 rounded-xl p-4 font-mono text-[10px] text-neutral-400 overflow-y-auto max-h-48 border border-outline/10 text-left">
                   <div class="text-primary/70 mb-2 border-b border-outline/5 pb-1 uppercase tracking-tighter flex justify-between">
-                    <span>System Terminal</span>
+                    <span id="console-filename">System Terminal</span>
                     <span class="animate-pulse">●</span>
                   </div>
                   <div id="ingestion-logs" class="space-y-1">
@@ -221,7 +254,7 @@ export function renderData() {
                   </div>
                 </div>
               </div>
-              <input type="file" id="file-input" class="hidden" accept=".csv,.xlsx">
+              <input type="file" id="file-input" class="hidden" accept=".csv,.xlsx" multiple>
             </div>
             <button class="btn-back mt-8 text-neutral-500 hover:text-neutral-300 flex items-center gap-2 text-sm transition-colors">
               <span class="material-symbols-outlined text-lg">arrow_back</span>
@@ -337,48 +370,166 @@ export function renderData() {
   const fileInput = container.querySelector('#file-input') as HTMLInputElement;
   
   dropZone?.addEventListener('click', () => fileInput.click());
-  fileInput?.addEventListener('change', async (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
-    if (file) await handleUpload(file);
+  
+  // Drag & Drop
+  ['dragover', 'dragenter'].forEach(eventName => {
+    dropZone?.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.add('border-primary/50', 'bg-surface-container');
+    });
   });
 
-  async function handleUpload(file: File) {
+  ['dragleave', 'drop'].forEach(eventName => {
+    dropZone?.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('border-primary/50', 'bg-surface-container');
+    });
+  });
+
+  dropZone?.addEventListener('drop', async (e: any) => {
+    const items = e.dataTransfer?.items;
+    if (!items) return;
+
+    const files: File[] = [];
+    
+    // UI Feedback for scanning
     const dropZoneContent = container.querySelector('#drop-zone-content');
     const dropZoneLoading = container.querySelector('#drop-zone-loading');
     const ingestionLogs = container.querySelector('#ingestion-logs');
+    const ingestionStatus = container.querySelector('#ingestion-status');
+    
+    dropZoneContent?.classList.add('opacity-0');
+    dropZoneLoading?.classList.remove('opacity-0', 'pointer-events-none');
+    if (ingestionLogs) ingestionLogs.innerHTML = '<div class="text-primary/50 italic font-mono">Scanning folder contents...</div>';
+    if (ingestionStatus) ingestionStatus.textContent = 'Scanning...';
+
+    async function scanEntry(entry: any) {
+      if (entry.isFile) {
+        const file = await new Promise<File>((resolve, reject) => entry.file(resolve, reject));
+        if (file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.xlsx')) {
+          files.push(file);
+        }
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const readEntries = async () => {
+          const entries: any[] = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+          if (entries.length > 0) {
+            for (const child of entries) {
+              await scanEntry(child);
+            }
+            await readEntries(); // Continue reading in case of many files
+          }
+        };
+        await readEntries();
+      }
+    }
+
+    const scanPromises = [];
+    for (let i = 0; i < items.length; i++) {
+      const entry = items[i].webkitGetAsEntry();
+      if (entry) scanPromises.push(scanEntry(entry));
+    }
+    
+    await Promise.all(scanPromises);
+    
+    if (files.length > 0) {
+      const contextInput = container.querySelector('#upload-context') as HTMLInputElement;
+      const context = contextInput?.value.trim() || '';
+      await handleUploads(files, context);
+    } else {
+      alert('No uploadable files (.csv, .xlsx) found in selection.');
+      dropZoneContent?.classList.remove('opacity-0');
+      dropZoneLoading?.classList.add('opacity-0', 'pointer-events-none');
+    }
+  });
+
+  fileInput?.addEventListener('change', async (e) => {
+    const files = (e.target as HTMLInputElement).files;
+    if (files && files.length > 0) {
+      const contextInput = container.querySelector('#upload-context') as HTMLInputElement;
+      const context = contextInput?.value.trim() || '';
+      await handleUploads(Array.from(files), context);
+    }
+  });
+
+  async function handleUploads(filesArray: File[], context?: string) {
+    // Filter to be safe, though drop handles it, file input might not
+    const filteredFiles = filesArray.filter(f => 
+      f.name.toLowerCase().endsWith('.csv') || f.name.toLowerCase().endsWith('.xlsx')
+    );
+    
+    if (filteredFiles.length === 0) return;
+
+    const dropZoneContent = container.querySelector('#drop-zone-content');
+    const dropZoneLoading = container.querySelector('#drop-zone-loading');
+    const ingestionLogs = container.querySelector('#ingestion-logs');
+    const consoleFilename = container.querySelector('#console-filename');
+    const queueStatus = container.querySelector('#queue-status');
+    const ingestionStatus = container.querySelector('#ingestion-status');
     
     dropZoneContent?.classList.add('opacity-0');
     dropZoneLoading?.classList.remove('opacity-0', 'pointer-events-none');
     
-    if (ingestionLogs) ingestionLogs.innerHTML = '<div class="text-primary/50 italic">Establishing data stream...</div>';
+    if (ingestionLogs) ingestionLogs.innerHTML = '';
+    if (ingestionStatus) ingestionStatus.textContent = 'Ingestion in Progress...';
 
-    const addLog = (msg: string) => {
+    const addLog = (msg: string, isHeader = false) => {
       if (ingestionLogs) {
         const div = document.createElement('div');
-        div.className = 'animate-in fade-in slide-in-from-left-1 duration-300';
-        div.innerHTML = `<span class="text-neutral-600 mr-2">></span>${msg}`;
+        div.className = isHeader ? 'text-primary font-bold mt-2 mb-1' : 'animate-in fade-in slide-in-from-left-1 duration-300';
+        if (isHeader) {
+          div.textContent = msg;
+        } else {
+          const prefix = document.createElement('span');
+          prefix.className = 'text-neutral-600 mr-2';
+          prefix.textContent = '>';
+          div.appendChild(prefix);
+          div.appendChild(document.createTextNode(msg));
+        }
         ingestionLogs.appendChild(div);
         const console = container.querySelector('#ingestion-console');
         if (console) console.scrollTop = console.scrollHeight;
       }
     };
 
-    api.streamUpload(
-      file, 
-      (msg) => addLog(msg),
-      (result) => {
-        if (result.is_duplicate) alert('Duplicate Data Detected: Already uploaded.');
-        setTimeout(() => {
-          hideAddModal();
-          refreshFiles();
-        }, 500);
-      },
-      (err) => {
-        alert(`Upload failed: ${err.message || err}`);
-        dropZoneContent?.classList.remove('opacity-0');
-        dropZoneLoading?.classList.add('opacity-0', 'pointer-events-none');
+    let completed = 0;
+    let failed = 0;
+
+    for (const file of filteredFiles) {
+      if (queueStatus) queueStatus.textContent = `Processing file ${completed + failed + 1} of ${filteredFiles.length}`;
+      if (consoleFilename) consoleFilename.textContent = file.name;
+      
+      addLog(`Starting ingestion for ${file.name}...`, true);
+
+      try {
+        const result = await api.streamUpload(file, (msg) => addLog(msg), context);
+        if (result.is_duplicate) {
+          addLog(`Notice: Duplicate file detected. Skipping new ingestion, using existing record.`, false);
+        }
+        addLog(`Success: ${file.name} ingested successfully.`, false);
+        completed++;
+      } catch (err: any) {
+        addLog(`Error processing ${file.name}: ${err.message || err}`, false);
+        failed++;
       }
-    );
+    }
+
+    // Final state
+    if (ingestionStatus) ingestionStatus.textContent = 'Ingestion Complete';
+    if (queueStatus) queueStatus.textContent = `${completed} Success, ${failed} Failed`;
+    if (consoleFilename) consoleFilename.textContent = 'Summary';
+    
+    addLog(`--- Ingestion Summary ---`, true);
+    addLog(`Total files discovered: ${filteredFiles.length}`);
+    addLog(`Successfully processed: ${completed}`);
+    if (failed > 0) addLog(`Failed: ${failed}`);
+
+    setTimeout(() => {
+      hideAddModal();
+      refreshFiles();
+    }, 2000);
   }
 
   // --- General Table Logic ---

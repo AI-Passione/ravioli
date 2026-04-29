@@ -25,9 +25,43 @@ def init_db():
         Base.metadata.create_all(bind=engine)
         # Idempotent column migrations for tables that already exist
         _migrate_columns()
+        # Seed initial data
+        seed_db()
         print("Database tables initialized successfully.")
     except Exception as e:
         print(f"Error initializing database: {e}")
+
+def seed_db():
+    """Create initial dummy records if they don't exist."""
+    from ravioli.backend.core import models
+    from ravioli.backend.core.database import SessionLocal
+    import uuid
+    
+    db = SessionLocal()
+    try:
+        email = "jimmypang@aipassione.com"
+        user = db.query(models.User).filter(models.User.email == email).first()
+        if not user:
+            user = models.User(
+                id=uuid.uuid4(),
+                name="Jimmy Pang",
+                email=email
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            print(f"Seeded dummy user: {user.name}")
+        
+        # Backfill: Populate owner_id for all existing data sources that are NULL
+        updated_count = db.query(models.DataSource).filter(models.DataSource.owner_id.is_(None)).update({models.DataSource.owner_id: user.id})
+        if updated_count > 0:
+            db.commit()
+            print(f"Backfilled {updated_count} data sources with owner_id: {user.name}")
+            
+    except Exception as e:
+        print(f"Error seeding database: {e}")
+    finally:
+        db.close()
 
 def _migrate_columns():
     """Add new columns to existing tables using IF NOT EXISTS (idempotent)."""
@@ -40,6 +74,7 @@ def _migrate_columns():
         "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS cover JSONB",
         "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS properties JSONB",
         "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES app.knowledge_pages(id)",
+        "ALTER TABLE app.data_sources ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES app.users(id)",
         # Safe type migration for content: wraps existing text in a paragraph block
         "ALTER TABLE app.knowledge_pages ALTER COLUMN content TYPE JSONB USING CASE WHEN content IS NULL THEN '[]'::JSONB WHEN content::text ~ '^[\\[\\{]' THEN content::JSONB ELSE jsonb_build_array(jsonb_build_object('type', 'paragraph', 'paragraph', jsonb_build_object('rich_text', jsonb_build_array(jsonb_build_object('type', 'text', 'text', jsonb_build_object('content', content)))))) END",
     ]
