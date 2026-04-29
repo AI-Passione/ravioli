@@ -124,7 +124,7 @@ class DataIngestor:
                     logger.info(f"CHUCKING MODE ACTIVATED for XLSX Sheet: {sheet_name} (Streaming enabled)")
                     gen = xlsx_chunk_generator(file_path, sheet_name, analysis)
                     xlsx_pipeline = create_ravioli_pipeline(f"xlsx_{clean_name}", schema)
-                    xlsx_pipeline.run(gen, table_name=table_name)
+                    xlsx_pipeline.run(gen, table_name=table_name, progress="log")
                 else:
                     df_final = process_sheet_with_analysis(pd.read_excel(file_path, sheet_name=sheet_name, header=None), analysis)
                     conn.register("tmp_df_final", df_final)
@@ -183,7 +183,7 @@ class DataIngestor:
             
             # Run all resources together
             logger.info(f"Executing dlt pipeline with {len(resources)} parallel resources for {original_filename}...")
-            load_info = pipeline.run(resources)
+            load_info = pipeline.run(resources, progress="log")
             logger.info(f"Pipeline execution completed for {original_filename}.")
             logger.info(f"Load Info Detail: {load_info}")
             
@@ -200,7 +200,7 @@ class DataIngestor:
             # Fallback for unrecognized XML
             tn = f"xml_{''.join(c if c.isalnum() else '_' for c in original_filename).lower()[:20]}"
             gen = xml_full_parse_generator(file_path, original_filename)
-            pipeline.run(dlt.resource(gen, name=tn))
+            pipeline.run(dlt.resource(gen, name=tn), progress="log")
             results.append({"table_name": tn, "row_count": 1, "status": "completed"})
             
         return results
@@ -219,6 +219,6 @@ class DataIngestor:
         
         tn = f"route_{''.join(c if c.isalnum() else '_' for c in original_filename).lower()[:20]}"
         p = create_ravioli_pipeline(f"gpx_{original_filename}", schema)
-        p.run(parse_gpx(), table_name=tn)
+        p.run(parse_gpx(), table_name=tn, progress="log")
         count = self.duckdb_manager.connection.execute(f'SELECT COUNT(*) FROM "{schema}"."{tn}"').fetchone()[0]
         return [{"table_name": tn, "row_count": count, "status": "completed"}]
