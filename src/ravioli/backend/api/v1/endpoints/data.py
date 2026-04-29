@@ -49,12 +49,12 @@ async def get_current_user(db: Session = Depends(get_db)) -> models.User:
     Temporary helper to get or create a default system user.
     Once auth is implemented, this should pull from JWT/Session.
     """
-    email = "admin@ai-passione.com"
+    email = "jimmypang@aipassione.com"
     user = db.execute(select(models.User).where(models.User.email == email)).scalar_one_or_none()
     if not user:
         user = models.User(
             id=uuid.uuid4(),
-            name="Admin User",
+            name="Jimmy Pang",
             email=email
         )
         db.add(user)

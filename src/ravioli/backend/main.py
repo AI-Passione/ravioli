@@ -25,9 +25,35 @@ def init_db():
         Base.metadata.create_all(bind=engine)
         # Idempotent column migrations for tables that already exist
         _migrate_columns()
+        # Seed initial data
+        seed_db()
         print("Database tables initialized successfully.")
     except Exception as e:
         print(f"Error initializing database: {e}")
+
+def seed_db():
+    """Create initial dummy records if they don't exist."""
+    from ravioli.backend.core import models
+    from ravioli.backend.core.database import SessionLocal
+    import uuid
+    
+    db = SessionLocal()
+    try:
+        email = "jimmypang@aipassione.com"
+        user = db.query(models.User).filter(models.User.email == email).first()
+        if not user:
+            user = models.User(
+                id=uuid.uuid4(),
+                name="Jimmy Pang",
+                email=email
+            )
+            db.add(user)
+            db.commit()
+            print(f"Seeded dummy user: {user.name}")
+    except Exception as e:
+        print(f"Error seeding database: {e}")
+    finally:
+        db.close()
 
 def _migrate_columns():
     """Add new columns to existing tables using IF NOT EXISTS (idempotent)."""
