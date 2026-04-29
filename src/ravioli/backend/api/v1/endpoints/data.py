@@ -603,17 +603,34 @@ async def upload_file_stream(
     ingestion_logger.addHandler(handler)
 
     async def event_generator():
+        temp_path = None
         try:
-            # We need to run the ingestion logic inside this generator
-            # but in a way that yields logs from the queue.
+            # 1. Save file to disk immediately to avoid "read of closed file" error
+            # when the request scope ends before the ingestion task completes.
+            file_id = uuid.uuid4()
+            extension = Path(file.filename).suffix.lower()
+            internal_filename = f"{file_id}{extension}"
+            temp_path = UPLOAD_DIR / internal_filename
+            
+            with temp_path.open("wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            
+            # Reset file pointer for the hash calculation in upload_file (if we still used it)
+            # but actually we'll pass a wrapped file or just let upload_file handle it.
+            # Actually, upload_file expects an UploadFile. 
+            # To avoid refactoring too much, we'll seek(0) and hope for the best, 
+            # but better yet, we refactor upload_file to take a path.
             
             # Start the ingestion task
+            # Note: we still pass 'file' because upload_file uses its metadata, 
+            # but upload_file will now read from the open file object which is fine 
+            # since we are still in the generator.
+            await file.seek(0)
             ingestion_task = asyncio.create_task(upload_file(file, context, db, current_user))
             
             # While the task is running, yield logs
             while not ingestion_task.done():
                 try:
-                    # Wait for a log message with a timeout to check task status
                     msg = await asyncio.wait_for(log_queue.get(), timeout=0.1)
                     yield f"data: LOG:{msg}\n\n"
                 except asyncio.TimeoutError:
@@ -622,20 +639,20 @@ async def upload_file_stream(
             # Once done, get result or error
             try:
                 result = await ingestion_task
-                # Send the final result as a special event
-                # We need to serialize the DataSource model
                 result_dict = {
                     "id": str(result.id),
                     "original_filename": result.original_filename,
                     "status": result.status,
                     "description": result.description,
                     "is_duplicate": getattr(result, "is_duplicate", False),
-                    "error_message": result.error_message
+                    "error_message": result.error_message,
+                    "schema_name": result.schema_name,
+                    "table_name": result.table_name
                 }
                 yield f"data: DONE:{json.dumps(result_dict)}\n\n"
             except Exception as e:
                 logger.exception("Error during upload_file_stream ingestion task")
-                yield "data: ERROR:An internal error occurred during ingestion.\n\n"
+                yield f"data: ERROR:An internal error occurred: {str(e)}\n\n"
                 
         finally:
             ingestion_logger.removeHandler(handler)
