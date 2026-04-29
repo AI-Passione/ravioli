@@ -118,15 +118,19 @@ def xlsx_chunk_generator(path: Path, sheet_name: str, analysis: dict, chunk_size
     if not header_row: return
 
     chunk = []
+    total_processed = 0
     for i, row in enumerate(ws.iter_rows(min_row=d_idx + 1, values_only=True)):
         # Convert row to dict
         record = dict(zip(header_row, row))
         chunk.append(record)
+        total_processed += 1
         if len(chunk) >= chunk_size:
+            logger.info(f"Chunking: Processed {total_processed:,} rows from sheet '{sheet_name}'")
             yield chunk
             chunk = []
             
     if chunk:
+        logger.info(f"Chunking complete for sheet '{sheet_name}'. Total: {total_processed:,} rows.")
         yield chunk
 
 # --- XML Ingestion Utils ---
@@ -206,12 +210,18 @@ def parallel_xml_tag_generator(path: Path, tag_name: str, extract_metadata: bool
 
     logger.info(f"Starting parallel XML ingestion with {num_workers} workers for tag {tag_name}")
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
-        futures = [executor.submit(scan_xml_chunk, path, tag_name, start, end, extract_metadata) for start, end in chunks]
+        futures = {executor.submit(scan_xml_chunk, path, tag_name, start, end, extract_metadata): (start, end) for start, end in chunks}
+        completed_workers = 0
         for future in concurrent.futures.as_completed(futures):
+            completed_workers += 1
+            start, end = futures[future]
+            logger.info(f"Worker {completed_workers}/{num_workers} finished chunk [{start:,} - {end:,}] for tag {tag_name}")
             try:
-                yield from future.result()
+                results = future.result()
+                logger.info(f"Chunk yielded {len(results):,} records.")
+                yield from results
             except Exception as e:
-                logger.error(f"Worker failed: {e}")
+                logger.error(f"Worker failed for chunk [{start} - {end}]: {e}")
 
 XML_STRATEGIES = {
     "apple_health_export": {

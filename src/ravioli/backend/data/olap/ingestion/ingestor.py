@@ -150,11 +150,13 @@ class DataIngestor:
         if strategy:
             # Collect resources to run them in one go for better worker distribution
             resources = []
+            logger.info(f"Strategy found: {strategy['match'].__name__ if hasattr(strategy['match'], '__name__') else 'dynamic'}. Collecting resources...")
             for table_cfg in strategy["tables"]:
                 tag = table_cfg.get("tag")
                 tn = table_cfg["table_name"]
                 extract_metadata = table_cfg.get("extract_metadata", False)
                 
+                logger.info(f"Preparing resource for table '{tn}' (Tag: {tag})")
                 if tag:
                     gen = parallel_xml_tag_generator(file_path, tag, extract_metadata) if is_chucking else xml_tag_generator(file_path, tag, extract_metadata)
                 else:
@@ -163,7 +165,9 @@ class DataIngestor:
                 resources.append(dlt.resource(gen, name=tn, write_disposition="append" if tag else "replace"))
             
             # Run all resources together
-            pipeline.run(resources, workers=4 if is_chucking else 1)
+            logger.info(f"Executing dlt pipeline with {len(resources)} resources...")
+            load_info = pipeline.run(resources, workers=4 if is_chucking else 1)
+            logger.info(f"Pipeline execution completed. Status: {load_info}")
             
             for table_cfg in strategy["tables"]:
                 tn = table_cfg["table_name"]
