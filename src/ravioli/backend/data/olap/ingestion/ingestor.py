@@ -15,7 +15,6 @@ from ravioli.backend.data.olap.ingestion.utils import (
     xml_tag_generator,
     xml_chunk_generator,
     xml_full_parse_generator,
-    parallel_xml_tag_generator,
     XML_STRATEGIES
 )
 
@@ -127,7 +126,9 @@ class DataIngestor:
                     xlsx_pipeline.run(gen, table_name=table_name)
                 else:
                     df_final = process_sheet_with_analysis(pd.read_excel(file_path, sheet_name=sheet_name, header=None), analysis)
-                    conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM df_final")
+                    conn.register("tmp_df_final", df_final)
+                    conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM tmp_df_final")
+                    conn.unregister("tmp_df_final")
                 
                 results.append({"sheet_name": sheet_name, "table_name": table_name, "status": "completed", "row_count": conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]})
         except Exception as e:
