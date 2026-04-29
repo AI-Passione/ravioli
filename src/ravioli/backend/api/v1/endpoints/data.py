@@ -78,8 +78,9 @@ async def upload_file(
     current_user: models.User = Depends(get_current_user)
 ):
     extension = Path(file.filename).suffix.lower()
-    if extension not in ['.csv', '.xlsx']:
-        raise HTTPException(status_code=400, detail="Only CSV and XLSX files are supported at this moment.")
+    allowed_extensions = ['.csv', '.xlsx', '.xml', '.gpx']
+    if extension not in allowed_extensions:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}")
 
     # Generate hash to check for duplicates
     file_hash = await calculate_hash(file)
@@ -154,6 +155,70 @@ async def upload_file(
                     db_source.description = await ollama_client.generate_description(db_source.original_filename, df_sample.to_csv(index=False), context=context)
                 except Exception as e:
                     logger.warning("Auto-description failed for CSV: %s", e)
+            elif extension in ['.xml', '.gpx']:
+                # Apple Health or general XML/GPX Ingestion
+                results = duckdb_manager.ingest_apple_health(file_path, file.filename, schema="s_manual")
+                
+                valid_results = [r for r in results if r["status"] == "completed"]
+                
+                if not valid_results:
+                    db_source.status = "failed"
+                    db_source.error_message = "No valid data extracted from file."
+                else:
+                    # Update primary record
+                    first = valid_results[0]
+                    db_source.table_name = first["table_name"]
+                    db_source.row_count = first["row_count"]
+                    db_source.status = "completed"
+                    
+                    # AI Description for primary
+                    try:
+                        ollama_client = OllamaClient(db)
+                        # For XML/GPX, we read the first 2000 chars as the "sample"
+                        with file_path.open("r", errors="ignore") as f:
+                            sample_text = f.read(2000)
+                        db_source.description = await ollama_client.generate_description(db_source.original_filename, sample_text, context=context)
+                    except Exception as e:
+                        logger.warning("Auto-description failed for XML/GPX: %s", e)
+                        
+                    # PII Scan for primary
+                    try:
+                        full_table_name = f'"s_manual"."{db_source.table_name}"'
+                        df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 100').fetchdf()
+                        db_source.has_pii = pii_scanner.scan_dataframe(df_sample)
+                    except Exception as e:
+                        logger.warning("PII scan failed for table %s: %s", db_source.table_name, e)
+
+                    # Create records for other valid tables
+                    for other in valid_results[1:]:
+                        other_source = DataSource(
+                            id=uuid.uuid4(),
+                            filename=internal_filename,
+                            original_filename=f"{file.filename} [{other['table_name']}]",
+                            content_type=file.content_type,
+                            size_bytes=file_path.stat().st_size,
+                            table_name=other["table_name"],
+                            schema_name="s_manual",
+                            file_hash=file_hash,
+                            status="completed",
+                            row_count=other["row_count"],
+                            owner_id=current_user.id
+                        )
+                        # PII Scan for other
+                        try:
+                            full_table_name = f'"s_manual"."{other["table_name"]}"'
+                            df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 100').fetchdf()
+                            other_source.has_pii = pii_scanner.scan_dataframe(df_sample)
+                        except Exception as e:
+                            logger.warning("PII scan failed for table %s: %s", other["table_name"], e)
+                        
+                        # AI Description for other
+                        try:
+                            other_source.description = await ollama_client.generate_description(other_source.original_filename, sample_text, context=context)
+                        except:
+                            pass
+                            
+                        db.add(other_source)
             else: # .xlsx
                 ollama_client = OllamaClient(db)
                 xlsx_results = await duckdb_manager.ingest_xlsx(file_path, table_name, schema="s_manual", ollama_client=ollama_client)

@@ -3,7 +3,10 @@ import os
 from pathlib import Path
 import pandas as pd
 import logging
+import xml.etree.ElementTree as ET
+import dlt
 from ravioli.backend.core.config import settings
+from ravioli.backend.data.olap.ingestion.dlt_utils import create_ravioli_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +144,140 @@ class DuckDBManager:
             raise e
             
         return results
+
+    def ingest_apple_health(self, file_path: Path, original_filename: str, schema: str = "s_manual") -> list:
+        """
+        Detects the type of Apple Health file and routes to the correct ingestor.
+        Returns a list of result metadata for each table created.
+        """
+        filename = original_filename.lower()
+        
+        if filename.endswith('.xml'):
+            if 'export_cda' in filename:
+                return self._ingest_apple_health_cda_xml(file_path, original_filename, schema)
+            elif 'export' in filename:
+                return self._ingest_apple_health_export_xml(file_path, original_filename, schema)
+        elif filename.endswith('.gpx'):
+            return self._ingest_apple_health_gpx(file_path, original_filename, schema)
+        elif filename.startswith('ecg_') and filename.endswith('.csv'):
+            return self._ingest_apple_health_ecg(file_path, original_filename, schema)
+            
+        raise ValueError(f"Unsupported Apple Health file type: {original_filename}")
+
+    def _ingest_apple_health_export_xml(self, file_path: Path, original_filename: str, schema: str) -> list:
+        """Streams Record, Workout, and ActivitySummary tags from export.xml."""
+        results = []
+        
+        def stream_records():
+            context = ET.iterparse(file_path, events=("end",))
+            for event, elem in context:
+                if elem.tag == "Record":
+                    yield dict(elem.attrib)
+                    elem.clear()
+
+        def stream_workouts():
+            context = ET.iterparse(file_path, events=("end",))
+            for event, elem in context:
+                if elem.tag == "Workout":
+                    workout = dict(elem.attrib)
+                    metadata = {}
+                    for child in elem:
+                        if child.tag == "MetadataEntry":
+                            metadata[child.attrib.get('key')] = child.attrib.get('value')
+                    if metadata:
+                        workout['metadata'] = metadata
+                    yield workout
+                    elem.clear()
+
+        def stream_activity_summaries():
+            context = ET.iterparse(file_path, events=("end",))
+            for event, elem in context:
+                if elem.tag == "ActivitySummary":
+                    yield dict(elem.attrib)
+                    elem.clear()
+
+        pipeline = create_ravioli_pipeline(
+            pipeline_name=f"apple_health_export_{os.path.getsize(file_path)}",
+            dataset_name=schema
+        )
+
+        tag_types = [
+            ("apple_health_records", stream_records),
+            ("apple_health_workouts", stream_workouts),
+            ("apple_health_activity_summaries", stream_activity_summaries)
+        ]
+
+        for table_name, generator in tag_types:
+            logger.info(f"Ingesting Apple Health {table_name}...")
+            pipeline.run(generator(), table_name=table_name, write_disposition="append")
+            
+            full_table_name = f'"{schema}"."{table_name}"'
+            try:
+                count = self.connection.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
+                results.append({
+                    "table_name": table_name,
+                    "row_count": count,
+                    "status": "completed"
+                })
+            except Exception as e:
+                logger.warning(f"Could not get row count for {table_name}: {e}")
+
+        return results
+
+    def _ingest_apple_health_cda_xml(self, file_path: Path, original_filename: str, schema: str) -> list:
+        """Parses Clinical Document Architecture files."""
+        def parse_cda():
+            tree = ET.parse(file_path)
+            root = tree.getroot()
+            yield {"filename": original_filename, "root_tag": root.tag, "attribs": dict(root.attrib)}
+
+        pipeline = create_ravioli_pipeline(
+            pipeline_name=f"apple_health_cda_{original_filename}",
+            dataset_name=schema
+        )
+        table_name = "apple_health_clinical_records"
+        pipeline.run(parse_cda(), table_name=table_name)
+        count = self.connection.execute(f'SELECT COUNT(*) FROM "{schema}"."{table_name}"').fetchone()[0]
+        return [{"table_name": table_name, "row_count": count, "status": "completed"}]
+
+    def _ingest_apple_health_gpx(self, file_path: Path, original_filename: str, schema: str) -> list:
+        """Extracts track points from GPX files."""
+        def parse_gpx():
+            context = ET.iterparse(file_path, events=("end",))
+            for event, elem in context:
+                tag = elem.tag.split('}')[-1]
+                if tag == "trkpt":
+                    point = {
+                        "latitude": float(elem.attrib.get('lat')),
+                        "longitude": float(elem.attrib.get('lon')),
+                        "time": None,
+                        "elevation": None
+                    }
+                    for child in elem:
+                        child_tag = child.tag.split('}')[-1]
+                        if child_tag == "time":
+                            point["time"] = child.text
+                        elif child_tag == "ele":
+                            point["elevation"] = float(child.text) if child.text else None
+                    yield point
+                    elem.clear()
+
+        pipeline = create_ravioli_pipeline(
+            pipeline_name=f"apple_health_gpx_{original_filename}",
+            dataset_name=schema
+        )
+        clean_name = "".join(c if c.isalnum() else "_" for c in original_filename).lower()
+        table_name = f"route_{clean_name[:20]}"
+        pipeline.run(parse_gpx(), table_name=table_name)
+        count = self.connection.execute(f'SELECT COUNT(*) FROM "{schema}"."{table_name}"').fetchone()[0]
+        return [{"table_name": table_name, "row_count": count, "status": "completed"}]
+
+    def _ingest_apple_health_ecg(self, file_path: Path, original_filename: str, schema: str) -> list:
+        """Handles ECG time-series CSVs."""
+        clean_name = "".join(c if c.isalnum() else "_" for c in original_filename).lower()
+        table_name = f"ecg_{clean_name[:20]}"
+        count = self.ingest_csv(file_path, table_name, schema=schema)
+        return [{"table_name": table_name, "row_count": count, "status": "completed"}]
 
     def _process_sheet_with_analysis(self, df: pd.DataFrame, analysis: dict) -> pd.DataFrame:
         """Apply the structural fixes discovered by AI analysis."""

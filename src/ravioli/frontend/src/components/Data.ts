@@ -254,7 +254,7 @@ export function renderData() {
                   </div>
                 </div>
               </div>
-              <input type="file" id="file-input" class="hidden" accept=".csv,.xlsx" multiple>
+              <input type="file" id="file-input" class="hidden" accept=".csv,.xlsx,.xml,.gpx" multiple>
             </div>
             <button class="btn-back mt-8 text-neutral-500 hover:text-neutral-300 flex items-center gap-2 text-sm transition-colors">
               <span class="material-symbols-outlined text-lg">arrow_back</span>
@@ -408,7 +408,8 @@ export function renderData() {
     async function scanEntry(entry: any) {
       if (entry.isFile) {
         const file = await new Promise<File>((resolve, reject) => entry.file(resolve, reject));
-        if (file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.xlsx')) {
+        const ext = file.name.toLowerCase();
+        if (ext.endsWith('.csv') || ext.endsWith('.xlsx') || ext.endsWith('.xml') || ext.endsWith('.gpx')) {
           files.push(file);
         }
       } else if (entry.isDirectory) {
@@ -456,9 +457,10 @@ export function renderData() {
 
   async function handleUploads(filesArray: File[], context?: string) {
     // Filter to be safe, though drop handles it, file input might not
-    const filteredFiles = filesArray.filter(f => 
-      f.name.toLowerCase().endsWith('.csv') || f.name.toLowerCase().endsWith('.xlsx')
-    );
+    const filteredFiles = filesArray.filter(f => {
+      const ext = f.name.toLowerCase();
+      return ext.endsWith('.csv') || ext.endsWith('.xlsx') || ext.endsWith('.xml') || ext.endsWith('.gpx');
+    });
     
     if (filteredFiles.length === 0) return;
 
@@ -475,15 +477,17 @@ export function renderData() {
     if (ingestionLogs) ingestionLogs.innerHTML = '';
     if (ingestionStatus) ingestionStatus.textContent = 'Ingestion in Progress...';
 
-    const addLog = (msg: string, isHeader = false) => {
+    const addLog = (msg: string, isHeader = false, isWarning = false) => {
       if (ingestionLogs) {
         const div = document.createElement('div');
         div.className = isHeader ? 'text-primary font-bold mt-2 mb-1' : 'animate-in fade-in slide-in-from-left-1 duration-300';
+        if (isWarning) div.className += ' text-amber-500 bg-amber-500/5 px-2 py-1 rounded-lg border border-amber-500/10 my-2';
+        
         if (isHeader) {
           div.textContent = msg;
         } else {
           const prefix = document.createElement('span');
-          prefix.className = 'text-neutral-600 mr-2';
+          prefix.className = isWarning ? 'hidden' : 'text-neutral-600 mr-2';
           prefix.textContent = '>';
           div.appendChild(prefix);
           div.appendChild(document.createTextNode(msg));
@@ -493,6 +497,12 @@ export function renderData() {
         if (console) console.scrollTop = console.scrollHeight;
       }
     };
+
+    // Check for large files (> 50MB)
+    const largeFiles = filteredFiles.filter(f => f.size > 50 * 1024 * 1024);
+    if (largeFiles.length > 0) {
+      addLog(`⚠️ Large file(s) detected (>50MB). Ingestion will use streaming mode but may take several minutes. Please keep this tab open.`, false, true);
+    }
 
     let completed = 0;
     let failed = 0;
