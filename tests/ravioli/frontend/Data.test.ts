@@ -140,4 +140,10 @@ describe('Data component', () => {
     const dismissBtn = el.querySelector('.btn-dismiss-pii');
     expect(dismissBtn).not.toBeNull();
   });
+
+  it('should have a multiple file input for batch uploads', () => {
+    const el = renderData();
+    const fileInput = el.querySelector('#file-input') as HTMLInputElement;
+    expect(fileInput.getAttribute('multiple')).not.toBeNull();
+  });
 });

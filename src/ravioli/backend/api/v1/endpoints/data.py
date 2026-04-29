@@ -83,9 +83,10 @@ async def upload_file(
     internal_filename = f"{file_id}{extension}"
     file_path = UPLOAD_DIR / internal_filename
     
-    # Generate a clean table name from the filename
+    # Generate a clean, unique table name from the filename
     base_name = Path(file.filename).stem
-    table_name = "".join(c if c.isalnum() else "_" for c in base_name).lower()
+    clean_base = "".join(c if c.isalnum() else "_" for c in base_name).lower()
+    table_name = f"{clean_base}_{file_id.hex[:4]}"
     
     try:
         # Save file to disk

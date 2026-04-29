@@ -209,11 +209,12 @@ export function renderData() {
               </div>
               <div id="drop-zone-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-container/90 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 z-10 p-6">
                 <span class="material-symbols-outlined animate-spin text-primary text-4xl mb-4">sync</span>
-                <p class="text-neutral-200 font-medium animate-pulse">Ingestion in Progress...</p>
+                <p id="ingestion-status" class="text-neutral-200 font-medium animate-pulse text-center">Ingestion in Progress...</p>
+                <p id="queue-status" class="text-[10px] text-primary/70 mt-1 uppercase tracking-[0.2em] font-bold"></p>
                 
-                <div id="ingestion-console" class="mt-6 w-full max-w-md bg-black/40 rounded-xl p-4 font-mono text-[10px] text-neutral-400 overflow-y-auto max-h-40 border border-outline/10 text-left">
+                <div id="ingestion-console" class="mt-6 w-full max-w-md bg-black/40 rounded-xl p-4 font-mono text-[10px] text-neutral-400 overflow-y-auto max-h-48 border border-outline/10 text-left">
                   <div class="text-primary/70 mb-2 border-b border-outline/5 pb-1 uppercase tracking-tighter flex justify-between">
-                    <span>System Terminal</span>
+                    <span id="console-filename">System Terminal</span>
                     <span class="animate-pulse">●</span>
                   </div>
                   <div id="ingestion-logs" class="space-y-1">
@@ -221,7 +222,7 @@ export function renderData() {
                   </div>
                 </div>
               </div>
-              <input type="file" id="file-input" class="hidden" accept=".csv,.xlsx">
+              <input type="file" id="file-input" class="hidden" accept=".csv,.xlsx" multiple>
             </div>
             <button class="btn-back mt-8 text-neutral-500 hover:text-neutral-300 flex items-center gap-2 text-sm transition-colors">
               <span class="material-symbols-outlined text-lg">arrow_back</span>
@@ -337,48 +338,101 @@ export function renderData() {
   const fileInput = container.querySelector('#file-input') as HTMLInputElement;
   
   dropZone?.addEventListener('click', () => fileInput.click());
-  fileInput?.addEventListener('change', async (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
-    if (file) await handleUpload(file);
+  
+  // Drag & Drop
+  ['dragover', 'dragenter'].forEach(eventName => {
+    dropZone?.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.add('border-primary/50', 'bg-surface-container');
+    });
   });
 
-  async function handleUpload(file: File) {
+  ['dragleave', 'drop'].forEach(eventName => {
+    dropZone?.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('border-primary/50', 'bg-surface-container');
+    });
+  });
+
+  dropZone?.addEventListener('drop', (e: any) => {
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) handleUploads(files);
+  });
+
+  fileInput?.addEventListener('change', async (e) => {
+    const files = (e.target as HTMLInputElement).files;
+    if (files && files.length > 0) await handleUploads(files);
+  });
+
+  async function handleUploads(files: FileList | File[]) {
+    const filesArray = Array.from(files).filter(f => 
+      f.name.toLowerCase().endsWith('.csv') || f.name.toLowerCase().endsWith('.xlsx')
+    );
+    
+    if (filesArray.length === 0) return;
+
     const dropZoneContent = container.querySelector('#drop-zone-content');
     const dropZoneLoading = container.querySelector('#drop-zone-loading');
     const ingestionLogs = container.querySelector('#ingestion-logs');
+    const consoleFilename = container.querySelector('#console-filename');
+    const queueStatus = container.querySelector('#queue-status');
+    const ingestionStatus = container.querySelector('#ingestion-status');
     
     dropZoneContent?.classList.add('opacity-0');
     dropZoneLoading?.classList.remove('opacity-0', 'pointer-events-none');
     
-    if (ingestionLogs) ingestionLogs.innerHTML = '<div class="text-primary/50 italic">Establishing data stream...</div>';
+    if (ingestionLogs) ingestionLogs.innerHTML = '';
+    if (ingestionStatus) ingestionStatus.textContent = 'Ingestion in Progress...';
 
-    const addLog = (msg: string) => {
+    const addLog = (msg: string, isHeader = false) => {
       if (ingestionLogs) {
         const div = document.createElement('div');
-        div.className = 'animate-in fade-in slide-in-from-left-1 duration-300';
-        div.innerHTML = `<span class="text-neutral-600 mr-2">></span>${msg}`;
+        div.className = isHeader ? 'text-primary font-bold mt-2 mb-1' : 'animate-in fade-in slide-in-from-left-1 duration-300';
+        div.innerHTML = isHeader ? msg : `<span class="text-neutral-600 mr-2">></span>${msg}`;
         ingestionLogs.appendChild(div);
         const console = container.querySelector('#ingestion-console');
         if (console) console.scrollTop = console.scrollHeight;
       }
     };
 
-    api.streamUpload(
-      file, 
-      (msg) => addLog(msg),
-      (result) => {
-        if (result.is_duplicate) alert('Duplicate Data Detected: Already uploaded.');
-        setTimeout(() => {
-          hideAddModal();
-          refreshFiles();
-        }, 500);
-      },
-      (err) => {
-        alert(`Upload failed: ${err.message || err}`);
-        dropZoneContent?.classList.remove('opacity-0');
-        dropZoneLoading?.classList.add('opacity-0', 'pointer-events-none');
+    let completed = 0;
+    let failed = 0;
+
+    for (const file of filesArray) {
+      if (queueStatus) queueStatus.textContent = `Processing file ${completed + failed + 1} of ${filesArray.length}`;
+      if (consoleFilename) consoleFilename.textContent = file.name;
+      
+      addLog(`Starting ingestion for ${file.name}...`, true);
+
+      try {
+        const result = await api.streamUpload(file, (msg) => addLog(msg));
+        if (result.is_duplicate) {
+          addLog(`Notice: Duplicate file detected. Skipping new ingestion, using existing record.`, false);
+        }
+        addLog(`Success: ${file.name} ingested successfully.`, false);
+        completed++;
+      } catch (err: any) {
+        addLog(`Error processing ${file.name}: ${err.message || err}`, false);
+        failed++;
       }
-    );
+    }
+
+    // Final state
+    if (ingestionStatus) ingestionStatus.textContent = 'Ingestion Complete';
+    if (queueStatus) queueStatus.textContent = `${completed} Success, ${failed} Failed`;
+    if (consoleFilename) consoleFilename.textContent = 'Summary';
+    
+    addLog(`--- Ingestion Summary ---`, true);
+    addLog(`Total files: ${filesArray.length}`);
+    addLog(`Successfully processed: ${completed}`);
+    if (failed > 0) addLog(`Failed: ${failed}`);
+
+    setTimeout(() => {
+      hideAddModal();
+      refreshFiles();
+    }, 2000);
   }
 
   // --- General Table Logic ---
