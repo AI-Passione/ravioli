@@ -216,7 +216,9 @@ def xml_chunk_generator(path: Path, tag_name: str, start: int, end: int, extract
                             
                     count += 1
                     if count % 50000 == 0:
-                        logger.info(f"Chunk [{start//1024**2}MB]: Found {count:,} records for {tag_name}...")
+                        msg = f"Chunk [{start//1024**2}MB]: Found {count:,} records for {tag_name}..."
+                        print(f"DEBUG: xml_chunk_generator print: {msg}", flush=True)
+                        logger.info(msg)
                     yield entry
             
             logger.info(f"Chunk completed. Total found: {count:,} records for {tag_name}.")

@@ -3,6 +3,7 @@ import shutil
 import uuid
 import hashlib
 import contextvars
+import os
 from pathlib import Path
 from typing import List, Optional
 import json
@@ -615,6 +616,20 @@ async def upload_file_stream(
             l.addHandler(handler)
         l.setLevel(logging.INFO)
         l.propagate = True
+
+    # Wrap upload_file to set the context variable and re-attach handlers
+    async def wrapped_upload_file(*args, **kwargs):
+        # Re-attach shotgun handlers inside the task in case dlt/others reset them
+        for name in logging.root.manager.loggerDict:
+            if "ravioli" in name or "dlt" in name:
+                l = logging.getLogger(name)
+                if handler not in l.handlers:
+                    l.addHandler(handler)
+        
+        try:
+            return await upload_file(*args, **kwargs)
+        finally:
+            pass
 
     async def event_generator():
         temp_path = None
