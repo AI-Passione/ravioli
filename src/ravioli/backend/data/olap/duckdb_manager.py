@@ -155,7 +155,27 @@ class DuckDBManager:
             data_start_idx = header_row_idx + 1
             
         is_split = analysis.get("is_split", False)
+        split_offsets = analysis.get("split_offsets", [])
         mapping = analysis.get("column_mapping", {})
+
+        # Heuristic Override: If AI missed a split but we see duplicate headers, force it.
+        # This is common in LinkedIn 'Top Posts' where the same columns repeat for different metrics.
+        if not is_split:
+            raw_headers = df.iloc[header_row_idx].tolist()
+            seen_headers = set()
+            for i, h in enumerate(raw_headers):
+                h_str = str(h).strip().lower()
+                # Skip empty or generic headers
+                if not h_str or "unnamed" in h_str or h_str.startswith("col_"):
+                    continue
+                if h_str in seen_headers:
+                    logger.warning(f"Heuristic: Detected duplicate header '{h}' at col {i}. Forcing Split mode.")
+                    is_split = True
+                    # Estimate split offsets by finding repeating blocks of the first valid header
+                    first_header = str(raw_headers[0]).strip().lower()
+                    split_offsets = [j for j, val in enumerate(raw_headers) if str(val).strip().lower() == first_header and j > 0]
+                    break
+                seen_headers.add(h_str)
 
         # Safety Check: If AI suggested a data start that is beyond the end of the file,
         # fallback to something safer (like the header row itself or row 0)
@@ -169,10 +189,11 @@ class DuckDBManager:
 
         # 1. Extraction Phase
         if is_split:
-            # Handle list of offsets or a single offset
-            split_offsets = analysis.get("split_offsets")
-            if not split_offsets and "split_column_offset" in analysis:
-                split_offsets = [analysis["split_column_offset"]]
+            # Use heuristic offsets if available, otherwise get from analysis
+            if not split_offsets:
+                split_offsets = analysis.get("split_offsets")
+                if not split_offsets and "split_column_offset" in analysis:
+                    split_offsets = [analysis["split_column_offset"]]
                 
             if split_offsets:
                 logger.info(f"Reconciling multi-block split table with offsets {split_offsets}...")
