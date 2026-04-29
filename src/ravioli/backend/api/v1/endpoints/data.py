@@ -217,8 +217,8 @@ async def upload_file(
                         # AI Description for other
                         try:
                             other_source.description = await ollama_client.generate_description(other_source.original_filename, sample_text, context=context)
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.warning("Auto-description failed for table %s: %s", other["table_name"], e)
                             
                         db.add(other_source)
             else: # .xlsx

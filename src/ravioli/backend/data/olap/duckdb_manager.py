@@ -1,7 +1,6 @@
 import duckdb
 import os
 import pandas as pd
-from pathlib import Path
 import logging
 from ravioli.backend.core.config import settings
 
