@@ -497,21 +497,44 @@ export function renderData() {
     const addLog = (msg: string, isHeader = false, isWarning = false) => {
       if (ingestionLogs) {
         const div = document.createElement('div');
-        div.className = isHeader ? 'text-primary font-bold mt-2 mb-1' : 'animate-in fade-in slide-in-from-left-1 duration-300';
-        if (isWarning) div.className += ' text-amber-500 bg-amber-500/5 px-2 py-1 rounded-lg border border-amber-500/10 my-2';
+        div.className = 'font-mono text-[10px] py-0.5 animate-in fade-in slide-in-from-left-1 duration-300 whitespace-pre-wrap break-all';
         
         if (isHeader) {
+          div.className = 'text-primary font-bold mt-2 mb-1 border-b border-primary/10 pb-1';
+          div.textContent = msg;
+        } else if (isWarning) {
+          div.className += ' text-amber-500 bg-amber-500/5 px-2 py-1 rounded-lg border border-amber-500/10 my-2';
           div.textContent = msg;
         } else {
-          const prefix = document.createElement('span');
-          prefix.className = isWarning ? 'hidden' : 'text-neutral-600 mr-2';
-          prefix.textContent = '>';
-          div.appendChild(prefix);
-          div.appendChild(document.createTextNode(msg));
+          // Detect log levels
+          if (msg.startsWith('INFO: ')) {
+            const span = document.createElement('span');
+            span.className = 'text-blue-400 mr-2 opacity-80';
+            span.textContent = 'INFO';
+            div.appendChild(span);
+            div.appendChild(document.createTextNode(msg.substring(6)));
+          } else if (msg.startsWith('WARNING: ')) {
+            const span = document.createElement('span');
+            span.className = 'text-amber-500 mr-2';
+            span.textContent = 'WARN';
+            div.appendChild(span);
+            div.appendChild(document.createTextNode(msg.substring(9)));
+            div.className += ' bg-amber-500/5 px-2 rounded';
+          } else if (msg.startsWith('ERROR: ')) {
+            const span = document.createElement('span');
+            span.className = 'text-red-500 mr-2';
+            span.textContent = 'ERR ';
+            div.appendChild(span);
+            div.appendChild(document.createTextNode(msg.substring(7)));
+            div.className += ' bg-red-500/5 px-2 rounded';
+          } else {
+            div.className += ' text-neutral-400';
+            div.textContent = msg;
+          }
         }
         ingestionLogs.appendChild(div);
-        const console = container.querySelector('#ingestion-console');
-        if (console) console.scrollTop = console.scrollHeight;
+        const consoleEl = container.querySelector('#ingestion-console');
+        if (consoleEl) consoleEl.scrollTop = consoleEl.scrollHeight;
       }
     };
 

@@ -2,6 +2,7 @@ import re
 import shutil
 import uuid
 import hashlib
+import contextvars
 from pathlib import Path
 from typing import List, Optional
 import json
@@ -74,7 +75,8 @@ async def upload_file(
     file: UploadFile = File(...),
     context: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user),
+    file_path: Optional[Path] = None
 ):
     extension = Path(file.filename).suffix.lower()
     allowed_extensions = ['.csv', '.xlsx', '.xml', '.gpx']
@@ -100,7 +102,11 @@ async def upload_file(
 
     file_id = uuid.uuid4()
     internal_filename = f"{file_id}{extension}"
-    file_path = UPLOAD_DIR / internal_filename
+    if not file_path:
+        file_path = UPLOAD_DIR / internal_filename
+        # Save file to disk
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
     
     # Generate a clean, unique table name from the filename
     base_name = Path(file.filename).stem
@@ -108,10 +114,6 @@ async def upload_file(
     table_name = f"{clean_base}_{file_id.hex[:4]}"
     
     try:
-        # Save file to disk
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
         # Create record in Postgres
         db_source = DataSource(
             id=file_id,
@@ -593,30 +595,20 @@ async def upload_file_stream(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """
-    Same as upload_file but returns a StreamingResponse with real-time logs.
-    """
     log_queue = asyncio.Queue()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     handler = LogCaptureHandler(log_queue, loop)
     
-    # Capture both app logs and dlt logs
-    ravioli_logger = logging.getLogger("ravioli")
-    dlt_logger = logging.getLogger("dlt")
+    # Attach handler to root logger to capture EVERYTHING
+    root_logger = logging.getLogger()
+    root_logger.addHandler(handler)
     
-    ravioli_logger.addHandler(handler)
-    dlt_logger.addHandler(handler)
-    
-    # Ensure levels are set correctly for capture
-    ravioli_logger.setLevel(logging.INFO)
-    dlt_logger.setLevel(logging.INFO)
-
     async def event_generator():
         temp_path = None
         try:
-            yield f"data: LOG:SYSTEM: Log stream initialized. Ready for ingestion...\n\n"
+            yield f"data: LOG:INFO: [SYSTEM] System Terminal linked. Capturing ingestion logs...\n\n"
+            
             # 1. Save file to disk immediately to avoid "read of closed file" error
-            # when the request scope ends before the ingestion task completes.
             file_id = uuid.uuid4()
             extension = Path(file.filename).suffix.lower()
             internal_filename = f"{file_id}{extension}"
@@ -625,18 +617,8 @@ async def upload_file_stream(
             with temp_path.open("wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             
-            # Reset file pointer for the hash calculation in upload_file (if we still used it)
-            # but actually we'll pass a wrapped file or just let upload_file handle it.
-            # Actually, upload_file expects an UploadFile. 
-            # To avoid refactoring too much, we'll seek(0) and hope for the best, 
-            # but better yet, we refactor upload_file to take a path.
-            
             # Start the ingestion task
-            # Note: we still pass 'file' because upload_file uses its metadata, 
-            # but upload_file will now read from the open file object which is fine 
-            # since we are still in the generator.
-            await file.seek(0)
-            ingestion_task = asyncio.create_task(upload_file(file, context, db, current_user))
+            ingestion_task = asyncio.create_task(upload_file(file, context, db, current_user, file_path=temp_path))
             
             # While the task is running, yield logs
             while not ingestion_task.done():
@@ -670,8 +652,7 @@ async def upload_file_stream(
                 yield f"data: ERROR:An internal error occurred: {str(e)}\n\n"
                 
         finally:
-            ravioli_logger.removeHandler(handler)
-            dlt_logger.removeHandler(handler)
+            root_logger.removeHandler(handler)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
