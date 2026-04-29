@@ -91,7 +91,7 @@ async def upload_file(
     
     # Check if file with same hash already exists
     query = select(DataSource).where(DataSource.file_hash == file_hash)
-    existing_file = db.execute(query).scalar_one_or_none()
+    existing_file = db.execute(query).scalars().first()
     
     if existing_file:
         # If it exists and was successful, we can just return it
@@ -602,30 +602,14 @@ async def upload_file_stream(
     loop = asyncio.get_running_loop()
     handler = LogCaptureHandler(log_queue, loop)
     
-    # SHOTGUN ATTACHMENT: Catch everything in the ravioli and dlt tree
-    loggers_to_capture = [logging.getLogger()] # Always start with root
-    
-    # Scan all existing loggers
-    for name in logging.root.manager.loggerDict:
-        if "ravioli" in name or "dlt" in name:
-            loggers_to_capture.append(logging.getLogger(name))
-            
-    for l in loggers_to_capture:
-        # Avoid duplicate handlers if possible
-        if handler not in l.handlers:
-            l.addHandler(handler)
-        l.setLevel(logging.INFO)
-        l.propagate = True
+    # Attach handler to root logger — this should catch everything via propagation
+    root_logger = logging.getLogger()
+    if handler not in root_logger.handlers:
+        root_logger.addHandler(handler)
+    root_logger.setLevel(logging.INFO)
 
-    # Wrap upload_file to set the context variable and re-attach handlers
+    # Wrap upload_file to set the context variable
     async def wrapped_upload_file(*args, **kwargs):
-        # Re-attach shotgun handlers inside the task in case dlt/others reset them
-        for name in logging.root.manager.loggerDict:
-            if "ravioli" in name or "dlt" in name:
-                l = logging.getLogger(name)
-                if handler not in l.handlers:
-                    l.addHandler(handler)
-        
         try:
             return await upload_file(*args, **kwargs)
         finally:
@@ -686,8 +670,8 @@ async def upload_file_stream(
                 yield f"data: ERROR:An internal error occurred: {str(e)}\n\n"
                 
         finally:
-            for l in loggers_to_capture:
-                l.removeHandler(handler)
+            root_logger = logging.getLogger()
+            root_logger.removeHandler(handler)
             if temp_path and temp_path.exists():
                 os.remove(temp_path)
 
