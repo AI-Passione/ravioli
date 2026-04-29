@@ -158,7 +158,8 @@ Criteria for JSON response:
 3. `data_start_row`: The 0-indexed row number where the first record of actual data begins.
 4. `is_split`: Boolean. True if the sheet contains side-by-side duplicate table structures.
 5. `split_offsets`: If `is_split` is true, a LIST of 0-indexed column numbers where each subsequent block starts (e.g. [4, 8, 12]).
-6. `column_mapping`: A dictionary mapping EXACT original header names to clean, snake_case, SQL-friendly names.
+6. `column_mapping`: A dictionary mapping original header names to clean names.
+   - IMPORTANT: If the sheet is a SUMMARY or METADATA sheet (just a few rows of key-value pairs like "Impressions | 100"), set `header_row` and `data_start_row` both to 0 and provide a mapping like {"col_0": "metric", "col_1": "value"}.
 
 Sample Grid (Row 0 is the first row in Excel):
 ---

@@ -157,6 +157,16 @@ class DuckDBManager:
         is_split = analysis.get("is_split", False)
         mapping = analysis.get("column_mapping", {})
 
+        # Safety Check: If AI suggested a data start that is beyond the end of the file,
+        # fallback to something safer (like the header row itself or row 0)
+        if data_start_idx >= df.shape[0]:
+            logger.warning(f"AI suggested data_start_row {data_start_idx} is beyond sheet length {df.shape[0]}. Falling back to header_row_idx.")
+            data_start_idx = header_row_idx
+            
+        # If still beyond (e.g. both were too high), fallback to 0
+        if data_start_idx >= df.shape[0]:
+            data_start_idx = 0
+
         # 1. Extraction Phase
         if is_split:
             # Handle list of offsets or a single offset
