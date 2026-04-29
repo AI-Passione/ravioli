@@ -184,8 +184,13 @@ class DataIngestor:
             
             for table_cfg in strategy["tables"]:
                 tn = table_cfg["table_name"]
-                count = self.duckdb_manager.connection.execute(f'SELECT COUNT(*) FROM "{schema}"."{tn}"').fetchone()[0]
-                results.append({"table_name": tn, "row_count": count, "status": "completed"})
+                try:
+                    count = self.duckdb_manager.connection.execute(f'SELECT COUNT(*) FROM "{schema}"."{tn}"').fetchone()[0]
+                    results.append({"table_name": tn, "row_count": count, "status": "completed"})
+                    logger.info(f"Ingestion successful for table '{tn}': {count:,} rows.")
+                except Exception as e:
+                    logger.warning(f"Table '{tn}' was not created or is empty: {e}")
+                    results.append({"table_name": tn, "row_count": 0, "status": "no_data_found"})
         else:
             # Fallback for unrecognized XML
             tn = f"xml_{''.join(c if c.isalnum() else '_' for c in original_filename).lower()[:20]}"

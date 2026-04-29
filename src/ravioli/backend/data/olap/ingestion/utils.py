@@ -171,17 +171,55 @@ def xml_chunk_generator(path: Path, tag_name: str, start: int, end: int, extract
                 for match in pattern.finditer(view):
                     attrs_raw = match.group(1).decode('utf-8', errors='ignore')
                     entry = dict(attr_pattern.findall(attrs_raw))
-                    if extract_metadata and match.group(2):
+                    
+                    if match.group(2):
                         inner = match.group(2).decode('utf-8', errors='ignore')
-                        meta_pattern = re.compile(r'<MetadataEntry\s+key="([^"]*)"\s+value="([^"]*)"\s*/>')
-                        metadata = {k: v for k, v in meta_pattern.findall(inner)}
-                        if metadata: entry['metadata'] = metadata
+                        
+                        # CDA Observation specific extraction
+                        if tag_name == "observation":
+                            # Extract code attributes
+                            code_match = re.search(r'<code\s+([^>]+)/>', inner)
+                            if code_match:
+                                for k, v in attr_pattern.findall(code_match.group(1)):
+                                    entry[f'code_{k}'] = v
+                            
+                            # Extract value attributes
+                            value_match = re.search(r'<value\s+([^>]+)/>', inner)
+                            if value_match:
+                                for k, v in attr_pattern.findall(value_match.group(1)):
+                                    entry[f'value_{k}'] = v
+                                    
+                            # Extract effectiveTime
+                            low_match = re.search(r'<low\s+([^>]+)/>', inner)
+                            if low_match:
+                                for k, v in attr_pattern.findall(low_match.group(1)):
+                                    entry[f'start_{k}'] = v
+                            high_match = re.search(r'<high\s+([^>]+)/>', inner)
+                            if high_match:
+                                for k, v in attr_pattern.findall(high_match.group(1)):
+                                    entry[f'end_{k}'] = v
+
+                            # Extract sourceName/sourceVersion from text
+                            source_match = re.search(r'<sourceName>([^<]+)</sourceName>', inner)
+                            if source_match: entry['source_name'] = source_match.group(1)
+                            version_match = re.search(r'<sourceVersion>([^<]+)</sourceVersion>', inner)
+                            if version_match: entry['source_version'] = version_match.group(1)
+                            type_match = re.search(r'<type>([^<]+)</type>', inner)
+                            if type_match: entry['type'] = type_match.group(1)
+                            unit_match = re.search(r'<unit>([^<]+)</unit>', inner)
+                            if unit_match: entry['unit'] = unit_match.group(1)
+
+                        if extract_metadata:
+                            meta_pattern = re.compile(r'<MetadataEntry\s+key="([^"]*)"\s+value="([^"]*)"\s*/>')
+                            metadata = {k: v for k, v in meta_pattern.findall(inner)}
+                            if metadata: entry['metadata'] = metadata
+                            
                     count += 1
                     if count % 100000 == 0:
-                        logger.info(f"Chunk [{start//1024**2}MB]: Found {count:,} records...")
+                        logger.info(f"Chunk [{start//1024**2}MB]: Found {count:,} records for {tag_name}...")
                     yield entry
             
-            logger.info(f"Chunk completed. Total found: {count:,} records.")
+            logger.info(f"Chunk completed. Total found: {count:,} records for {tag_name}.")
             del view
 
 def xml_full_parse_generator(path: Path, original_filename: str):
@@ -273,7 +311,7 @@ XML_STRATEGIES = {
     "apple_health_cda": {
         "match": lambda fn: 'export_cda' in fn,
         "tables": [
-            {"tag": "ClinicalRecord", "table_name": "apple_health_clinical_records"}
+            {"tag": "observation", "table_name": "apple_health_observations"}
         ]
     }
 }

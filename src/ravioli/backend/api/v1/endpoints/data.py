@@ -601,6 +601,8 @@ async def upload_file_stream(
     
     # Attach handler to root ravioli logger to catch all sub-module logs
     ingestion_logger = logging.getLogger("ravioli")
+    # Ensure level is set to capture everything from children
+    ingestion_logger.setLevel(logging.INFO)
     ingestion_logger.addHandler(handler)
 
     async def event_generator():
@@ -636,6 +638,11 @@ async def upload_file_stream(
                     yield f"data: LOG:{msg}\n\n"
                 except asyncio.TimeoutError:
                     continue
+            
+            # Drain the queue one last time after task is done
+            while not log_queue.empty():
+                msg = log_queue.get_nowait()
+                yield f"data: LOG:{msg}\n\n"
             
             # Once done, get result or error
             try:
