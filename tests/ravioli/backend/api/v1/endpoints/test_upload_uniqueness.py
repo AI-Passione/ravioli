@@ -28,13 +28,13 @@ async def test_upload_generates_unique_table_name(client, session, mocker):
     # Mocking session behavior
     import datetime
     def mock_session_add(obj):
-        if not obj.id:
+        if hasattr(obj, 'id') and not obj.id:
             obj.id = uuid.uuid4()
-        if not obj.source_type:
+        if hasattr(obj, 'source_type') and not getattr(obj, 'source_type', None):
             obj.source_type = "file"
-        if not obj.created_at:
+        if hasattr(obj, 'created_at') and not obj.created_at:
             obj.created_at = datetime.datetime.now()
-        if not obj.updated_at:
+        if hasattr(obj, 'updated_at') and not getattr(obj, 'updated_at', None):
             obj.updated_at = datetime.datetime.now()
         return obj
     session.add.side_effect = mock_session_add
