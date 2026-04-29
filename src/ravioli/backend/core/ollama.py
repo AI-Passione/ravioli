@@ -159,7 +159,9 @@ Criteria for JSON response:
 4. `is_split`: Boolean. True if the sheet contains side-by-side duplicate table structures.
 5. `split_offsets`: If `is_split` is true, a LIST of 0-indexed column numbers where each subsequent block starts (e.g. [4, 8, 12]).
 6. `column_mapping`: A dictionary mapping original header names to clean names.
-   - IMPORTANT: If the sheet is a SUMMARY or METADATA sheet (just a few rows of key-value pairs like "Impressions | 100"), set `header_row` and `data_start_row` both to 0 and provide a mapping like {"col_0": "metric", "col_1": "value"}.
+   - **CRITICAL**: Detect if the sheet is a **SUMMARY** sheet (a vertical list of metrics like "Impressions | 100").
+   - If it is a summary, DO NOT skip any rows. Set `header_row: 0` and `data_start_row: 0`.
+   - In this case, use a mapping like {"col_0": "metric", "col_1": "value"} to transform the list into a 2-column table.
 
 Sample Grid (Row 0 is the first row in Excel):
 ---

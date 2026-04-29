@@ -216,6 +216,17 @@ class DuckDBManager:
             data = data.drop(columns=to_drop)
         
         logger.info(f"Final data shape: {data.shape}")
+        
+        # Ultimate Fallback: If after all that the data is empty but the original sheet had data,
+        # just ingest the whole sheet as generic columns so we don't lose information.
+        if data.empty and not df.dropna(how='all').empty:
+            logger.warning("Processed data is empty but original sheet has content. Falling back to full sheet ingestion.")
+            data = df.copy()
+            data.columns = [f"col_{i}" for i in range(df.shape[1])]
+            # Basic cleanup on fallback data
+            data = data.dropna(axis=1, how='all')
+            data = data.dropna(axis=0, how='all')
+
         return data
 
     def _reconcile_split_table(self, df: pd.DataFrame, header_row: int, data_start: int, split_offsets: list) -> pd.DataFrame:
