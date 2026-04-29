@@ -140,7 +140,9 @@ def xml_tag_generator(path: Path, tag_name: str, extract_metadata: bool = False)
     """Generic generator to stream specific XML tags using iterparse."""
     context = ET.iterparse(path, events=("end",))
     for _, elem in context:
-        if elem.tag == tag_name:
+        # Handle namespaces: elem.tag is usually {namespace}tagname
+        local_tag = elem.tag.split('}')[-1]
+        if local_tag == tag_name:
             data = dict(elem.attrib)
             if extract_metadata:
                 metadata = {c.attrib.get('key'): c.attrib.get('value') for c in elem if c.tag == "MetadataEntry"}
@@ -158,7 +160,8 @@ def xml_chunk_generator(path: Path, tag_name: str, start: int, end: int, extract
             view = mm[start:end]
             
             if tag_name == "Record":
-                pattern = re.compile(rf'<{tag_name}\s+([^>]+)\s*/>'.encode())
+                # Allow optional namespace prefix (e.g. <n1:Record ... />)
+                pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>]+)\s*/>'.encode())
                 for match in pattern.finditer(view):
                     attrs_raw = match.group(1).decode('utf-8', errors='ignore')
                     count += 1
@@ -166,7 +169,8 @@ def xml_chunk_generator(path: Path, tag_name: str, start: int, end: int, extract
                         logger.info(f"Chunk [{start//1024**2}MB]: Found {count:,} records...")
                     yield dict(attr_pattern.findall(attrs_raw))
             else:
-                pattern = re.compile(rf'<{tag_name}\s+([^>/]+)\s*(?:/>|>(.*?)</{tag_name}>)'.encode(), re.DOTALL)
+                # Allow optional namespace prefix (e.g. <n1:observation ...> ... </n1:observation>)
+                pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>/]+)\s*(?:/>|>(.*?)</(?:[\w-]+:)?{tag_name}>)'.encode(), re.DOTALL)
                 for match in pattern.finditer(view):
                     attrs_raw = match.group(1).decode('utf-8', errors='ignore')
                     entry = dict(attr_pattern.findall(attrs_raw))
@@ -239,14 +243,14 @@ def scan_xml_chunk(path: Path, tag_name: str, start: int, end: int, extract_meta
         data = f.read(end - start)
         
         if tag_name == "Record":
-            # optimized for flat Record tags
-            tag_pattern = re.compile(rf'<{tag_name}\s+([^>]+)\s*/>'.encode())
+            # optimized for flat Record tags, allowing optional prefix
+            tag_pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>]+)\s*/>'.encode())
             for match in tag_pattern.finditer(data):
                 attrs_raw = match.group(1).decode('utf-8', errors='ignore')
                 results.append(dict(attr_pattern.findall(attrs_raw)))
         elif tag_name == "Workout":
-            # handle Workout tags with potential MetadataEntry children
-            tag_pattern = re.compile(rf'<{tag_name}\s+([^>]+)>(.*?)</{tag_name}>'.encode(), re.DOTALL)
+            # handle Workout tags with potential MetadataEntry children, allowing optional prefix
+            tag_pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>]+)>(.*?)</(?:[\w-]+:)?{tag_name}>'.encode(), re.DOTALL)
             for match in tag_pattern.finditer(data):
                 attrs_raw = match.group(1).decode('utf-8', errors='ignore')
                 entry = dict(attr_pattern.findall(attrs_raw))
@@ -257,8 +261,8 @@ def scan_xml_chunk(path: Path, tag_name: str, start: int, end: int, extract_meta
                     if metadata: entry['metadata'] = metadata
                 results.append(entry)
         else:
-            # generic fallback for other tags
-            tag_pattern = re.compile(rf'<{tag_name}\s+([^>/]+)\s*(?:/>|>(.*?)</{tag_name}>)'.encode(), re.DOTALL)
+            # generic fallback for other tags, allowing optional prefix
+            tag_pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>/]+)\s*(?:/>|>(.*?)</(?:[\w-]+:)?{tag_name}>)'.encode(), re.DOTALL)
             for match in tag_pattern.finditer(data):
                 attrs_raw = match.group(1).decode('utf-8', errors='ignore')
                 results.append(dict(attr_pattern.findall(attrs_raw)))
