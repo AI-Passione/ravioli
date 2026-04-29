@@ -136,93 +136,53 @@ Description:"""
         except Exception as e:
             raise Exception(f"Ollama generation failed: {str(e)}")
 
-    async def validate_sheet_content(self, sheet_name: str, sample_data: str) -> Dict[str, Any]:
+    async def analyze_sheet_structure(self, sheet_name: str, sample_grid: str) -> Dict[str, Any]:
         """
-        Validate if the sheet content is suitable for DuckDB ingestion and determine the handling strategy.
-        Returns {"verdict": "ready" | "needs_fix" | "no_headers" | "reject", "reason": str, "header_row": int | None}
+        Perform a clinical analysis of an Excel sheet's structure to determine how to ingest it.
+        Detects headers, data start, splitting, and suggests clean column names.
         """
         prompt = f"""{KOWALSKI_PERSONA}
-Task: Evaluate the structural integrity of Excel sheet "{sheet_name}" for database ingestion.
+Task: Methodically analyze the structural integrity and layout of Excel sheet "{sheet_name}".
 
-Context: You are looking at a VISUAL GRID representing the first 10 rows of an Excel sheet.
-Column names might not be on the first row. There might be summary titles (e.g. "Monthly Report") or empty rows at the top.
+Context: You are inspecting a VISUAL GRID of the first 20 rows of an Excel sheet. 
+Your goal is to provide a precise ingestion strategy for a SQL database.
 
-Criteria:
-- "ready": A clear horizontal header row exists at row 0 (index 0).
-- "needs_fix": A clear horizontal header row exists, but it's at a different row index (e.g. row 2) OR the headers need normalization.
-- "no_headers": The sheet contains data but NO identifiable header labels (data starts immediately).
-- "reject": No structured data (empty sheet, purely decorative, or single-value summary).
+Special Case: LinkedIn Data Exports
+- LinkedIn often places aggregated totals (e.g. "Total Followers: 1234") in Row 0 or 1.
+- Real column headers usually appear at Row 2 or 3 (0-indexed).
+- "Followers" tab sometimes splits a single table into two side-by-side blocks (e.g. Columns A-C and E-G are the same metrics but different time periods).
 
-Identification Rules:
-- A "Header Row" usually contains multiple distinct strings (e.g. "Date", "Post URL", "Views").
-- A "Data Row" usually contains values (dates, numbers, URLs).
-- IGNORE summary titles that span only one or two columns at the very top.
+Criteria for JSON response:
+1. `verdict`: "ready" (perfect), "needs_fix" (offsets/mapping), "split_table" (side-by-side blocks), or "reject" (no data).
+2. `header_row`: The 0-indexed row number containing the primary COLUMN NAMES.
+3. `data_start_row`: The 0-indexed row number where the first record of actual data begins.
+4. `is_split`: Boolean. True if the sheet contains side-by-side duplicate table structures.
+5. `split_column_offset`: If `is_split` is true, the 0-indexed column number where the second block starts.
+6. `column_mapping`: A dictionary mapping EXACT original header names to clean, snake_case, SQL-friendly names.
 
-Sample Grid (Row 0 is the absolute first row in Excel):
+Sample Grid (Row 0 is the first row in Excel):
 ---
-{sample_data}
+{sample_grid}
 ---
 
-Return your response in the following JSON format:
-{{
-  "verdict": "ready" or "needs_fix" or "no_headers" or "reject",
-  "header_row": 0, // The 0-indexed row number where the COLUMN NAMES are located.
-  "reason": "Explicit explanation (e.g. 'Found headers Date and Impressions at Row 2, skipping Row 0 summary text')"
-}}
+Return ONLY a clinical JSON object.
 JSON:"""
 
         try:
-            content = await self._generate(prompt, "Sheet Validation", temperature=0.1, num_predict=250)
-            # Try to parse JSON from response
+            content = await self._generate(prompt, "Structural Analysis", temperature=0.1, num_predict=1000)
             match = re.search(r'\{.*\}', content, re.DOTALL)
             if match:
                 return json.loads(match.group(0))
-            return {"verdict": "reject", "header_row": 0, "reason": "Failed to parse AI validation response."}
+            return {"verdict": "reject", "reason": "Failed to parse structural analysis."}
         except Exception as e:
-            # Fallback to ready if AI fails, but log it
-            print(f"OllamaClient: [WARNING] AI Validation failed: {e}")
-            return {"verdict": "ready", "header_row": 0, "reason": f"AI Validation skipped due to error: {str(e)}"}
-
-    async def suggest_schema_fix(self, sheet_name: str, sample_data: str) -> Dict[str, str]:
-        """
-        Suggest better column names for a dataset based on a visual grid.
-        Returns a mapping of {original_name: fixed_name}
-        """
-        prompt = f"""{KOWALSKI_PERSONA}
-Task: Analyze the column names in the following Visual Grid from Excel sheet "{sheet_name}" and suggest clean, descriptive, and SQL-friendly column names.
-
-Rules:
-- Use snake_case.
-- Remove special characters and spaces.
-- Keep them concise but meaningful.
-- Map EVERY original column label to a fixed name.
-
-Sample Grid (with detected headers):
----
-{sample_data}
----
-
-Return your response in the following JSON format:
-{{
-  "column_mapping": {{
-    "Original Name": "fixed_name",
-    ...
-  }}
-}}
-JSON:"""
-
-        try:
-            content = await self._generate(prompt, "Schema Fix", temperature=0.1, num_predict=500)
-            # Try to parse JSON from response
-            match = re.search(r'\{.*\}', content, re.DOTALL)
-            if match:
-                data = json.loads(match.group(0))
-                return data.get("column_mapping", {})
-            return {}
-        except Exception as e:
-            # Fallback to no fix if AI fails
-            print(f"OllamaClient: [WARNING] AI Schema Fix failed: {e}")
-            return {}
+            print(f"OllamaClient: [WARNING] Structural Analysis failed: {e}")
+            return {
+                "verdict": "ready", 
+                "header_row": 0, 
+                "data_start_row": 1, 
+                "is_split": False, 
+                "column_mapping": {}
+            }
 
     async def _generate(self, prompt: str, task_name: str, temperature: float = 0.5, num_predict: int = 300) -> str:
         """Helper method to handle the actual API call to Ollama with logging."""
