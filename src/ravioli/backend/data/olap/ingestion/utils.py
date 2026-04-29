@@ -175,9 +175,10 @@ def xml_chunk_generator(path: Path, tag_name: str, start: int, end: int, extract
                 yield entry
         else:
             # Allow optional namespace prefix (e.g. <n1:observation ...> ... </n1:observation>)
-            pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>/]+)\s*(?:/>|>(.*?)</(?:[\w-]+:)?{tag_name}>)'.encode(), re.DOTALL)
+            # Flexible regex that handles tags with or without attributes
+            pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}(?:\s+([^>/]*))?\s*(?:/>|>(.*?)</(?:[\w-]+:)?{tag_name}>)'.encode(), re.DOTALL)
             for match in pattern.finditer(chunk_bytes):
-                attrs_raw = match.group(1).decode('utf-8', errors='ignore')
+                attrs_raw = match.group(1).decode('utf-8', errors='ignore') if match.group(1) else ""
                 entry = dict(attr_pattern.findall(attrs_raw))
                 
                 if match.group(2):
