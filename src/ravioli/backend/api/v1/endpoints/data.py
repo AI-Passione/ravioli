@@ -14,14 +14,11 @@ from sqlalchemy import select
 from ravioli.backend.core import schemas, models
 from ravioli.backend.core.database import get_db, SessionLocal
 from ravioli.backend.core.config import settings
-from ravioli.backend.core.models import DataSource
-from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
-from ravioli.backend.data.olap.ingestion.wfs_client import WFSClient
+from ravioli.backend.data.olap.ingestion.ingestor import WFSClient
+from ravioli.backend.data.olap.ingestion.utils import pii_scanner, create_ravioli_pipeline
 
 import logging
 from ravioli.backend.core.ollama import OllamaClient
-from ravioli.backend.data.olap.ingestion.pii_scanner import pii_scanner
-from ravioli.backend.data.olap.ingestion.dlt_utils import create_ravioli_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -130,10 +127,9 @@ async def upload_file(
         db.commit()
         db.refresh(db_source)
         
-        # Ingest into DuckDB
         try:
             if extension == '.csv':
-                row_count = duckdb_manager.ingest_csv(file_path, table_name, schema="s_manual")
+                row_count = data_ingestor.ingest_csv(file_path, table_name, schema="s_manual")
                 db_source.row_count = row_count
                 
                 # PII Scan
@@ -156,8 +152,11 @@ async def upload_file(
                 except Exception as e:
                     logger.warning("Auto-description failed for CSV: %s", e)
             elif extension in ['.xml', '.gpx']:
-                # Apple Health or general XML/GPX Ingestion
-                results = duckdb_manager.ingest_apple_health(file_path, file.filename, schema="s_manual")
+                # Generic XML/GPX Ingestion
+                if extension == '.xml':
+                    results = data_ingestor.ingest_xml(file_path, file.filename, schema="s_manual")
+                else: # .gpx
+                    results = data_ingestor.ingest_gpx(file_path, file.filename, schema="s_manual")
                 
                 valid_results = [r for r in results if r["status"] == "completed"]
                 
@@ -221,7 +220,7 @@ async def upload_file(
                         db.add(other_source)
             else: # .xlsx
                 ollama_client = OllamaClient(db)
-                xlsx_results = await duckdb_manager.ingest_xlsx(file_path, table_name, schema="s_manual", ollama_client=ollama_client)
+                xlsx_results = await data_ingestor.ingest_xlsx(file_path, table_name, schema="s_manual", ollama_client=ollama_client)
                 
                 valid_results = [r for r in xlsx_results if r["status"] == "completed"]
                 
