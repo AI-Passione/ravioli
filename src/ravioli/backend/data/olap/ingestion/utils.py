@@ -15,10 +15,15 @@ logger = logging.getLogger(__name__)
 # --- Pipeline Utils ---
 def create_ravioli_pipeline(pipeline_name: str, dataset_name: str = "main"):
     """Creates a dlt pipeline configured to use the Ravioli DuckDB instance."""
+    # Sanitize pipeline name and dataset name: dlt uses them as directory/schema names
+    # and is strict about characters. We'll replace non-alphanumeric with _
+    san_pipeline = re.sub(r'[^a-zA-Z0-9_]', '_', pipeline_name)
+    san_dataset = re.sub(r'[^a-zA-Z0-9_]', '_', dataset_name)
+    
     return dlt.pipeline(
-        pipeline_name=pipeline_name,
+        pipeline_name=san_pipeline,
         destination=dlt.destinations.duckdb(str(settings.duckdb_path)),
-        dataset_name=dataset_name,
+        dataset_name=san_dataset,
         progress="log"
     )
 
