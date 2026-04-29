@@ -1,5 +1,8 @@
 import httpx
 import os
+import json
+import re
+import time
 from typing import Dict, Any
 from sqlalchemy.orm import Session
 from ravioli.backend.core.models import SystemSetting
@@ -133,9 +136,60 @@ Description:"""
         except Exception as e:
             raise Exception(f"Ollama generation failed: {str(e)}")
 
+    async def analyze_sheet_structure(self, sheet_name: str, sample_grid: str) -> Dict[str, Any]:
+        """
+        Perform a clinical analysis of an Excel sheet's structure to determine how to ingest it.
+        Detects headers, data start, splitting, and suggests clean column names.
+        """
+        prompt = f"""{KOWALSKI_PERSONA}
+Task: Methodically analyze the structural integrity and layout of Excel sheet "{sheet_name}".
+
+Context: You are inspecting a VISUAL GRID of the first 20 rows of an Excel sheet. 
+Your goal is to provide a precise ingestion strategy for a SQL database.
+
+Special Case: LinkedIn Data Exports
+- LinkedIn often places aggregated totals (e.g. "Total Followers: 1234") in Row 0 or 1.
+- Real column headers usually appear at Row 2 or 3 (0-indexed).
+- "Followers" tab sometimes splits a single table into two side-by-side blocks (e.g. Columns A-C and E-G are the same metrics but different time periods).
+
+Criteria for JSON response:
+1. `verdict`: "ready" (perfect), "needs_fix" (offsets/mapping), "split_table" (side-by-side blocks), or "reject" (no data).
+2. `header_row`: The 0-indexed row number containing the primary COLUMN NAMES.
+3. `data_start_row`: The 0-indexed row number where the first record of actual data begins.
+4. `is_split`: Boolean. True if the sheet contains side-by-side duplicate table structures.
+   - **DETECTION**: If you see the SAME column headers (e.g., "Post URL", "Date") appearing twice in the same row (e.g., once in Col A-C and again in Col E-G), this is a split table.
+5. `split_offsets`: If `is_split` is true, a LIST of 0-indexed column numbers where each subsequent block starts (e.g. [4, 8, 12]).
+6. `column_mapping`: A dictionary mapping original header names to clean names.
+   - **CRITICAL**: Detect if the sheet is a **SUMMARY** sheet (a vertical list of metrics like "Impressions | 100").
+   - If it is a summary, DO NOT skip any rows. Set `header_row: 0` and `data_start_row: 0`.
+   - In this case, use a mapping like {{"col_0": "metric", "col_1": "value"}} to transform the list into a 2-column table.
+
+Sample Grid (Row 0 is the first row in Excel):
+---
+{sample_grid}
+---
+
+Return ONLY a clinical JSON object.
+JSON:"""
+
+        try:
+            content = await self._generate(prompt, "Structural Analysis", temperature=0.1, num_predict=1000)
+            match = re.search(r'\{.*\}', content, re.DOTALL)
+            if match:
+                return json.loads(match.group(0))
+            return {"verdict": "reject", "reason": "Failed to parse structural analysis."}
+        except Exception as e:
+            print(f"OllamaClient: [WARNING] Structural Analysis failed: {e}")
+            return {
+                "verdict": "ready", 
+                "header_row": 0, 
+                "data_start_row": 1, 
+                "is_split": False, 
+                "column_mapping": {}
+            }
+
     async def _generate(self, prompt: str, task_name: str, temperature: float = 0.5, num_predict: int = 300) -> str:
         """Helper method to handle the actual API call to Ollama with logging."""
-        import time
         start_time = time.time()
         
         url = f"{self.base_url.rstrip('/')}/api/generate"
@@ -339,7 +393,6 @@ Answer:"""
           - limitations: str     — raw text of the Known Limitations section
           - metadata: dict       — {"basic_stats": str, "appendix": str}
         """
-        import re
 
         sections: dict[str, str] = {}
         current: str | None = None
@@ -459,9 +512,6 @@ Answer:"""
                 "num_predict": 1000
             }
         }
-
-        import httpx
-        import json
         
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:

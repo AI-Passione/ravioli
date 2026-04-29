@@ -61,7 +61,7 @@ export function renderCreateAnalysis() {
           <div class="space-y-2">
             <h3 class="text-2xl font-headline-sm text-white">Quick Insight</h3>
             <p class="text-on-surface-variant text-sm leading-relaxed opacity-70">
-              Upload a CSV and get an instant AI-powered executive summary. Perfect for vibe-checking new data streams.
+              Upload a Flat File (CSV/XLSX) and get an instant AI-powered executive summary. Perfect for vibe-checking new data streams.
             </p>
           </div>
           <div class="flex items-center gap-2 text-primary text-[10px] font-label-sm uppercase tracking-widest pt-4">
@@ -132,13 +132,13 @@ export function renderCreateAnalysis() {
       <div class="glass-panel p-10 rounded-3xl space-y-8 max-w-xl mx-auto w-full">
         <div id="quick-main-content" class="space-y-6">
           <div id="drop-zone" class="border-2 border-dashed border-outline-variant/30 rounded-2xl p-12 text-center space-y-4 hover:border-primary-fixed-dim/50 transition-colors cursor-pointer group">
-            <input type="file" id="file-input" class="hidden" accept=".csv" />
+            <input type="file" id="file-input" class="hidden" accept=".csv,.xlsx" />
             <div class="w-16 h-16 rounded-full bg-surface-container-highest flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
               <span class="material-symbols-outlined text-3xl text-outline" data-icon="upload_file">upload_file</span>
             </div>
             <div class="space-y-1">
-              <p class="text-white font-medium">Drop your CSV here</p>
-              <p class="text-xs text-on-surface-variant opacity-60">or click to browse local files</p>
+              <p class="text-white font-medium">Drop your file here</p>
+              <p class="text-xs text-on-surface-variant opacity-60">or click to browse CSV / XLSX</p>
             </div>
           </div>
 
@@ -303,8 +303,9 @@ export function renderCreateAnalysis() {
   }
 
   async function handleFileUpload(file: File) {
-    if (!file.name.endsWith('.csv')) {
-      alert('Please upload a CSV file.');
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (extension !== 'csv' && extension !== 'xlsx') {
+      alert('Please upload a CSV or XLSX file.');
       return;
     }
 

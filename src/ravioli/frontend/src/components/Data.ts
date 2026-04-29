@@ -75,7 +75,7 @@ export function renderData() {
                           </span>
                         ` : ''}
                       </div>
-                      <span class="text-[10px] text-neutral-500 font-mono mt-0.5">${source.source_type === 'wfs' ? 'WFS API' : 'CSV File'} • ${formatBytes(source.size_bytes)}</span>
+                      <span class="text-[10px] text-neutral-500 font-mono mt-0.5">${source.source_type === 'wfs' ? 'WFS API' : 'Flat File'} • ${formatBytes(source.size_bytes)}</span>
                     </div>
                   </td>
                   <td class="px-8 py-5">
@@ -171,7 +171,7 @@ export function renderData() {
                 <span class="material-symbols-outlined text-primary text-4xl">upload_file</span>
               </div>
               <h3 class="text-lg font-medium text-neutral-100 mb-2">Flat File</h3>
-              <p class="text-sm text-neutral-500">Upload CSV files from your local machine</p>
+              <p class="text-sm text-neutral-500">Upload CSV or XLSX files from your local machine</p>
             </div>
           </div>
 
@@ -204,14 +204,24 @@ export function renderData() {
                 <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <span class="material-symbols-outlined text-primary text-3xl">upload_file</span>
                 </div>
-                <h3 class="text-xl font-medium text-neutral-200 mb-2">Drop your CSV here</h3>
-                <p class="text-neutral-500 text-sm">or click to browse your files</p>
+                <h3 class="text-xl font-medium text-neutral-200 mb-2">Drop your file here</h3>
+                <p class="text-neutral-500 text-sm">or click to browse CSV / XLSX</p>
               </div>
-              <div id="drop-zone-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-container/90 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 z-10">
+              <div id="drop-zone-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-container/90 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 z-10 p-6">
                 <span class="material-symbols-outlined animate-spin text-primary text-4xl mb-4">sync</span>
-                <p class="text-neutral-200 font-medium animate-pulse">Processing...</p>
+                <p class="text-neutral-200 font-medium animate-pulse">Ingestion in Progress...</p>
+                
+                <div id="ingestion-console" class="mt-6 w-full max-w-md bg-black/40 rounded-xl p-4 font-mono text-[10px] text-neutral-400 overflow-y-auto max-h-40 border border-outline/10 text-left">
+                  <div class="text-primary/70 mb-2 border-b border-outline/5 pb-1 uppercase tracking-tighter flex justify-between">
+                    <span>System Terminal</span>
+                    <span class="animate-pulse">●</span>
+                  </div>
+                  <div id="ingestion-logs" class="space-y-1">
+                    <div class="text-neutral-600 italic">Initializing neural link...</div>
+                  </div>
+                </div>
               </div>
-              <input type="file" id="file-input" class="hidden" accept=".csv">
+              <input type="file" id="file-input" class="hidden" accept=".csv,.xlsx">
             </div>
             <button class="btn-back mt-8 text-neutral-500 hover:text-neutral-300 flex items-center gap-2 text-sm transition-colors">
               <span class="material-symbols-outlined text-lg">arrow_back</span>
@@ -261,7 +271,7 @@ export function renderData() {
     
     if (step === 'selection') stepSubtitle.textContent = 'Select ingestion method';
     else if (step === 'wfs') stepSubtitle.textContent = 'Configure WFS API Source';
-    else if (step === 'csv') stepSubtitle.textContent = 'Upload CSV Data';
+    else if (step === 'csv') stepSubtitle.textContent = 'Upload Flat File (CSV / XLSX)';
   };
 
   btnAddSource?.addEventListener('click', () => {
@@ -335,20 +345,40 @@ export function renderData() {
   async function handleUpload(file: File) {
     const dropZoneContent = container.querySelector('#drop-zone-content');
     const dropZoneLoading = container.querySelector('#drop-zone-loading');
+    const ingestionLogs = container.querySelector('#ingestion-logs');
+    
     dropZoneContent?.classList.add('opacity-0');
     dropZoneLoading?.classList.remove('opacity-0', 'pointer-events-none');
+    
+    if (ingestionLogs) ingestionLogs.innerHTML = '<div class="text-primary/50 italic">Establishing data stream...</div>';
 
-    try {
-      const result = await api.uploadFile(file);
-      if (result.is_duplicate) alert('Duplicate Data Detected: Already uploaded.');
-      hideAddModal();
-      refreshFiles();
-    } catch (err) {
-      alert('Upload failed.');
-    } finally {
-      dropZoneContent?.classList.remove('opacity-0');
-      dropZoneLoading?.classList.add('opacity-0', 'pointer-events-none');
-    }
+    const addLog = (msg: string) => {
+      if (ingestionLogs) {
+        const div = document.createElement('div');
+        div.className = 'animate-in fade-in slide-in-from-left-1 duration-300';
+        div.innerHTML = `<span class="text-neutral-600 mr-2">></span>${msg}`;
+        ingestionLogs.appendChild(div);
+        const console = container.querySelector('#ingestion-console');
+        if (console) console.scrollTop = console.scrollHeight;
+      }
+    };
+
+    api.streamUpload(
+      file, 
+      (msg) => addLog(msg),
+      (result) => {
+        if (result.is_duplicate) alert('Duplicate Data Detected: Already uploaded.');
+        setTimeout(() => {
+          hideAddModal();
+          refreshFiles();
+        }, 500);
+      },
+      (err) => {
+        alert(`Upload failed: ${err.message || err}`);
+        dropZoneContent?.classList.remove('opacity-0');
+        dropZoneLoading?.classList.add('opacity-0', 'pointer-events-none');
+      }
+    );
   }
 
   // --- General Table Logic ---

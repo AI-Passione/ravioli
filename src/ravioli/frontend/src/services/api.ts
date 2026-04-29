@@ -117,6 +117,45 @@ export const api = {
     return response.json();
   },
 
+  streamUpload(file: File, onLog: (msg: string) => void, onComplete: (result: DataSource) => void, onError: (err: any) => void) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    fetch(`${API_BASE}/data/upload-stream`, {
+      method: 'POST',
+      body: formData,
+    }).then(async (response) => {
+      if (!response.ok) throw new Error('Upload failed');
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      if (!reader) return;
+
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split('\n\n');
+        buffer = chunks.pop() || '';
+        
+        for (const chunk of chunks) {
+          if (chunk.startsWith('data: ')) {
+            const content = chunk.substring(6);
+            if (content.startsWith('LOG:')) {
+              onLog(content.substring(4));
+            } else if (content.startsWith('DONE:')) {
+              onComplete(JSON.parse(content.substring(5)));
+            } else if (content.startsWith('ERROR:')) {
+              onError(new Error(content.substring(6)));
+            }
+          }
+        }
+      }
+    }).catch(onError);
+  },
+
   async getPreview(tableName: string): Promise<any[]> {
     const response = await fetch(`${API_BASE}/data/preview/${tableName}`);
     if (!response.ok) throw new Error('Failed to fetch preview');
