@@ -518,7 +518,7 @@ export function renderData() {
     // Check for massive files (> 1GB) to activate heavylift warning
     const largeFiles = filteredFiles.filter(f => f.size > 1024 * 1024 * 1024);
     if (largeFiles.length > 0) {
-      addLog(`🚀 Massive file(s) detected (>1GB). Parallel Heavylift Mode activated. Ingestion will be distributed across multiple CPU cores.`, false, true);
+      addLog(`🚀 Massive file(s) detected (>1GB). "is_chucking" mode activated. Ingestion will be distributed across multiple CPU cores via chunking.`, false, true);
     }
 
     let completed = 0;

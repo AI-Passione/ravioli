@@ -2,6 +2,7 @@ import os
 import io
 import logging
 import httpx
+import dlt
 import pandas as pd
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import List, Dict, Any, Optional
 from ravioli.backend.data.olap.ingestion.utils import (
     create_ravioli_pipeline,
     process_sheet_with_analysis,
+    xlsx_chunk_generator,
     xml_tag_generator,
     xml_full_parse_generator,
     parallel_xml_tag_generator,
@@ -75,16 +77,25 @@ class WFSClient:
 
 # --- Main Data Ingestor ---
 class DataIngestor:
-    HEAVYLIFT_THRESHOLD = 1024 * 1024 * 1024  # 1GB
+    CHUCKING_THRESHOLD = 1024 * 1024 * 1024  # 1GB
 
     def __init__(self, duckdb_manager):
         self.duckdb_manager = duckdb_manager
+
+    def _is_chucking(self, file_path: Path) -> bool:
+        """Determines if a file is large enough to trigger chunked processing."""
+        return os.path.getsize(file_path) >= self.CHUCKING_THRESHOLD
 
     def ingest_csv(self, file_path: Path, table_name: str, schema: str = "main") -> int:
         """Standard CSV Ingestion."""
         conn = self.duckdb_manager.connection
         conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
         full_table_name = f'"{schema}"."{table_name}"'
+        
+        if self._is_chucking(file_path):
+            logger.info(f"CHUCKING MODE ACTIVATED for CSV: {file_path}")
+            # DuckDB handles this well natively, but we could add specific settings here
+        
         conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM read_csv_auto('{file_path}')")
         return conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
 
@@ -93,18 +104,30 @@ class DataIngestor:
         conn = self.duckdb_manager.connection
         conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
         results = []
+        is_chucking = self._is_chucking(file_path)
+        
         try:
             excel_file = pd.ExcelFile(file_path)
             for sheet_name in excel_file.sheet_names:
                 clean_name = "".join(c if c.isalnum() else "_" for c in sheet_name).lower()
                 table_name = f"{base_table_name}_{clean_name}__xlsx"
                 full_table_name = f'"{schema}"."{table_name}"'
+                
+                # Analyze sheet structure regardless of size (using small sample)
                 df_raw_sample = pd.read_excel(file_path, sheet_name=sheet_name, nrows=20, header=None)
                 grid_lines = [f"Row {i}: | " + " | ".join([str(v).strip().replace('\n',' ') for v in row]) + " |" for i, row in df_raw_sample.iterrows()]
                 analysis = await ollama_client.analyze_sheet_structure(sheet_name, "\n".join(grid_lines)) if ollama_client else {"verdict": "ready"}
                 if analysis.get("verdict") == "reject": continue
-                df_final = process_sheet_with_analysis(pd.read_excel(file_path, sheet_name=sheet_name, header=None), analysis)
-                conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM df_final")
+
+                if is_chucking:
+                    logger.info(f"CHUCKING MODE ACTIVATED for XLSX Sheet: {sheet_name} (Streaming enabled)")
+                    gen = xlsx_chunk_generator(file_path, sheet_name, analysis)
+                    xlsx_pipeline = create_ravioli_pipeline(f"xlsx_{clean_name}", schema)
+                    xlsx_pipeline.run(gen, table_name=table_name)
+                else:
+                    df_final = process_sheet_with_analysis(pd.read_excel(file_path, sheet_name=sheet_name, header=None), analysis)
+                    conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM df_final")
+                
                 results.append({"sheet_name": sheet_name, "table_name": table_name, "status": "completed", "row_count": conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]})
         except Exception as e:
             logger.error(f"XLSX Ingestion failed: {e}")
@@ -112,42 +135,45 @@ class DataIngestor:
         return results
 
     def ingest_xml(self, file_path: Path, original_filename: str, schema: str = "s_manual") -> list:
-        """Config-driven XML Ingestion with parallel heavylift mode."""
+        """Config-driven XML Ingestion with chucking (chunked) mode."""
         fn = original_filename.lower()
         file_size = os.path.getsize(file_path)
-        is_heavylift = file_size >= self.HEAVYLIFT_THRESHOLD
+        is_chucking = self._is_chucking(file_path)
         
         strategy = next((s for s in XML_STRATEGIES.values() if s["match"](fn)), None)
         results = []
         pipeline = create_ravioli_pipeline(f"xml_{file_size}", schema)
         
-        if is_heavylift:
-            logger.info(f"HEAVYLIFT MODE ACTIVATED for {original_filename} ({file_size / 1024**2:.1f} MB)")
-            # Add a log message to the system terminal if we had a way to push it, 
-            # for now it will just show in server logs.
+        if is_chucking:
+            logger.info(f"CHUCKING MODE ACTIVATED for {original_filename} ({file_size / 1024**2:.1f} MB)")
         
         if strategy:
+            # Collect resources to run them in one go for better worker distribution
+            resources = []
             for table_cfg in strategy["tables"]:
                 tag = table_cfg.get("tag")
                 tn = table_cfg["table_name"]
                 extract_metadata = table_cfg.get("extract_metadata", False)
                 
                 if tag:
-                    if is_heavylift:
-                        gen = parallel_xml_tag_generator(file_path, tag, extract_metadata)
-                    else:
-                        gen = xml_tag_generator(file_path, tag, extract_metadata)
+                    gen = parallel_xml_tag_generator(file_path, tag, extract_metadata) if is_chucking else xml_tag_generator(file_path, tag, extract_metadata)
                 else:
                     gen = xml_full_parse_generator(file_path, original_filename)
                 
-                pipeline.run(gen, table_name=tn, write_disposition="append" if tag else "replace")
-                
+                resources.append(dlt.resource(gen, name=tn, write_disposition="append" if tag else "replace"))
+            
+            # Run all resources together
+            pipeline.run(resources, workers=4 if is_chucking else 1)
+            
+            for table_cfg in strategy["tables"]:
+                tn = table_cfg["table_name"]
                 count = self.duckdb_manager.connection.execute(f'SELECT COUNT(*) FROM "{schema}"."{tn}"').fetchone()[0]
                 results.append({"table_name": tn, "row_count": count, "status": "completed"})
         else:
             # Fallback for unrecognized XML
             tn = f"xml_{''.join(c if c.isalnum() else '_' for c in original_filename).lower()[:20]}"
-            pipeline.run(xml_full_parse_generator(file_path, original_filename), table_name=tn)
+            gen = xml_full_parse_generator(file_path, original_filename)
+            pipeline.run(dlt.resource(gen, name=tn), workers=4 if is_chucking else 1)
             results.append({"table_name": tn, "row_count": 1, "status": "completed"})
             
         return results

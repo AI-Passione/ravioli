@@ -3,6 +3,7 @@ import re
 import logging
 import pandas as pd
 import dlt
+import openpyxl
 import xml.etree.ElementTree as ET
 import concurrent.futures
 from pathlib import Path
@@ -98,6 +99,35 @@ def extract_block(df: pd.DataFrame, h_idx: int, d_idx: int, s_col: int, e_col: i
     b = df.iloc[d_idx:, s_col:e_col].copy()
     b.columns = h
     return b.dropna(axis=1, how='all').dropna(axis=0, how='all')
+
+def xlsx_chunk_generator(path: Path, sheet_name: str, analysis: dict, chunk_size: int = 50000):
+    """Memory-efficient streaming generator for massive XLSX sheets."""
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    ws = wb[sheet_name]
+    
+    h_idx = int(analysis.get("header_row", 0))
+    d_idx = int(analysis.get("data_start_row", h_idx + 1))
+    
+    # Get headers
+    header_row = None
+    for i, row in enumerate(ws.iter_rows(values_only=True)):
+        if i == h_idx:
+            header_row = [str(x).strip() if x is not None else f"col_{j}" for j, x in enumerate(row)]
+            break
+            
+    if not header_row: return
+
+    chunk = []
+    for i, row in enumerate(ws.iter_rows(min_row=d_idx + 1, values_only=True)):
+        # Convert row to dict
+        record = dict(zip(header_row, row))
+        chunk.append(record)
+        if len(chunk) >= chunk_size:
+            yield chunk
+            chunk = []
+            
+    if chunk:
+        yield chunk
 
 # --- XML Ingestion Utils ---
 def xml_tag_generator(path: Path, tag_name: str, extract_metadata: bool = False):
