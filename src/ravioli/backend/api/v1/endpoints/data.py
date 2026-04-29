@@ -2,7 +2,6 @@ import re
 import shutil
 import uuid
 import hashlib
-import contextvars
 import os
 from pathlib import Path
 from typing import List, Optional
@@ -607,13 +606,6 @@ async def upload_file_stream(
     if handler not in root_logger.handlers:
         root_logger.addHandler(handler)
     root_logger.setLevel(logging.INFO)
-
-    # Wrap upload_file to set the context variable
-    async def wrapped_upload_file(*args, **kwargs):
-        try:
-            return await upload_file(*args, **kwargs)
-        finally:
-            pass
 
     async def event_generator():
         temp_path = None

@@ -7,7 +7,7 @@ import openpyxl
 import xml.etree.ElementTree as ET
 import concurrent.futures
 from pathlib import Path
-from typing import List, Dict, Callable
+from typing import List, Callable
 from ravioli.backend.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -135,7 +135,6 @@ def xlsx_chunk_generator(path: Path, sheet_name: str, analysis: dict, chunk_size
 
 # --- XML Ingestion Utils ---
 import mmap
-import re
 
 def xml_tag_generator(path: Path, tag_name: str, extract_metadata: bool = False):
     """Generic generator to stream specific XML tags using iterparse."""
