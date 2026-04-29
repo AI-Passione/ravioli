@@ -4,6 +4,7 @@ FROM python:3.11-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Set working directory
+# Set working directory
 WORKDIR /app
 
 # Install system dependencies (e.g., for psycopg2)
@@ -15,12 +16,18 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy project files
-COPY . .
+# Copy dependency files first for layer caching
+COPY pyproject.toml uv.lock* requirements.txt README.md ./
+
+# Create dummy package structure so hatchling/uv can install dependencies
+RUN mkdir -p src/ravioli && touch src/ravioli/__init__.py
 
 # Install the project and its dependencies
 # Install project in editable mode with dev dependencies for testing
 RUN uv pip install --system -e ".[dev]"
+
+# Copy the rest of the application code
+COPY . .
 
 # Expose the API port
 EXPOSE 8000

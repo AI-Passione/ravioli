@@ -9,6 +9,9 @@ from ravioli.backend.core.models import SystemSetting
 from ravioli.backend.core.config import settings
 from ravioli.backend.core.encryption import decrypt_value
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 def _load_kowalski_persona() -> str:
     """Loads the Kowalski persona dossier from the AI agents directory."""
@@ -18,7 +21,7 @@ def _load_kowalski_persona() -> str:
         if persona_path.exists():
             return persona_path.read_text()
     except Exception as e:
-        print(f"OllamaClient: [WARNING] Failed to load Kowalski dossier: {e}")
+        logger.warning(f"OllamaClient: [WARNING] Failed to load Kowalski dossier: {e}")
     
     # Minimal fallback if file is missing
     return "You are Kowalski, a lead analytics specialist. Clinical and precise. Punctuate with varied Polish analytical confirmations (Tak, Zrozumiałem, Oczywiście, etc.) to signal clinical status."
@@ -37,18 +40,18 @@ class OllamaClient:
             
             if setting and setting.value:
                 config = dict(setting.value)
-                print(f"OllamaClient: Found setting in DB: {config.get('mode')}")
+                logger.info(f"OllamaClient: Found setting in DB: {config.get('mode')}")
                 # Decrypt API key if present
                 if "api_key" in config and config["api_key"]:
                     try:
                         config["api_key"] = decrypt_value(config["api_key"])
                     except Exception as e:
-                        print(f"OllamaClient: Decryption failed: {e}")
+                        logger.error(f"OllamaClient: Decryption failed: {e}")
                 return config
             
-            print("OllamaClient: No setting found in DB, using defaults")
+            logger.info("OllamaClient: No setting found in DB, using defaults")
         except Exception as e:
-            print(f"OllamaClient: Error loading config from DB: {e}")
+            logger.error(f"OllamaClient: Error loading config from DB: {e}")
 
         # Fallback to defaults from config.py
         return {
@@ -180,7 +183,7 @@ JSON:"""
                 return json.loads(match.group(0))
             return {"verdict": "reject", "reason": "Failed to parse structural analysis."}
         except Exception as e:
-            print(f"OllamaClient: [WARNING] Structural Analysis failed: {e}")
+            logger.warning(f"OllamaClient: [WARNING] Structural Analysis failed: {e}")
             return {
                 "verdict": "ready", 
                 "header_row": 0, 
@@ -198,14 +201,14 @@ JSON:"""
         if self.mode == "cloud" and self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
-        print(f"OllamaClient: [INFO] URL: {url}", flush=True)
-        print(f"OllamaClient: [INFO] Task: {task_name}", flush=True)
-        print(f"OllamaClient: [INFO] Model: {self.model}", flush=True)
-        print(f"OllamaClient: [INFO] Data Size: {len(prompt)} chars", flush=True)
+        logger.info(f"OllamaClient: [INFO] URL: {url}")
+        logger.info(f"OllamaClient: [INFO] Task: {task_name}")
+        logger.info(f"OllamaClient: [INFO] Model: {self.model}")
+        logger.info(f"OllamaClient: [INFO] Data Size: {len(prompt)} chars")
 
         # Final safety truncation: most models can't handle more than ~100k characters in a prompt
         if len(prompt) > 100000:
-            print(f"OllamaClient: [WARNING] Truncating prompt from {len(prompt)} to 100000 characters", flush=True)
+            logger.warning(f"OllamaClient: [WARNING] Truncating prompt from {len(prompt)} to 100000 characters")
             prompt = prompt[:100000] + "\n... [TRUNCATED DUE TO SIZE] ..."
 
         payload = {
@@ -223,8 +226,8 @@ JSON:"""
                 response = await client.post(url, json=payload, headers=headers)
                 
                 if response.status_code != 200:
-                    print(f"OllamaClient: [ERROR] API returned {response.status_code}", flush=True)
-                    print(f"OllamaClient: [ERROR] Response: {response.text[:500]}", flush=True)
+                    logger.error(f"OllamaClient: [ERROR] API failed ({response.status_code}) for {url}")
+                    logger.error(f"OllamaClient: [ERROR] Response: {response.text[:500]}")
                     if response.status_code == 401:
                         raise Exception("Ollama authentication failed. Check your API Key.")
                     response.raise_for_status()
@@ -233,11 +236,11 @@ JSON:"""
                 content = result.get("response", "").strip()
                 
                 duration = time.time() - start_time
-                print(f"OllamaClient: [SUCCESS] {task_name} completed in {duration:.2f}s", flush=True)
+                logger.info(f"OllamaClient: [SUCCESS] {task_name} completed in {duration:.2f}s")
                 return content
         except Exception as e:
             duration = time.time() - start_time
-            print(f"OllamaClient: [EXCEPTION] {task_name} failed after {duration:.2f}s: {str(e)}", flush=True)
+            logger.error(f"OllamaClient: [EXCEPTION] {task_name} failed after {duration:.2f}s: {str(e)}")
             raise e
 
     async def generate_quick_insight(self, filename: str, sample_data: str) -> str:
@@ -447,7 +450,7 @@ Extracted Insights:"""
                     if re.match(r"^\s*[-*•]\s+.{10,}", line)
                 ][:20]
             except Exception as e:
-                print(f"OllamaClient: [WARNING] Failed to extract fallback insights bullets: {e}")
+                logger.warning(f"OllamaClient: [WARNING] Failed to extract fallback insights bullets: {e}")
 
         return {
             "bullets": bullets[:20],
@@ -520,7 +523,7 @@ Answer:"""
                     if response.status_code != 200:
                         error_body = await response.aread()
                         error_msg = error_body.decode()
-                        print(f"OllamaClient: [ERROR] Stream failed with {response.status_code}: {error_msg}")
+                        logger.error(f"OllamaClient: [ERROR] Stream failed with {response.status_code}: {error_msg}")
                         yield f"\n\n> [!ERROR]\n> **Stream Error ({response.status_code})**: {error_msg}"
                         return
 
@@ -535,8 +538,8 @@ Answer:"""
                             if data.get("done", False):
                                 break
                         except json.JSONDecodeError as e:
-                            print(f"OllamaClient: [ERROR] Failed to parse JSON line: {line} - {str(e)}")
+                            logger.error(f"OllamaClient: [ERROR] Failed to parse JSON line: {line} - {str(e)}")
                             continue
         except Exception as e:
-            print(f"OllamaClient: [EXCEPTION] Stream interrupted: {str(e)}")
+            logger.error(f"OllamaClient: [EXCEPTION] Stream interrupted: {str(e)}")
             yield f"\n\n> [!ERROR]\n> **Stream Interrupted**: {str(e)}"

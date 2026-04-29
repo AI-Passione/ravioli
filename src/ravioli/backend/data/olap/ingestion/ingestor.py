@@ -1,5 +1,6 @@
 import os
 import io
+import uuid
 import logging
 import httpx
 import dlt
@@ -145,7 +146,7 @@ class DataIngestor:
         
         strategy = next((s for s in XML_STRATEGIES.values() if s["match"](fn)), None)
         results = []
-        pipeline = create_ravioli_pipeline(f"xml_{file_size}", schema)
+        pipeline = create_ravioli_pipeline(f"xml_{file_size}_{uuid.uuid4().hex[:8]}", schema)
         
         if is_chucking:
             logger.info(f"CHUCKING MODE ACTIVATED for {original_filename} ({file_size / 1024**2:.1f} MB)")
@@ -171,7 +172,8 @@ class DataIngestor:
                         for i, (start, end) in enumerate(chunks):
                             gen = xml_chunk_generator(file_path, tag, start, end, extract_metadata)
                             # Using a unique resource name but same table_name for dlt
-                            resources.append(dlt.resource(gen, name=f"{tn}_p{i}", table_name=tn, write_disposition="append"))
+                            # Set write_disposition to replace so dlt handles table creation correctly across parallel resources
+                            resources.append(dlt.resource(gen, name=f"{tn}_p{i}", table_name=tn, write_disposition="replace"))
                     else:
                         gen = xml_tag_generator(file_path, tag, extract_metadata)
                         resources.append(dlt.resource(gen, name=tn, write_disposition="append"))
@@ -180,9 +182,10 @@ class DataIngestor:
                     resources.append(dlt.resource(gen, name=tn, write_disposition="replace"))
             
             # Run all resources together
-            logger.info(f"Executing dlt pipeline with {len(resources)} parallel resources...")
+            logger.info(f"Executing dlt pipeline with {len(resources)} parallel resources for {original_filename}...")
             load_info = pipeline.run(resources)
-            logger.info(f"Pipeline execution completed. Status: {load_info}")
+            logger.info(f"Pipeline execution completed for {original_filename}.")
+            logger.info(f"Load Info Detail: {load_info}")
             
             for table_cfg in strategy["tables"]:
                 tn = table_cfg["table_name"]

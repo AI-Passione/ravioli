@@ -106,9 +106,11 @@ async def upload_file(
     internal_filename = f"{file_id}{extension}"
     if not file_path:
         file_path = UPLOAD_DIR / internal_filename
-        # Save file to disk
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Save file to disk - run in thread to avoid blocking loop
+        def save_file():
+            with file_path.open("wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        await asyncio.to_thread(save_file)
     
     # Generate a clean, unique table name from the filename
     base_name = Path(file.filename).stem
@@ -131,12 +133,13 @@ async def upload_file(
             owner_id=current_user.id
         )
         db.add(db_source)
-        db.commit()
-        db.refresh(db_source)
+        # Use to_thread for DB commit if it's slow, but here it's mostly for consistency
+        await asyncio.to_thread(db.commit)
+        await asyncio.to_thread(db.refresh, db_source)
         
         try:
             if extension == '.csv':
-                row_count = data_ingestor.ingest_csv(file_path, table_name, schema="s_manual")
+                row_count = await asyncio.to_thread(data_ingestor.ingest_csv, file_path, table_name, schema="s_manual")
                 db_source.row_count = row_count
                 
                 # PII Scan
@@ -161,9 +164,9 @@ async def upload_file(
             elif extension in ['.xml', '.gpx']:
                 # Generic XML/GPX Ingestion
                 if extension == '.xml':
-                    results = data_ingestor.ingest_xml(file_path, file.filename, schema="s_manual")
+                    results = await asyncio.to_thread(data_ingestor.ingest_xml, file_path, file.filename, schema="s_manual")
                 else: # .gpx
-                    results = data_ingestor.ingest_gpx(file_path, file.filename, schema="s_manual")
+                    results = await asyncio.to_thread(data_ingestor.ingest_gpx, file_path, file.filename, schema="s_manual")
                 
                 valid_results = [r for r in results if r["status"] == "completed"]
                 
@@ -621,8 +624,16 @@ async def upload_file_stream(
             internal_filename = f"{file_id}{extension}"
             temp_path = UPLOAD_DIR / internal_filename
             
-            with temp_path.open("wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+            def save_sync():
+                with temp_path.open("wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+            
+            await asyncio.to_thread(save_sync)
+            
+            # CRITICAL: Reset pointer after save so calculate_hash inside upload_file can read it!
+            await file.seek(0)
+            
+            logging.info(f"[SYSTEM] File saved to {temp_path.name}. Starting ingestion...")
             
             # Start the ingestion task
             ingestion_task = asyncio.create_task(upload_file(file, context, db, current_user, file_path=temp_path))

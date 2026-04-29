@@ -18,7 +18,8 @@ def create_ravioli_pipeline(pipeline_name: str, dataset_name: str = "main"):
     return dlt.pipeline(
         pipeline_name=pipeline_name,
         destination=dlt.destinations.duckdb(str(settings.duckdb_path)),
-        dataset_name=dataset_name
+        dataset_name=dataset_name,
+        progress="log"
     )
 
 # --- PII Scanning ---
@@ -116,7 +117,7 @@ def xlsx_chunk_generator(path: Path, sheet_name: str, analysis: dict, chunk_size
             break
             
     if not header_row: return
-
+ 
     chunk = []
     total_processed = 0
     for i, row in enumerate(ws.iter_rows(min_row=d_idx + 1, values_only=True)):
@@ -140,7 +141,9 @@ def xml_tag_generator(path: Path, tag_name: str, extract_metadata: bool = False)
     """Generic generator to stream specific XML tags using iterparse."""
     context = ET.iterparse(path, events=("end",))
     for _, elem in context:
-        if elem.tag == tag_name:
+        # Handle namespaces: elem.tag is usually {namespace}tagname
+        local_tag = elem.tag.split('}')[-1]
+        if local_tag == tag_name:
             data = dict(elem.attrib)
             if extract_metadata:
                 metadata = {c.attrib.get('key'): c.attrib.get('value') for c in elem if c.tag == "MetadataEntry"}
@@ -149,79 +152,65 @@ def xml_tag_generator(path: Path, tag_name: str, extract_metadata: bool = False)
         elem.clear()
 
 def xml_chunk_generator(path: Path, tag_name: str, start: int, end: int, extract_metadata: bool = False):
-    """Memory-efficient generator using mmap to scan XML chunks without loading them into RAM."""
+    """Memory-efficient generator that scans specific byte chunks of an XML file."""
     attr_pattern = re.compile(r'(\w+)="([^"]*)"')
     count = 0
     
     with open(path, "rb") as f:
-        with mmap.mmap(f.fileno(), length=0, access=mmap.ACCESS_READ) as mm:
-            view = mm[start:end]
-            
-            if tag_name == "Record":
-                pattern = re.compile(rf'<{tag_name}\s+([^>]+)\s*/>'.encode())
-                for match in pattern.finditer(view):
-                    attrs_raw = match.group(1).decode('utf-8', errors='ignore')
-                    count += 1
-                    if count % 100000 == 0:
-                        logger.info(f"Chunk [{start//1024**2}MB]: Found {count:,} records...")
-                    yield dict(attr_pattern.findall(attrs_raw))
-            else:
-                pattern = re.compile(rf'<{tag_name}\s+([^>/]+)\s*(?:/>|>(.*?)</{tag_name}>)'.encode(), re.DOTALL)
-                for match in pattern.finditer(view):
-                    attrs_raw = match.group(1).decode('utf-8', errors='ignore')
-                    entry = dict(attr_pattern.findall(attrs_raw))
+        f.seek(start)
+        chunk_bytes = f.read(end - start)
+        
+        if tag_name == "Record":
+            # Allow optional namespace prefix (e.g. <n1:Record ... />)
+            pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>]+)\s*/>'.encode())
+            for match in pattern.finditer(chunk_bytes):
+                attrs_raw = match.group(1).decode('utf-8', errors='ignore')
+                entry = dict(attr_pattern.findall(attrs_raw))
+                
+                count += 1
+                if count % 10000 == 0:
+                    msg = f"Ingestion Progress: {count:,} records found in chunk {start//1024**2}MB"
+                    logger.info(msg)
+                    print(f"DEBUG: {msg}", flush=True)
+                yield entry
+        else:
+            # Allow optional namespace prefix (e.g. <n1:observation ...> ... </n1:observation>)
+            # Flexible regex that handles tags with or without attributes
+            pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}(?:\s+([^>/]*))?\s*(?:/>|>(.*?)</(?:[\w-]+:)?{tag_name}>)'.encode(), re.DOTALL)
+            for match in pattern.finditer(chunk_bytes):
+                attrs_raw = match.group(1).decode('utf-8', errors='ignore') if match.group(1) else ""
+                entry = dict(attr_pattern.findall(attrs_raw))
+                
+                if match.group(2):
+                    inner = match.group(2).decode('utf-8', errors='ignore')
                     
-                    if match.group(2):
-                        inner = match.group(2).decode('utf-8', errors='ignore')
+                    # CDA Observation specific extraction
+                    if tag_name == "observation":
+                        # Extract code/value/time attributes
+                        for tag, prefix in [("code", "code_"), ("value", "value_"), ("low", "start_"), ("high", "end_")]:
+                            m = re.search(rf'<{tag}\s+([^>]+)/>', inner)
+                            if m:
+                                for k, v in attr_pattern.findall(m.group(1)):
+                                    entry[f"{prefix}{k}"] = v
                         
-                        # CDA Observation specific extraction
-                        if tag_name == "observation":
-                            # Extract code attributes
-                            code_match = re.search(r'<code\s+([^>]+)/>', inner)
-                            if code_match:
-                                for k, v in attr_pattern.findall(code_match.group(1)):
-                                    entry[f'code_{k}'] = v
-                            
-                            # Extract value attributes
-                            value_match = re.search(r'<value\s+([^>]+)/>', inner)
-                            if value_match:
-                                for k, v in attr_pattern.findall(value_match.group(1)):
-                                    entry[f'value_{k}'] = v
-                                    
-                            # Extract effectiveTime
-                            low_match = re.search(r'<low\s+([^>]+)/>', inner)
-                            if low_match:
-                                for k, v in attr_pattern.findall(low_match.group(1)):
-                                    entry[f'start_{k}'] = v
-                            high_match = re.search(r'<high\s+([^>]+)/>', inner)
-                            if high_match:
-                                for k, v in attr_pattern.findall(high_match.group(1)):
-                                    entry[f'end_{k}'] = v
+                        # Extract text fields
+                        for tag, key in [("sourceName", "source_name"), ("sourceVersion", "source_version"), ("type", "type"), ("unit", "unit")]:
+                            m = re.search(rf'<{tag}>([^<]+)</{tag}>', inner)
+                            if m: entry[key] = m.group(1)
 
-                            # Extract sourceName/sourceVersion from text
-                            source_match = re.search(r'<sourceName>([^<]+)</sourceName>', inner)
-                            if source_match: entry['source_name'] = source_match.group(1)
-                            version_match = re.search(r'<sourceVersion>([^<]+)</sourceVersion>', inner)
-                            if version_match: entry['source_version'] = version_match.group(1)
-                            type_match = re.search(r'<type>([^<]+)</type>', inner)
-                            if type_match: entry['type'] = type_match.group(1)
-                            unit_match = re.search(r'<unit>([^<]+)</unit>', inner)
-                            if unit_match: entry['unit'] = unit_match.group(1)
-
-                        if extract_metadata:
-                            meta_pattern = re.compile(r'<MetadataEntry\s+key="([^"]*)"\s+value="([^"]*)"\s*/>')
-                            metadata = {k: v for k, v in meta_pattern.findall(inner)}
-                            if metadata: entry['metadata'] = metadata
-                            
-                    count += 1
-                    if count % 50000 == 0:
-                        msg = f"Chunk [{start//1024**2}MB]: Found {count:,} records for {tag_name}..."
-                        print(f"DEBUG: xml_chunk_generator print: {msg}", flush=True)
-                        logger.info(msg)
-                    yield entry
-            
-            logger.info(f"Chunk completed. Total found: {count:,} records for {tag_name}.")
-            del view
+                    if extract_metadata:
+                        meta_pattern = re.compile(r'<MetadataEntry\s+key="([^"]*)"\s+value="([^"]*)"\s*/>')
+                        metadata = {k: v for k, v in meta_pattern.findall(inner)}
+                        if metadata: entry['metadata'] = metadata
+                        
+                count += 1
+                if count % 10000 == 0:
+                    msg = f"Ingestion Progress: {count:,} records found in chunk {start//1024**2}MB"
+                    logger.info(msg)
+                    print(f"DEBUG: {msg}", flush=True)
+                yield entry
+        
+        logger.info(f"Chunk completed. Total found: {count:,} records for {tag_name}.")
 
 def xml_full_parse_generator(path: Path, original_filename: str):
     """Fallback generator for full XML parsing."""
@@ -239,14 +228,14 @@ def scan_xml_chunk(path: Path, tag_name: str, start: int, end: int, extract_meta
         data = f.read(end - start)
         
         if tag_name == "Record":
-            # optimized for flat Record tags
-            tag_pattern = re.compile(rf'<{tag_name}\s+([^>]+)\s*/>'.encode())
+            # optimized for flat Record tags, allowing optional prefix
+            tag_pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>]+)\s*/>'.encode())
             for match in tag_pattern.finditer(data):
                 attrs_raw = match.group(1).decode('utf-8', errors='ignore')
                 results.append(dict(attr_pattern.findall(attrs_raw)))
         elif tag_name == "Workout":
-            # handle Workout tags with potential MetadataEntry children
-            tag_pattern = re.compile(rf'<{tag_name}\s+([^>]+)>(.*?)</{tag_name}>'.encode(), re.DOTALL)
+            # handle Workout tags with potential MetadataEntry children, allowing optional prefix
+            tag_pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>]+)>(.*?)</(?:[\w-]+:)?{tag_name}>'.encode(), re.DOTALL)
             for match in tag_pattern.finditer(data):
                 attrs_raw = match.group(1).decode('utf-8', errors='ignore')
                 entry = dict(attr_pattern.findall(attrs_raw))
@@ -257,8 +246,8 @@ def scan_xml_chunk(path: Path, tag_name: str, start: int, end: int, extract_meta
                     if metadata: entry['metadata'] = metadata
                 results.append(entry)
         else:
-            # generic fallback for other tags
-            tag_pattern = re.compile(rf'<{tag_name}\s+([^>/]+)\s*(?:/>|>(.*?)</{tag_name}>)'.encode(), re.DOTALL)
+            # generic fallback for other tags, allowing optional prefix
+            tag_pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>/]+)\s*(?:/>|>(.*?)</(?:[\w-]+:)?{tag_name}>)'.encode(), re.DOTALL)
             for match in tag_pattern.finditer(data):
                 attrs_raw = match.group(1).decode('utf-8', errors='ignore')
                 results.append(dict(attr_pattern.findall(attrs_raw)))
