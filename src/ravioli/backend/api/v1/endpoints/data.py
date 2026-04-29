@@ -37,6 +37,8 @@ class LogCaptureHandler(logging.Handler):
     def emit(self, record):
         try:
             msg = self.format(record)
+            # DEBUG: Print to server console to verify capture
+            print(f"DEBUG: LogCaptureHandler captured: {msg}", flush=True)
             self.loop.call_soon_threadsafe(self.queue.put_nowait, msg)
         except Exception:
             self.handleError(record)
@@ -599,10 +601,18 @@ async def upload_file_stream(
     loop = asyncio.get_running_loop()
     handler = LogCaptureHandler(log_queue, loop)
     
-    # Attach handler to root logger to capture EVERYTHING
-    root_logger = logging.getLogger()
-    root_logger.addHandler(handler)
+    # Redundant attachment to ensure coverage
+    loggers_to_capture = [
+        logging.getLogger(),      # root
+        logging.getLogger("ravioli"),
+        logging.getLogger("dlt")
+    ]
     
+    for l in loggers_to_capture:
+        l.addHandler(handler)
+        l.setLevel(logging.INFO)
+        l.propagate = True
+
     async def event_generator():
         temp_path = None
         try:
@@ -623,9 +633,12 @@ async def upload_file_stream(
             # While the task is running, yield logs
             while not ingestion_task.done():
                 try:
-                    msg = await asyncio.wait_for(log_queue.get(), timeout=0.1)
+                    # Shorter timeout to allow for frequent pings/checks
+                    msg = await asyncio.wait_for(log_queue.get(), timeout=0.5)
                     yield f"data: LOG:{msg}\n\n"
                 except asyncio.TimeoutError:
+                    # Keep-alive ping
+                    yield f"data: PING:keep-alive\n\n"
                     continue
             
             # Drain the queue one last time after task is done
@@ -652,7 +665,10 @@ async def upload_file_stream(
                 yield f"data: ERROR:An internal error occurred: {str(e)}\n\n"
                 
         finally:
-            root_logger.removeHandler(handler)
+            for l in loggers_to_capture:
+                l.removeHandler(handler)
+            if temp_path and temp_path.exists():
+                os.remove(temp_path)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
