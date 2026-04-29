@@ -151,6 +151,9 @@ export const api = {
               const content = chunk.substring(6);
               if (content.startsWith('LOG:')) {
                 onLog(content.substring(4));
+              } else if (content.startsWith('PING:')) {
+                // Keep-alive ping, just ignore or log to console
+                console.debug('Stream PING: keep-alive');
               } else if (content.startsWith('DONE:')) {
                 resolve(JSON.parse(content.substring(5)));
               } else if (content.startsWith('ERROR:')) {

@@ -18,9 +18,12 @@ async def test_upload_generates_unique_table_name(client, session, mocker):
     mocker.patch("ravioli.backend.api.v1.endpoints.data.Path.open", mocker.mock_open())
     mocker.patch("ravioli.backend.api.v1.endpoints.data.Path.stat", return_value=MagicMock(st_size=1024))
     
-    # Mocking DuckDB ingestion
-    mock_duckdb = mocker.patch("ravioli.backend.api.v1.endpoints.data.duckdb_manager")
-    mock_duckdb.ingest_csv.return_value = 10
+    # Mocking DataIngestor ingestion
+    mock_ingestor = mocker.patch("ravioli.backend.api.v1.endpoints.data.data_ingestor")
+    mock_ingestor.ingest_csv.return_value = 10
+    
+    # Mocking duckdb_manager for sample data fetch
+    mocker.patch("ravioli.backend.api.v1.endpoints.data.duckdb_manager")
     
     # Mocking PII scan
     mocker.patch("ravioli.backend.api.v1.endpoints.data.pii_scanner.scan_dataframe", return_value=False)
@@ -36,6 +39,8 @@ async def test_upload_generates_unique_table_name(client, session, mocker):
             obj.created_at = datetime.datetime.now()
         if hasattr(obj, 'updated_at') and not getattr(obj, 'updated_at', None):
             obj.updated_at = datetime.datetime.now()
+        if hasattr(obj, 'has_pii') and getattr(obj, 'has_pii', None) is None:
+            obj.has_pii = False
         return obj
     session.add.side_effect = mock_session_add
     session.commit.side_effect = lambda: None
@@ -58,6 +63,6 @@ async def test_upload_generates_unique_table_name(client, session, mocker):
     assert len(data["table_name"]) == 5 + 4 # "test_" + 4 chars
     
     # Verify the table_name was used in ingestion
-    mock_duckdb.ingest_csv.assert_called_once()
-    args, kwargs = mock_duckdb.ingest_csv.call_args
+    mock_ingestor.ingest_csv.assert_called_once()
+    args, kwargs = mock_ingestor.ingest_csv.call_args
     assert args[1] == data["table_name"]

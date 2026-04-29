@@ -2,6 +2,7 @@ import re
 import shutil
 import uuid
 import hashlib
+import os
 from pathlib import Path
 from typing import List, Optional
 import json
@@ -15,29 +16,30 @@ from ravioli.backend.core import schemas, models
 from ravioli.backend.core.database import get_db, SessionLocal
 from ravioli.backend.core.config import settings
 from ravioli.backend.core.models import DataSource
-from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
-from ravioli.backend.data.olap.ingestion.wfs_client import WFSClient
+from ravioli.backend.data.olap.duckdb_manager import duckdb_manager, data_ingestor
+from ravioli.backend.data.olap.ingestion.ingestor import WFSClient
+from ravioli.backend.data.olap.ingestion.utils import pii_scanner, create_ravioli_pipeline
 
 import logging
 from ravioli.backend.core.ollama import OllamaClient
-from ravioli.backend.data.olap.ingestion.pii_scanner import pii_scanner
-from ravioli.backend.data.olap.ingestion.dlt_utils import create_ravioli_pipeline
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 class LogCaptureHandler(logging.Handler):
-    def __init__(self, queue: asyncio.Queue):
+    def __init__(self, queue: asyncio.Queue, loop: asyncio.AbstractEventLoop):
         super().__init__()
         self.queue = queue
-        self.setFormatter(logging.Formatter('%(message)s'))
+        self.loop = loop
+        self.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
 
     def emit(self, record):
         try:
             msg = self.format(record)
-            # Use call_soon_threadsafe to safely push to queue from potentially different threads
-            asyncio.get_event_loop().call_soon_threadsafe(self.queue.put_nowait, msg)
+            # DEBUG: Print to server console to verify capture
+            print(f"DEBUG: LogCaptureHandler captured: {msg}", flush=True)
+            self.loop.call_soon_threadsafe(self.queue.put_nowait, msg)
         except Exception:
             self.handleError(record)
 
@@ -75,18 +77,20 @@ async def upload_file(
     file: UploadFile = File(...),
     context: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user),
+    file_path: Optional[Path] = None
 ):
     extension = Path(file.filename).suffix.lower()
-    if extension not in ['.csv', '.xlsx']:
-        raise HTTPException(status_code=400, detail="Only CSV and XLSX files are supported at this moment.")
+    allowed_extensions = ['.csv', '.xlsx', '.xml', '.gpx']
+    if extension not in allowed_extensions:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}")
 
     # Generate hash to check for duplicates
     file_hash = await calculate_hash(file)
     
     # Check if file with same hash already exists
     query = select(DataSource).where(DataSource.file_hash == file_hash)
-    existing_file = db.execute(query).scalar_one_or_none()
+    existing_file = db.execute(query).scalars().first()
     
     if existing_file:
         # If it exists and was successful, we can just return it
@@ -100,7 +104,11 @@ async def upload_file(
 
     file_id = uuid.uuid4()
     internal_filename = f"{file_id}{extension}"
-    file_path = UPLOAD_DIR / internal_filename
+    if not file_path:
+        file_path = UPLOAD_DIR / internal_filename
+        # Save file to disk
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
     
     # Generate a clean, unique table name from the filename
     base_name = Path(file.filename).stem
@@ -108,10 +116,6 @@ async def upload_file(
     table_name = f"{clean_base}_{file_id.hex[:4]}"
     
     try:
-        # Save file to disk
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
         # Create record in Postgres
         db_source = DataSource(
             id=file_id,
@@ -123,16 +127,16 @@ async def upload_file(
             schema_name="s_manual",
             file_hash=file_hash,
             status="pending",
+            has_pii=False,
             owner_id=current_user.id
         )
         db.add(db_source)
         db.commit()
         db.refresh(db_source)
         
-        # Ingest into DuckDB
         try:
             if extension == '.csv':
-                row_count = duckdb_manager.ingest_csv(file_path, table_name, schema="s_manual")
+                row_count = data_ingestor.ingest_csv(file_path, table_name, schema="s_manual")
                 db_source.row_count = row_count
                 
                 # PII Scan
@@ -154,9 +158,76 @@ async def upload_file(
                     db_source.description = await ollama_client.generate_description(db_source.original_filename, df_sample.to_csv(index=False), context=context)
                 except Exception as e:
                     logger.warning("Auto-description failed for CSV: %s", e)
+            elif extension in ['.xml', '.gpx']:
+                # Generic XML/GPX Ingestion
+                if extension == '.xml':
+                    results = data_ingestor.ingest_xml(file_path, file.filename, schema="s_manual")
+                else: # .gpx
+                    results = data_ingestor.ingest_gpx(file_path, file.filename, schema="s_manual")
+                
+                valid_results = [r for r in results if r["status"] == "completed"]
+                
+                if not valid_results:
+                    db_source.status = "failed"
+                    db_source.error_message = "No valid data extracted from file."
+                else:
+                    # Update primary record
+                    first = valid_results[0]
+                    db_source.table_name = first["table_name"]
+                    db_source.row_count = first["row_count"]
+                    db_source.status = "completed"
+                    
+                    # AI Description for primary
+                    try:
+                        ollama_client = OllamaClient(db)
+                        # For XML/GPX, we read the first 2000 chars as the "sample"
+                        with file_path.open("r", errors="ignore") as f:
+                            sample_text = f.read(2000)
+                        db_source.description = await ollama_client.generate_description(db_source.original_filename, sample_text, context=context)
+                    except Exception as e:
+                        logger.warning("Auto-description failed for XML/GPX: %s", e)
+                        
+                    # PII Scan for primary
+                    try:
+                        full_table_name = f'"s_manual"."{db_source.table_name}"'
+                        df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 100').fetchdf()
+                        db_source.has_pii = pii_scanner.scan_dataframe(df_sample)
+                    except Exception as e:
+                        logger.warning("PII scan failed for table %s: %s", db_source.table_name, e)
+
+                    # Create records for other valid tables
+                    for other in valid_results[1:]:
+                        other_source = DataSource(
+                            id=uuid.uuid4(),
+                            filename=internal_filename,
+                            original_filename=f"{file.filename} [{other['table_name']}]",
+                            content_type=file.content_type,
+                            size_bytes=file_path.stat().st_size,
+                            table_name=other["table_name"],
+                            schema_name="s_manual",
+                            file_hash=file_hash,
+                            status="completed",
+                            row_count=other["row_count"],
+                            has_pii=False, owner_id=current_user.id
+                        )
+                        # PII Scan for other
+                        try:
+                            full_table_name = f'"s_manual"."{other["table_name"]}"'
+                            df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 100').fetchdf()
+                            other_source.has_pii = pii_scanner.scan_dataframe(df_sample)
+                        except Exception as e:
+                            logger.warning("PII scan failed for table %s: %s", other["table_name"], e)
+                        
+                        # AI Description for other
+                        try:
+                            other_source.description = await ollama_client.generate_description(other_source.original_filename, sample_text, context=context)
+                        except Exception as e:
+                            logger.warning("Auto-description failed for table %s: %s", other["table_name"], e)
+                            
+                        db.add(other_source)
             else: # .xlsx
                 ollama_client = OllamaClient(db)
-                xlsx_results = await duckdb_manager.ingest_xlsx(file_path, table_name, schema="s_manual", ollama_client=ollama_client)
+                xlsx_results = await data_ingestor.ingest_xlsx(file_path, table_name, schema="s_manual", ollama_client=ollama_client)
                 
                 valid_results = [r for r in xlsx_results if r["status"] == "completed"]
                 
@@ -202,7 +273,7 @@ async def upload_file(
                             file_hash=file_hash,
                             status="completed",
                             row_count=other["row_count"],
-                            owner_id=current_user.id
+                            has_pii=False, owner_id=current_user.id
                         )
                         # PII Scan for other
                         try:
@@ -223,6 +294,7 @@ async def upload_file(
                             
                         db.add(other_source)
         except Exception as e:
+            logger.error(f"Ingestion failed for {file.filename}: {e}", exc_info=True)
             db_source.status = "failed"
             db_source.error_message = str(e)
         
@@ -525,53 +597,75 @@ async def upload_file_stream(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """
-    Same as upload_file but returns a StreamingResponse with real-time logs.
-    """
     log_queue = asyncio.Queue()
-    handler = LogCaptureHandler(log_queue)
+    loop = asyncio.get_running_loop()
+    handler = LogCaptureHandler(log_queue, loop)
     
-    # Attach handler to root ravioli logger to catch all sub-module logs
-    ingestion_logger = logging.getLogger("ravioli")
-    ingestion_logger.addHandler(handler)
+    # Attach handler to root logger — this should catch everything via propagation
+    root_logger = logging.getLogger()
+    if handler not in root_logger.handlers:
+        root_logger.addHandler(handler)
+    root_logger.setLevel(logging.INFO)
 
     async def event_generator():
+        temp_path = None
         try:
-            # We need to run the ingestion logic inside this generator
-            # but in a way that yields logs from the queue.
+            # Verification log to prove the handler is attached and working
+            logging.info("[SYSTEM] Ingestion stream started - Logger Verification")
+            
+            yield f"data: LOG:INFO: [SYSTEM] System Terminal linked. Capturing ingestion logs...\n\n"
+            
+            # 1. Save file to disk immediately to avoid "read of closed file" error
+            file_id = uuid.uuid4()
+            extension = Path(file.filename).suffix.lower()
+            internal_filename = f"{file_id}{extension}"
+            temp_path = UPLOAD_DIR / internal_filename
+            
+            with temp_path.open("wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
             
             # Start the ingestion task
-            ingestion_task = asyncio.create_task(upload_file(file, context, db, current_user))
+            ingestion_task = asyncio.create_task(upload_file(file, context, db, current_user, file_path=temp_path))
             
             # While the task is running, yield logs
             while not ingestion_task.done():
                 try:
-                    # Wait for a log message with a timeout to check task status
-                    msg = await asyncio.wait_for(log_queue.get(), timeout=0.1)
+                    # Shorter timeout to allow for frequent pings/checks
+                    msg = await asyncio.wait_for(log_queue.get(), timeout=0.5)
                     yield f"data: LOG:{msg}\n\n"
                 except asyncio.TimeoutError:
+                    # Keep-alive ping
+                    yield f"data: PING:keep-alive\n\n"
                     continue
+            
+            # Drain the queue one last time after task is done
+            while not log_queue.empty():
+                msg = log_queue.get_nowait()
+                yield f"data: LOG:{msg}\n\n"
             
             # Once done, get result or error
             try:
                 result = await ingestion_task
-                # Send the final result as a special event
-                # We need to serialize the DataSource model
                 result_dict = {
                     "id": str(result.id),
                     "original_filename": result.original_filename,
                     "status": result.status,
                     "description": result.description,
                     "is_duplicate": getattr(result, "is_duplicate", False),
-                    "error_message": result.error_message
+                    "error_message": result.error_message,
+                    "schema_name": result.schema_name,
+                    "table_name": result.table_name
                 }
                 yield f"data: DONE:{json.dumps(result_dict)}\n\n"
             except Exception as e:
-                logger.exception("Error during upload_file_stream ingestion task")
-                yield "data: ERROR:An internal error occurred during ingestion.\n\n"
+                logger.exception(f"Error during upload_file_stream ingestion task for {file.filename}")
+                yield f"data: ERROR:An internal error occurred: {str(e)}\n\n"
                 
         finally:
-            ingestion_logger.removeHandler(handler)
+            root_logger = logging.getLogger()
+            root_logger.removeHandler(handler)
+            if temp_path and temp_path.exists():
+                os.remove(temp_path)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

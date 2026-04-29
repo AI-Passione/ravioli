@@ -254,7 +254,7 @@ export function renderData() {
                   </div>
                 </div>
               </div>
-              <input type="file" id="file-input" class="hidden" accept=".csv,.xlsx" multiple>
+              <input type="file" id="file-input" class="hidden" accept=".csv,.xlsx,.xml,.gpx" multiple>
             </div>
             <button class="btn-back mt-8 text-neutral-500 hover:text-neutral-300 flex items-center gap-2 text-sm transition-colors">
               <span class="material-symbols-outlined text-lg">arrow_back</span>
@@ -285,7 +285,9 @@ export function renderData() {
       </div>
     </div>
   `;
-
+  
+  let isIngesting = false;
+  
   // --- Modal Logic ---
   const addModal = container.querySelector('#add-source-modal') as HTMLElement;
   const btnAddSource = container.querySelector('#btn-add-source');
@@ -322,17 +324,24 @@ export function renderData() {
     setTimeout(() => addModal.classList.add('hidden'), 300);
   };
 
-  closeAddModal?.addEventListener('click', hideAddModal);
+  closeAddModal?.addEventListener('click', () => {
+    if (isIngesting) return;
+    hideAddModal();
+  });
   
   sourceTypeCards.forEach(card => {
     card.addEventListener('click', () => {
+      if (isIngesting) return;
       const type = card.getAttribute('data-type');
       showStep(type as any);
     });
   });
 
   btnBacks.forEach(btn => {
-    btn.addEventListener('click', () => showStep('selection'));
+    btn.addEventListener('click', () => {
+      if (isIngesting) return;
+      showStep('selection');
+    });
   });
 
   // --- WFS Ingestion Logic ---
@@ -369,11 +378,15 @@ export function renderData() {
   const dropZone = container.querySelector('#drop-zone');
   const fileInput = container.querySelector('#file-input') as HTMLInputElement;
   
-  dropZone?.addEventListener('click', () => fileInput.click());
+  dropZone?.addEventListener('click', () => {
+    if (isIngesting) return;
+    fileInput.click();
+  });
   
   // Drag & Drop
   ['dragover', 'dragenter'].forEach(eventName => {
     dropZone?.addEventListener(eventName, (e) => {
+      if (isIngesting) return;
       e.preventDefault();
       e.stopPropagation();
       dropZone.classList.add('border-primary/50', 'bg-surface-container');
@@ -389,6 +402,7 @@ export function renderData() {
   });
 
   dropZone?.addEventListener('drop', async (e: any) => {
+    if (isIngesting) return;
     const items = e.dataTransfer?.items;
     if (!items) return;
 
@@ -408,7 +422,8 @@ export function renderData() {
     async function scanEntry(entry: any) {
       if (entry.isFile) {
         const file = await new Promise<File>((resolve, reject) => entry.file(resolve, reject));
-        if (file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.xlsx')) {
+        const ext = file.name.toLowerCase();
+        if (ext.endsWith('.csv') || ext.endsWith('.xlsx') || ext.endsWith('.xml') || ext.endsWith('.gpx')) {
           files.push(file);
         }
       } else if (entry.isDirectory) {
@@ -446,6 +461,7 @@ export function renderData() {
   });
 
   fileInput?.addEventListener('change', async (e) => {
+    if (isIngesting) return;
     const files = (e.target as HTMLInputElement).files;
     if (files && files.length > 0) {
       const contextInput = container.querySelector('#upload-context') as HTMLInputElement;
@@ -456,11 +472,14 @@ export function renderData() {
 
   async function handleUploads(filesArray: File[], context?: string) {
     // Filter to be safe, though drop handles it, file input might not
-    const filteredFiles = filesArray.filter(f => 
-      f.name.toLowerCase().endsWith('.csv') || f.name.toLowerCase().endsWith('.xlsx')
-    );
+    const filteredFiles = filesArray.filter(f => {
+      const ext = f.name.toLowerCase();
+      return ext.endsWith('.csv') || ext.endsWith('.xlsx') || ext.endsWith('.xml') || ext.endsWith('.gpx');
+    });
     
     if (filteredFiles.length === 0) return;
+    
+    isIngesting = true;
 
     const dropZoneContent = container.querySelector('#drop-zone-content');
     const dropZoneLoading = container.querySelector('#drop-zone-loading');
@@ -475,24 +494,55 @@ export function renderData() {
     if (ingestionLogs) ingestionLogs.innerHTML = '';
     if (ingestionStatus) ingestionStatus.textContent = 'Ingestion in Progress...';
 
-    const addLog = (msg: string, isHeader = false) => {
+    const addLog = (msg: string, isHeader = false, isWarning = false) => {
       if (ingestionLogs) {
         const div = document.createElement('div');
-        div.className = isHeader ? 'text-primary font-bold mt-2 mb-1' : 'animate-in fade-in slide-in-from-left-1 duration-300';
+        div.className = 'font-mono text-[10px] py-0.5 animate-in fade-in slide-in-from-left-1 duration-300 whitespace-pre-wrap break-all';
+        
         if (isHeader) {
+          div.className = 'text-primary font-bold mt-2 mb-1 border-b border-primary/10 pb-1';
+          div.textContent = msg;
+        } else if (isWarning) {
+          div.className += ' text-amber-500 bg-amber-500/5 px-2 py-1 rounded-lg border border-amber-500/10 my-2';
           div.textContent = msg;
         } else {
-          const prefix = document.createElement('span');
-          prefix.className = 'text-neutral-600 mr-2';
-          prefix.textContent = '>';
-          div.appendChild(prefix);
-          div.appendChild(document.createTextNode(msg));
+          // Detect log levels
+          if (msg.startsWith('INFO: ')) {
+            const span = document.createElement('span');
+            span.className = 'text-blue-400 mr-2 opacity-80';
+            span.textContent = 'INFO';
+            div.appendChild(span);
+            div.appendChild(document.createTextNode(msg.substring(6)));
+          } else if (msg.startsWith('WARNING: ')) {
+            const span = document.createElement('span');
+            span.className = 'text-amber-500 mr-2';
+            span.textContent = 'WARN';
+            div.appendChild(span);
+            div.appendChild(document.createTextNode(msg.substring(9)));
+            div.className += ' bg-amber-500/5 px-2 rounded';
+          } else if (msg.startsWith('ERROR: ')) {
+            const span = document.createElement('span');
+            span.className = 'text-red-500 mr-2';
+            span.textContent = 'ERR ';
+            div.appendChild(span);
+            div.appendChild(document.createTextNode(msg.substring(7)));
+            div.className += ' bg-red-500/5 px-2 rounded';
+          } else {
+            div.className += ' text-neutral-400';
+            div.textContent = msg;
+          }
         }
         ingestionLogs.appendChild(div);
-        const console = container.querySelector('#ingestion-console');
-        if (console) console.scrollTop = console.scrollHeight;
+        const consoleEl = container.querySelector('#ingestion-console');
+        if (consoleEl) consoleEl.scrollTop = consoleEl.scrollHeight;
       }
     };
+
+    // Check for massive files (> 1GB) to activate chucking warning
+    const largeFiles = filteredFiles.filter(f => f.size > 1_000_000_000);
+    if (largeFiles.length > 0) {
+      addLog(`🚀 Massive file(s) detected (>1GB). "is_chucking" mode activated. Ingestion will be distributed across multiple CPU cores via chunking.`, false, true);
+    }
 
     let completed = 0;
     let failed = 0;
@@ -527,6 +577,7 @@ export function renderData() {
     if (failed > 0) addLog(`Failed: ${failed}`);
 
     setTimeout(() => {
+      isIngesting = false;
       hideAddModal();
       refreshFiles();
     }, 2000);
