@@ -179,7 +179,7 @@ class DataIngestor:
             
             # Run all resources together
             logger.info(f"Executing dlt pipeline with {len(resources)} parallel resources...")
-            load_info = pipeline.run(resources, workers=num_workers if is_chucking else 1)
+            load_info = pipeline.run(resources)
             logger.info(f"Pipeline execution completed. Status: {load_info}")
             
             for table_cfg in strategy["tables"]:
@@ -190,7 +190,7 @@ class DataIngestor:
             # Fallback for unrecognized XML
             tn = f"xml_{''.join(c if c.isalnum() else '_' for c in original_filename).lower()[:20]}"
             gen = xml_full_parse_generator(file_path, original_filename)
-            pipeline.run(dlt.resource(gen, name=tn), workers=4 if is_chucking else 1)
+            pipeline.run(dlt.resource(gen, name=tn))
             results.append({"table_name": tn, "row_count": 1, "status": "completed"})
             
         return results

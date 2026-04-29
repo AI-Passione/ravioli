@@ -290,6 +290,7 @@ async def upload_file(
                             
                         db.add(other_source)
         except Exception as e:
+            logger.error(f"Ingestion failed for {file.filename}: {e}", exc_info=True)
             db_source.status = "failed"
             db_source.error_message = str(e)
         
@@ -651,7 +652,7 @@ async def upload_file_stream(
                 }
                 yield f"data: DONE:{json.dumps(result_dict)}\n\n"
             except Exception as e:
-                logger.exception("Error during upload_file_stream ingestion task")
+                logger.exception(f"Error during upload_file_stream ingestion task for {file.filename}")
                 yield f"data: ERROR:An internal error occurred: {str(e)}\n\n"
                 
         finally:
