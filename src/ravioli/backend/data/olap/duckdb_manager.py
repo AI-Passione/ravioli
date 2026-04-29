@@ -105,10 +105,14 @@ class DuckDBManager:
                 try:
                     # Read the entire sheet without header first to apply fixes
                     df_full = pd.read_excel(file_path, sheet_name=sheet_name, header=None)
+                    logger.info(f"Sheet '{sheet_name}' full shape: {df_full.shape}")
                     
                     df_final = self._process_sheet_with_analysis(df_full, analysis)
                     
                     if df_final is None or df_final.empty:
+                        logger.error(f"Sheet '{sheet_name}' processed result is empty. Analysis: {analysis}")
+                        if df_final is not None:
+                            logger.error(f"Columns remaining: {df_final.columns.tolist()}")
                         raise ValueError("Processed dataframe is empty or invalid.")
 
                     conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM df_final")
@@ -155,7 +159,7 @@ class DuckDBManager:
 
         # 1. Extraction Phase
         if is_split:
-            # Handle list of offsets or a single offset (for backward compatibility)
+            # Handle list of offsets or a single offset
             split_offsets = analysis.get("split_offsets")
             if not split_offsets and "split_column_offset" in analysis:
                 split_offsets = [analysis["split_column_offset"]]
@@ -173,13 +177,17 @@ class DuckDBManager:
             # Standard Extraction
             raw_headers = df.iloc[header_row_idx].tolist()
             headers = [str(h).strip() if pd.notna(h) and str(h).strip() != "" else f"col_{i}" for i, h in enumerate(raw_headers)]
+            logger.info(f"Standard extraction: header_row={header_row_idx}, data_start={data_start_idx}, headers={headers}")
             data = df.iloc[data_start_idx:].copy()
             data.columns = headers
+        
+        logger.info(f"Data shape after extraction: {data.shape}")
         
         # 2. Cleaning Phase
         # Drop completely empty columns and rows
         data = data.dropna(axis=1, how='all')
         data = data.dropna(axis=0, how='all')
+        logger.info(f"Data shape after dropna: {data.shape}")
         
         # 3. Mapping Phase
         if mapping:
@@ -190,16 +198,14 @@ class DuckDBManager:
         
         # 4. Final Polish
         # Remove internal pandas 'Unnamed' artifacts.
-        # We keep 'col_N' columns if they contain data and weren't mapped to something else,
-        # as they might be valid data without an identified header.
         unnamed_mask = data.columns.astype(str).str.contains('^Unnamed', regex=True)
-        # We only drop columns that are Unnamed AND not in our mapping
         to_drop = [col for i, col in enumerate(data.columns) if unnamed_mask[i] and col not in mapping.values()]
         
         if to_drop:
-            logger.info(f"Dropping unnamed/empty columns: {to_drop}")
+            logger.info(f"Dropping unnamed columns: {to_drop}")
             data = data.drop(columns=to_drop)
         
+        logger.info(f"Final data shape: {data.shape}")
         return data
 
     def _reconcile_split_table(self, df: pd.DataFrame, header_row: int, data_start: int, split_offsets: list) -> pd.DataFrame:
