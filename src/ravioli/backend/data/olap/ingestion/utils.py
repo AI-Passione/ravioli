@@ -18,7 +18,8 @@ def create_ravioli_pipeline(pipeline_name: str, dataset_name: str = "main"):
     return dlt.pipeline(
         pipeline_name=pipeline_name,
         destination=dlt.destinations.duckdb(str(settings.duckdb_path)),
-        dataset_name=dataset_name
+        dataset_name=dataset_name,
+        progress="log"
     )
 
 # --- PII Scanning ---
