@@ -140,8 +140,16 @@ class DuckDBManager:
 
     def _process_sheet_with_analysis(self, df: pd.DataFrame, analysis: dict) -> pd.DataFrame:
         """Apply the structural fixes discovered by AI analysis."""
-        header_row_idx = analysis.get("header_row", 0)
-        data_start_idx = analysis.get("data_start_row", header_row_idx + 1)
+        try:
+            header_row_idx = int(analysis.get("header_row", 0))
+        except (ValueError, TypeError):
+            header_row_idx = 0
+            
+        try:
+            data_start_idx = int(analysis.get("data_start_row", header_row_idx + 1))
+        except (ValueError, TypeError):
+            data_start_idx = header_row_idx + 1
+            
         is_split = analysis.get("is_split", False)
         mapping = analysis.get("column_mapping", {})
 
@@ -158,13 +166,13 @@ class DuckDBManager:
             else:
                 logger.warning("Split detected but no split_offsets provided. Falling back to standard extraction.")
                 raw_headers = df.iloc[header_row_idx].tolist()
-                headers = [str(h).strip() if pd.notna(h) else f"col_{i}" for i, h in enumerate(raw_headers)]
+                headers = [str(h).strip() if pd.notna(h) and str(h).strip() != "" else f"col_{i}" for i, h in enumerate(raw_headers)]
                 data = df.iloc[data_start_idx:].copy()
                 data.columns = headers
         else:
             # Standard Extraction
             raw_headers = df.iloc[header_row_idx].tolist()
-            headers = [str(h).strip() if pd.notna(h) else f"col_{i}" for i, h in enumerate(raw_headers)]
+            headers = [str(h).strip() if pd.notna(h) and str(h).strip() != "" else f"col_{i}" for i, h in enumerate(raw_headers)]
             data = df.iloc[data_start_idx:].copy()
             data.columns = headers
         
@@ -181,7 +189,16 @@ class DuckDBManager:
                 data = data.rename(columns=clean_mapping)
         
         # 4. Final Polish
-        data = data.loc[:, ~data.columns.astype(str).str.contains('^Unnamed|^col_', regex=True) | data.columns.astype(str).isin(mapping.values())]
+        # Remove internal pandas 'Unnamed' artifacts.
+        # We keep 'col_N' columns if they contain data and weren't mapped to something else,
+        # as they might be valid data without an identified header.
+        unnamed_mask = data.columns.astype(str).str.contains('^Unnamed', regex=True)
+        # We only drop columns that are Unnamed AND not in our mapping
+        to_drop = [col for i, col in enumerate(data.columns) if unnamed_mask[i] and col not in mapping.values()]
+        
+        if to_drop:
+            logger.info(f"Dropping unnamed/empty columns: {to_drop}")
+            data = data.drop(columns=to_drop)
         
         return data
 
