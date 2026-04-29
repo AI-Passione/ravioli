@@ -199,6 +199,18 @@ export function renderData() {
 
           <!-- Step 2: CSV Form -->
           <div id="step-csv" class="hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div class="space-y-4 mb-6">
+              <div class="relative group">
+                <label class="text-[10px] uppercase tracking-widest text-neutral-500 mb-2 block group-focus-within:text-primary transition-colors">Upload Context (Optional)</label>
+                <div class="relative">
+                  <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500 group-focus-within:text-primary transition-colors text-lg">info</span>
+                  <input type="text" id="upload-context" placeholder="e.g. Substack export data for April..." 
+                    class="w-full bg-surface-container-highest border border-outline/20 rounded-2xl pl-12 pr-6 py-4 text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all" />
+                </div>
+                <p class="text-[9px] text-neutral-600 mt-2 ml-1">This context helps the AI generate more accurate descriptions for your assets.</p>
+              </div>
+            </div>
+            
             <div id="drop-zone" class="border-2 border-dashed border-outline/20 rounded-3xl p-12 flex flex-col items-center justify-center bg-surface-container-highest hover:bg-surface-container hover:border-primary/50 transition-all cursor-pointer group relative overflow-hidden">
               <div id="drop-zone-content" class="flex flex-col items-center justify-center transition-opacity duration-300">
                 <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -403,7 +415,9 @@ export function renderData() {
     await Promise.all(scanPromises);
     
     if (files.length > 0) {
-      await handleUploads(files);
+      const contextInput = container.querySelector('#upload-context') as HTMLInputElement;
+      const context = contextInput?.value.trim() || '';
+      await handleUploads(files, context);
     } else {
       alert('No uploadable files (.csv, .xlsx) found in selection.');
       dropZoneContent?.classList.remove('opacity-0');
@@ -413,10 +427,14 @@ export function renderData() {
 
   fileInput?.addEventListener('change', async (e) => {
     const files = (e.target as HTMLInputElement).files;
-    if (files && files.length > 0) await handleUploads(Array.from(files));
+    if (files && files.length > 0) {
+      const contextInput = container.querySelector('#upload-context') as HTMLInputElement;
+      const context = contextInput?.value.trim() || '';
+      await handleUploads(Array.from(files), context);
+    }
   });
 
-  async function handleUploads(filesArray: File[]) {
+  async function handleUploads(filesArray: File[], context?: string) {
     // Filter to be safe, though drop handles it, file input might not
     const filteredFiles = filesArray.filter(f => 
       f.name.toLowerCase().endsWith('.csv') || f.name.toLowerCase().endsWith('.xlsx')
@@ -458,7 +476,7 @@ export function renderData() {
       addLog(`Starting ingestion for ${file.name}...`, true);
 
       try {
-        const result = await api.streamUpload(file, (msg) => addLog(msg));
+        const result = await api.streamUpload(file, (msg) => addLog(msg), context);
         if (result.is_duplicate) {
           addLog(`Notice: Duplicate file detected. Skipping new ingestion, using existing record.`, false);
         }

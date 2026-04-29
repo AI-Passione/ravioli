@@ -84,13 +84,14 @@ class OllamaClient:
     def mode(self) -> str:
         return self._config.get("mode", "default")
 
-    async def generate_description(self, filename: str, sample_data: str) -> str:
+    async def generate_description(self, filename: str, sample_data: str, context: str = None) -> str:
         """
-        Generate a professional, concise description for a data asset based on its name and content.
+        Generate a professional, concise description for a data asset based on its name, content, and optional context.
         """
+        context_str = f'\nUser Provided Context: "{context}"' if context else ""
         prompt = f"""
 You are a professional data engineer. Generate an extremely concise, single-sentence description for a data asset.
-The asset is named "{filename}".
+The asset is named "{filename}".{context_str}
 Here is a preview of the data (CSV format):
 ---
 {sample_data}

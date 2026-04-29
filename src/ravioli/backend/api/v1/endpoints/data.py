@@ -56,6 +56,7 @@ async def calculate_hash(file: UploadFile) -> str:
 @router.post("/upload", response_model=schemas.DataSource)
 async def upload_file(
     file: UploadFile = File(...),
+    context: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     extension = Path(file.filename).suffix.lower()
@@ -473,6 +474,7 @@ async def ingest_wfs_layer(
 @router.post("/upload-stream")
 async def upload_file_stream(
     file: UploadFile = File(...),
+    context: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -491,7 +493,7 @@ async def upload_file_stream(
             # but in a way that yields logs from the queue.
             
             # Start the ingestion task
-            ingestion_task = asyncio.create_task(upload_file(file, db))
+            ingestion_task = asyncio.create_task(upload_file(file, context, db))
             
             # While the task is running, yield logs
             while not ingestion_task.done():

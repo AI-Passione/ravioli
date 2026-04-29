@@ -105,9 +105,10 @@ export const api = {
     return response.json();
   },
 
-  async uploadFile(file: File): Promise<DataSource> {
+  async uploadFile(file: File, context?: string): Promise<DataSource> {
     const formData = new FormData();
     formData.append('file', file);
+    if (context) formData.append('context', context);
 
     const response = await fetch(`${API_BASE}/data/upload`, {
       method: 'POST',
@@ -117,10 +118,11 @@ export const api = {
     return response.json();
   },
 
-  streamUpload(file: File, onLog: (msg: string) => void): Promise<DataSource> {
+  streamUpload(file: File, onLog: (msg: string) => void, context?: string): Promise<DataSource> {
     return new Promise((resolve, reject) => {
       const formData = new FormData();
       formData.append('file', file);
+      if (context) formData.append('context', context);
 
       fetch(`${API_BASE}/data/upload-stream`, {
         method: 'POST',
