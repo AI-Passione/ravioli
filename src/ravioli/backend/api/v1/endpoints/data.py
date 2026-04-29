@@ -123,6 +123,7 @@ async def upload_file(
             schema_name="s_manual",
             file_hash=file_hash,
             status="pending",
+            has_pii=False,
             owner_id=current_user.id
         )
         db.add(db_source)
@@ -203,7 +204,7 @@ async def upload_file(
                             file_hash=file_hash,
                             status="completed",
                             row_count=other["row_count"],
-                            owner_id=current_user.id
+                            has_pii=False, owner_id=current_user.id
                         )
                         # PII Scan for other
                         try:
@@ -268,7 +269,7 @@ async def upload_file(
                             file_hash=file_hash,
                             status="completed",
                             row_count=other["row_count"],
-                            owner_id=current_user.id
+                            has_pii=False, owner_id=current_user.id
                         )
                         # PII Scan for other
                         try:

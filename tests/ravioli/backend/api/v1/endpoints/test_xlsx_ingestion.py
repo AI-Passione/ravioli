@@ -19,14 +19,17 @@ async def test_upload_xlsx(client, session, mocker):
     mocker.patch("ravioli.backend.api.v1.endpoints.data.Path.open", mocker.mock_open())
     mocker.patch("ravioli.backend.api.v1.endpoints.data.Path.stat", return_value=MagicMock(st_size=1024))
     
-    # Mocking DuckDB ingestion
-    mock_duckdb = mocker.patch("ravioli.backend.api.v1.endpoints.data.duckdb_manager")
-    mock_duckdb.ingest_xlsx = AsyncMock(return_value=[{
+    # Mocking DataIngestor ingestion
+    mock_ingestor = mocker.patch("ravioli.backend.api.v1.endpoints.data.data_ingestor")
+    mock_ingestor.ingest_xlsx = AsyncMock(return_value=[{
         "sheet_name": "Sheet1",
         "table_name": "test_sheet1__xlsx",
         "status": "completed",
         "row_count": 100
     }])
+    
+    # Mocking duckdb_manager for sample data fetch
+    mocker.patch("ravioli.backend.api.v1.endpoints.data.duckdb_manager")
     
     # Mocking PII scan
     mocker.patch("ravioli.backend.api.v1.endpoints.data.pii_scanner.scan_dataframe", return_value=False)
@@ -45,6 +48,8 @@ async def test_upload_xlsx(client, session, mocker):
             obj.updated_at = datetime.datetime.now()
         if hasattr(obj, 'source_type') and not obj.source_type:
             obj.source_type = "xlsx"
+        if hasattr(obj, 'has_pii') and obj.has_pii is None:
+            obj.has_pii = False
         return obj
 
     session.add.side_effect = mock_session_add
@@ -70,8 +75,8 @@ async def test_upload_xlsx(client, session, mocker):
     assert data["status"] == "completed"
     
     # Verify the correct ingestion method was called
-    mock_duckdb.ingest_xlsx.assert_called_once()
-    mock_duckdb.ingest_csv.assert_not_called()
+    mock_ingestor.ingest_xlsx.assert_called_once()
+    mock_ingestor.ingest_csv.assert_not_called()
 
 @pytest.mark.anyio
 async def test_quick_insight_xlsx(client, session, mocker):
