@@ -53,7 +53,7 @@ def seed_db():
             print(f"Seeded dummy user: {user.name}")
         
         # Backfill: Populate owner_id for all existing data sources that are NULL
-        updated_count = db.query(models.DataSource).filter(models.DataSource.owner_id == None).update({models.DataSource.owner_id: user.id})
+        updated_count = db.query(models.DataSource).filter(models.DataSource.owner_id.is_(None)).update({models.DataSource.owner_id: user.id})
         if updated_count > 0:
             db.commit()
             print(f"Backfilled {updated_count} data sources with owner_id: {user.name}")
