@@ -356,22 +356,73 @@ export function renderData() {
     });
   });
 
-  dropZone?.addEventListener('drop', (e: any) => {
-    const files = e.dataTransfer?.files;
-    if (files && files.length > 0) handleUploads(files);
+  dropZone?.addEventListener('drop', async (e: any) => {
+    const items = e.dataTransfer?.items;
+    if (!items) return;
+
+    const files: File[] = [];
+    
+    // UI Feedback for scanning
+    const dropZoneContent = container.querySelector('#drop-zone-content');
+    const dropZoneLoading = container.querySelector('#drop-zone-loading');
+    const ingestionLogs = container.querySelector('#ingestion-logs');
+    const ingestionStatus = container.querySelector('#ingestion-status');
+    
+    dropZoneContent?.classList.add('opacity-0');
+    dropZoneLoading?.classList.remove('opacity-0', 'pointer-events-none');
+    if (ingestionLogs) ingestionLogs.innerHTML = '<div class="text-primary/50 italic font-mono">Scanning folder contents...</div>';
+    if (ingestionStatus) ingestionStatus.textContent = 'Scanning...';
+
+    async function scanEntry(entry: any) {
+      if (entry.isFile) {
+        const file = await new Promise<File>((resolve, reject) => entry.file(resolve, reject));
+        if (file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.xlsx')) {
+          files.push(file);
+        }
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const readEntries = async () => {
+          const entries: any[] = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+          if (entries.length > 0) {
+            for (const child of entries) {
+              await scanEntry(child);
+            }
+            await readEntries(); // Continue reading in case of many files
+          }
+        };
+        await readEntries();
+      }
+    }
+
+    const scanPromises = [];
+    for (let i = 0; i < items.length; i++) {
+      const entry = items[i].webkitGetAsEntry();
+      if (entry) scanPromises.push(scanEntry(entry));
+    }
+    
+    await Promise.all(scanPromises);
+    
+    if (files.length > 0) {
+      await handleUploads(files);
+    } else {
+      alert('No uploadable files (.csv, .xlsx) found in selection.');
+      dropZoneContent?.classList.remove('opacity-0');
+      dropZoneLoading?.classList.add('opacity-0', 'pointer-events-none');
+    }
   });
 
   fileInput?.addEventListener('change', async (e) => {
     const files = (e.target as HTMLInputElement).files;
-    if (files && files.length > 0) await handleUploads(files);
+    if (files && files.length > 0) await handleUploads(Array.from(files));
   });
 
-  async function handleUploads(files: FileList | File[]) {
-    const filesArray = Array.from(files).filter(f => 
+  async function handleUploads(filesArray: File[]) {
+    // Filter to be safe, though drop handles it, file input might not
+    const filteredFiles = filesArray.filter(f => 
       f.name.toLowerCase().endsWith('.csv') || f.name.toLowerCase().endsWith('.xlsx')
     );
     
-    if (filesArray.length === 0) return;
+    if (filteredFiles.length === 0) return;
 
     const dropZoneContent = container.querySelector('#drop-zone-content');
     const dropZoneLoading = container.querySelector('#drop-zone-loading');
@@ -400,8 +451,8 @@ export function renderData() {
     let completed = 0;
     let failed = 0;
 
-    for (const file of filesArray) {
-      if (queueStatus) queueStatus.textContent = `Processing file ${completed + failed + 1} of ${filesArray.length}`;
+    for (const file of filteredFiles) {
+      if (queueStatus) queueStatus.textContent = `Processing file ${completed + failed + 1} of ${filteredFiles.length}`;
       if (consoleFilename) consoleFilename.textContent = file.name;
       
       addLog(`Starting ingestion for ${file.name}...`, true);
@@ -425,7 +476,7 @@ export function renderData() {
     if (consoleFilename) consoleFilename.textContent = 'Summary';
     
     addLog(`--- Ingestion Summary ---`, true);
-    addLog(`Total files: ${filesArray.length}`);
+    addLog(`Total files discovered: ${filteredFiles.length}`);
     addLog(`Successfully processed: ${completed}`);
     if (failed > 0) addLog(`Failed: ${failed}`);
 
