@@ -285,7 +285,9 @@ export function renderData() {
       </div>
     </div>
   `;
-
+  
+  let isIngesting = false;
+  
   // --- Modal Logic ---
   const addModal = container.querySelector('#add-source-modal') as HTMLElement;
   const btnAddSource = container.querySelector('#btn-add-source');
@@ -322,17 +324,24 @@ export function renderData() {
     setTimeout(() => addModal.classList.add('hidden'), 300);
   };
 
-  closeAddModal?.addEventListener('click', hideAddModal);
+  closeAddModal?.addEventListener('click', () => {
+    if (isIngesting) return;
+    hideAddModal();
+  });
   
   sourceTypeCards.forEach(card => {
     card.addEventListener('click', () => {
+      if (isIngesting) return;
       const type = card.getAttribute('data-type');
       showStep(type as any);
     });
   });
 
   btnBacks.forEach(btn => {
-    btn.addEventListener('click', () => showStep('selection'));
+    btn.addEventListener('click', () => {
+      if (isIngesting) return;
+      showStep('selection');
+    });
   });
 
   // --- WFS Ingestion Logic ---
@@ -369,11 +378,15 @@ export function renderData() {
   const dropZone = container.querySelector('#drop-zone');
   const fileInput = container.querySelector('#file-input') as HTMLInputElement;
   
-  dropZone?.addEventListener('click', () => fileInput.click());
+  dropZone?.addEventListener('click', () => {
+    if (isIngesting) return;
+    fileInput.click();
+  });
   
   // Drag & Drop
   ['dragover', 'dragenter'].forEach(eventName => {
     dropZone?.addEventListener(eventName, (e) => {
+      if (isIngesting) return;
       e.preventDefault();
       e.stopPropagation();
       dropZone.classList.add('border-primary/50', 'bg-surface-container');
@@ -389,6 +402,7 @@ export function renderData() {
   });
 
   dropZone?.addEventListener('drop', async (e: any) => {
+    if (isIngesting) return;
     const items = e.dataTransfer?.items;
     if (!items) return;
 
@@ -447,6 +461,7 @@ export function renderData() {
   });
 
   fileInput?.addEventListener('change', async (e) => {
+    if (isIngesting) return;
     const files = (e.target as HTMLInputElement).files;
     if (files && files.length > 0) {
       const contextInput = container.querySelector('#upload-context') as HTMLInputElement;
@@ -463,6 +478,8 @@ export function renderData() {
     });
     
     if (filteredFiles.length === 0) return;
+    
+    isIngesting = true;
 
     const dropZoneContent = container.querySelector('#drop-zone-content');
     const dropZoneLoading = container.querySelector('#drop-zone-loading');
@@ -498,10 +515,10 @@ export function renderData() {
       }
     };
 
-    // Check for large files (> 50MB)
-    const largeFiles = filteredFiles.filter(f => f.size > 50 * 1024 * 1024);
+    // Check for massive files (> 1GB) to activate heavylift warning
+    const largeFiles = filteredFiles.filter(f => f.size > 1024 * 1024 * 1024);
     if (largeFiles.length > 0) {
-      addLog(`⚠️ Large file(s) detected (>50MB). Ingestion will use streaming mode but may take several minutes. Please keep this tab open.`, false, true);
+      addLog(`🚀 Massive file(s) detected (>1GB). Parallel Heavylift Mode activated. Ingestion will be distributed across multiple CPU cores.`, false, true);
     }
 
     let completed = 0;
@@ -537,6 +554,7 @@ export function renderData() {
     if (failed > 0) addLog(`Failed: ${failed}`);
 
     setTimeout(() => {
+      isIngesting = false;
       hideAddModal();
       refreshFiles();
     }, 2000);

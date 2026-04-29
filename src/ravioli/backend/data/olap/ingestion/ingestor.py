@@ -12,6 +12,7 @@ from ravioli.backend.data.olap.ingestion.utils import (
     process_sheet_with_analysis,
     xml_tag_generator,
     xml_full_parse_generator,
+    parallel_xml_tag_generator,
     XML_STRATEGIES
 )
 
@@ -74,6 +75,8 @@ class WFSClient:
 
 # --- Main Data Ingestor ---
 class DataIngestor:
+    HEAVYLIFT_THRESHOLD = 1024 * 1024 * 1024  # 1GB
+
     def __init__(self, duckdb_manager):
         self.duckdb_manager = duckdb_manager
 
@@ -109,19 +112,34 @@ class DataIngestor:
         return results
 
     def ingest_xml(self, file_path: Path, original_filename: str, schema: str = "s_manual") -> list:
-        """Config-driven XML Ingestion (Tooling-agnostic)."""
+        """Config-driven XML Ingestion with parallel heavylift mode."""
         fn = original_filename.lower()
-        strategy = next((s for s in XML_STRATEGIES.values() if s["match"](fn)), None)
+        file_size = os.path.getsize(file_path)
+        is_heavylift = file_size >= self.HEAVYLIFT_THRESHOLD
         
+        strategy = next((s for s in XML_STRATEGIES.values() if s["match"](fn)), None)
         results = []
-        pipeline = create_ravioli_pipeline(f"xml_{os.path.getsize(file_path)}", schema)
+        pipeline = create_ravioli_pipeline(f"xml_{file_size}", schema)
+        
+        if is_heavylift:
+            logger.info(f"HEAVYLIFT MODE ACTIVATED for {original_filename} ({file_size / 1024**2:.1f} MB)")
+            # Add a log message to the system terminal if we had a way to push it, 
+            # for now it will just show in server logs.
         
         if strategy:
             for table_cfg in strategy["tables"]:
                 tag = table_cfg.get("tag")
                 tn = table_cfg["table_name"]
+                extract_metadata = table_cfg.get("extract_metadata", False)
                 
-                gen = xml_tag_generator(file_path, tag, table_cfg.get("extract_metadata", False)) if tag else xml_full_parse_generator(file_path, original_filename)
+                if tag:
+                    if is_heavylift:
+                        gen = parallel_xml_tag_generator(file_path, tag, extract_metadata)
+                    else:
+                        gen = xml_tag_generator(file_path, tag, extract_metadata)
+                else:
+                    gen = xml_full_parse_generator(file_path, original_filename)
+                
                 pipeline.run(gen, table_name=tn, write_disposition="append" if tag else "replace")
                 
                 count = self.duckdb_manager.connection.execute(f'SELECT COUNT(*) FROM "{schema}"."{tn}"').fetchone()[0]

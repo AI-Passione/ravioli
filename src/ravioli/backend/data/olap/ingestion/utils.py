@@ -4,6 +4,7 @@ import logging
 import pandas as pd
 import dlt
 import xml.etree.ElementTree as ET
+import concurrent.futures
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Callable
 from ravioli.backend.core.config import settings
@@ -116,6 +117,71 @@ def xml_full_parse_generator(path: Path, original_filename: str):
     tree = ET.parse(path)
     root = tree.getroot()
     yield {"filename": original_filename, "root_tag": root.tag, "attribs": dict(root.attrib)}
+
+def scan_xml_chunk(path: Path, tag_name: str, start: int, end: int, extract_metadata: bool):
+    """Worker function for parallel XML scanning."""
+    results = []
+    attr_pattern = re.compile(r'(\w+)="([^"]*)"')
+    
+    with open(path, 'rb') as f:
+        f.seek(start)
+        data = f.read(end - start)
+        
+        if tag_name == "Record":
+            # optimized for flat Record tags
+            tag_pattern = re.compile(rf'<{tag_name}\s+([^>]+)\s*/>'.encode())
+            for match in tag_pattern.finditer(data):
+                attrs_raw = match.group(1).decode('utf-8', errors='ignore')
+                results.append(dict(attr_pattern.findall(attrs_raw)))
+        elif tag_name == "Workout":
+            # handle Workout tags with potential MetadataEntry children
+            tag_pattern = re.compile(rf'<{tag_name}\s+([^>]+)>(.*?)</{tag_name}>'.encode(), re.DOTALL)
+            for match in tag_pattern.finditer(data):
+                attrs_raw = match.group(1).decode('utf-8', errors='ignore')
+                entry = dict(attr_pattern.findall(attrs_raw))
+                if extract_metadata:
+                    inner = match.group(2).decode('utf-8', errors='ignore')
+                    meta_pattern = re.compile(r'<MetadataEntry\s+key="([^"]*)"\s+value="([^"]*)"\s*/>')
+                    metadata = {k: v for k, v in meta_pattern.findall(inner)}
+                    if metadata: entry['metadata'] = metadata
+                results.append(entry)
+        else:
+            # generic fallback for other tags
+            tag_pattern = re.compile(rf'<{tag_name}\s+([^>/]+)\s*(?:/>|>(.*?)</{tag_name}>)'.encode(), re.DOTALL)
+            for match in tag_pattern.finditer(data):
+                attrs_raw = match.group(1).decode('utf-8', errors='ignore')
+                results.append(dict(attr_pattern.findall(attrs_raw)))
+    return results
+
+def parallel_xml_tag_generator(path: Path, tag_name: str, extract_metadata: bool = False, num_workers: int = 4):
+    """Heavylift: Parallelized XML scanning for massive files."""
+    size = os.path.getsize(path)
+    chunk_size = size // num_workers
+    chunks = []
+    
+    with open(path, 'rb') as f:
+        for i in range(num_workers):
+            start = i * chunk_size
+            if i > 0:
+                f.seek(start)
+                f.readline() # align to next line
+                start = f.tell()
+            
+            end = (i + 1) * chunk_size if i < num_workers - 1 else size
+            if i < num_workers - 1:
+                f.seek(end)
+                f.readline() # align to end of line
+                end = f.tell()
+            chunks.append((start, end))
+
+    logger.info(f"Starting parallel XML ingestion with {num_workers} workers for tag {tag_name}")
+    with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = [executor.submit(scan_xml_chunk, path, tag_name, start, end, extract_metadata) for start, end in chunks]
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                yield from future.result()
+            except Exception as e:
+                logger.error(f"Worker failed: {e}")
 
 XML_STRATEGIES = {
     "apple_health_export": {
