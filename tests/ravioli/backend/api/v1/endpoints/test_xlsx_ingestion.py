@@ -32,8 +32,7 @@ async def test_upload_xlsx(client, session, mocker):
     mocker.patch("ravioli.backend.api.v1.endpoints.data.pii_scanner.scan_dataframe", return_value=False)
     
     # Mocking OllamaClient to avoid DB config issues
-    mock_ollama_cls = mocker.patch("ravioli.backend.api.v1.endpoints.data.OllamaClient")
-    mock_ollama = mock_ollama_cls.return_value
+    mocker.patch("ravioli.backend.api.v1.endpoints.data.OllamaClient")
     
     # Mocking model instantiation to provide an ID
     from ravioli.backend.core.models import DataSource
