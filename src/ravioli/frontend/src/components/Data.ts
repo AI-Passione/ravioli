@@ -216,7 +216,7 @@ export function renderData() {
                 <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <span class="material-symbols-outlined text-primary text-3xl">upload_file</span>
                 </div>
-                <h3 class="text-xl font-medium text-neutral-200 mb-2">Drop your file here</h3>
+                <h3 class="text-xl font-medium text-neutral-200 mb-2">Drop files or folders here</h3>
                 <p class="text-neutral-500 text-sm">or click to browse CSV / XLSX</p>
               </div>
               <div id="drop-zone-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-container/90 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 z-10 p-6">
