@@ -479,7 +479,15 @@ export function renderData() {
       if (ingestionLogs) {
         const div = document.createElement('div');
         div.className = isHeader ? 'text-primary font-bold mt-2 mb-1' : 'animate-in fade-in slide-in-from-left-1 duration-300';
-        div.innerHTML = isHeader ? msg : `<span class="text-neutral-600 mr-2">></span>${msg}`;
+        if (isHeader) {
+          div.textContent = msg;
+        } else {
+          const prefix = document.createElement('span');
+          prefix.className = 'text-neutral-600 mr-2';
+          prefix.textContent = '>';
+          div.appendChild(prefix);
+          div.appendChild(document.createTextNode(msg));
+        }
         ingestionLogs.appendChild(div);
         const console = container.querySelector('#ingestion-console');
         if (console) console.scrollTop = console.scrollHeight;

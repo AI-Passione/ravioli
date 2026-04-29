@@ -1,8 +1,7 @@
 import uuid
 import io
 import pytest
-from unittest.mock import MagicMock, AsyncMock
-from ravioli.backend.core.models import DataSource
+from unittest.mock import MagicMock
 
 @pytest.mark.anyio
 async def test_upload_generates_unique_table_name(client, session, mocker):
