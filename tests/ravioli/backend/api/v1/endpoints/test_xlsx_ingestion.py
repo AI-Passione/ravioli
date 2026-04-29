@@ -2,8 +2,7 @@ import uuid
 import io
 import pytest
 import pandas as pd
-from unittest.mock import MagicMock, patch, AsyncMock
-from ravioli.backend.core.models import DataSource
+from unittest.mock import MagicMock, AsyncMock
 
 @pytest.mark.anyio
 async def test_upload_xlsx(client, session, mocker):

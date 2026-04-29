@@ -3,7 +3,7 @@ import os
 import json
 import re
 import time
-from typing import Dict, Any, List
+from typing import Dict, Any
 from sqlalchemy.orm import Session
 from ravioli.backend.core.models import SystemSetting
 from ravioli.backend.core.config import settings

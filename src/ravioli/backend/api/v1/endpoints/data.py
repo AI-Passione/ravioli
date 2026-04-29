@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional
 import json
 import asyncio
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -38,8 +38,8 @@ class LogCaptureHandler(logging.Handler):
             msg = self.format(record)
             # Use call_soon_threadsafe to safely push to queue from potentially different threads
             asyncio.get_event_loop().call_soon_threadsafe(self.queue.put_nowait, msg)
-        except:
-            pass
+        except Exception:
+            self.handleError(record)
 
 # Ensure upload directory exists
 UPLOAD_DIR = settings.local_data_path / "uploads"
@@ -169,8 +169,9 @@ async def upload_file(
                             full_table_name = f'"s_manual"."{other["table_name"]}"'
                             df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 100').fetchdf()
                             other_source.has_pii = pii_scanner.scan_dataframe(df_sample)
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.warning("PII scan failed for table %s: %s", other["table_name"], e)
+                            other_source.has_pii = False
                         db.add(other_source)
         except Exception as e:
             db_source.status = "failed"
@@ -514,7 +515,8 @@ async def upload_file_stream(
                 }
                 yield f"data: DONE:{json.dumps(result_dict)}\n\n"
             except Exception as e:
-                yield f"data: ERROR:{str(e)}\n\n"
+                logger.exception("Error during upload_file_stream ingestion task")
+                yield "data: ERROR:An internal error occurred during ingestion.\n\n"
                 
         finally:
             ingestion_logger.removeHandler(handler)
