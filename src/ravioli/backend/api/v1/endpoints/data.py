@@ -8,10 +8,10 @@ import json
 import asyncio
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select
 
-from ravioli.backend.core import schemas
+from ravioli.backend.core import schemas, models
 from ravioli.backend.core.database import get_db, SessionLocal
 from ravioli.backend.core.config import settings
 from ravioli.backend.core.models import DataSource
@@ -41,9 +41,26 @@ class LogCaptureHandler(logging.Handler):
         except Exception:
             self.handleError(record)
 
-# Ensure upload directory exists
 UPLOAD_DIR = settings.local_data_path / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+async def get_current_user(db: Session = Depends(get_db)) -> models.User:
+    """
+    Temporary helper to get or create a default system user.
+    Once auth is implemented, this should pull from JWT/Session.
+    """
+    email = "admin@ai-passione.com"
+    user = db.execute(select(models.User).where(models.User.email == email)).scalar_one_or_none()
+    if not user:
+        user = models.User(
+            id=uuid.uuid4(),
+            name="Admin User",
+            email=email
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
 
 async def calculate_hash(file: UploadFile) -> str:
     sha256_hash = hashlib.sha256()
@@ -57,7 +74,8 @@ async def calculate_hash(file: UploadFile) -> str:
 async def upload_file(
     file: UploadFile = File(...),
     context: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     extension = Path(file.filename).suffix.lower()
     if extension not in ['.csv', '.xlsx']:
@@ -104,7 +122,8 @@ async def upload_file(
             table_name=table_name,
             schema_name="s_manual",
             file_hash=file_hash,
-            status="pending"
+            status="pending",
+            owner_id=current_user.id
         )
         db.add(db_source)
         db.commit()
@@ -126,6 +145,15 @@ async def upload_file(
                     db_source.has_pii = False
                     
                 db_source.status = "completed"
+                
+                # Auto-description for CSV
+                try:
+                    ollama_client = OllamaClient(db)
+                    full_table_name = f'"s_manual"."{table_name}"'
+                    df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 5').fetchdf()
+                    db_source.description = await ollama_client.generate_description(db_source.original_filename, df_sample.to_csv(index=False), context=context)
+                except Exception as e:
+                    logger.warning("Auto-description failed for CSV: %s", e)
             else: # .xlsx
                 ollama_client = OllamaClient(db)
                 xlsx_results = await duckdb_manager.ingest_xlsx(file_path, table_name, schema="s_manual", ollama_client=ollama_client)
@@ -143,6 +171,15 @@ async def upload_file(
                     db_source.row_count = first["row_count"]
                     db_source.original_filename = f"{file.filename} [{first['sheet_name']}]"
                     db_source.status = "completed"
+                    
+                    # Auto-description for primary
+                    try:
+                        ollama_client = OllamaClient(db)
+                        full_table_name = f'"s_manual"."{db_source.table_name}"'
+                        df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 5').fetchdf()
+                        db_source.description = await ollama_client.generate_description(db_source.original_filename, df_sample.to_csv(index=False), context=context)
+                    except Exception as e:
+                        logger.warning("Auto-description failed for primary sheet: %s", e)
                     
                     # PII Scan for primary
                     try:
@@ -164,7 +201,8 @@ async def upload_file(
                             schema_name="s_manual",
                             file_hash=file_hash,
                             status="completed",
-                            row_count=other["row_count"]
+                            row_count=other["row_count"],
+                            owner_id=current_user.id
                         )
                         # PII Scan for other
                         try:
@@ -174,6 +212,15 @@ async def upload_file(
                         except Exception as e:
                             logger.warning("PII scan failed for table %s: %s", other["table_name"], e)
                             other_source.has_pii = False
+                        # Auto-description for other
+                        try:
+                            ollama_client = OllamaClient(db)
+                            full_table_name = f'"s_manual"."{other["table_name"]}"'
+                            df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 5').fetchdf()
+                            other_source.description = await ollama_client.generate_description(other_source.original_filename, df_sample.to_csv(index=False), context=context)
+                        except Exception as e:
+                            logger.warning("Auto-description failed for sheet %s: %s", other['sheet_name'], e)
+                            
                         db.add(other_source)
         except Exception as e:
             db_source.status = "failed"
@@ -191,7 +238,7 @@ async def upload_file(
 
 @router.get("/files", response_model=List[schemas.DataSource])
 async def list_files(db: Session = Depends(get_db)):
-    query = select(DataSource).order_by(DataSource.created_at.desc())
+    query = select(DataSource).options(joinedload(DataSource.owner)).order_by(DataSource.created_at.desc())
     result = db.execute(query)
     return result.scalars().all()
 
@@ -475,7 +522,8 @@ async def ingest_wfs_layer(
 async def upload_file_stream(
     file: UploadFile = File(...),
     context: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     """
     Same as upload_file but returns a StreamingResponse with real-time logs.
@@ -493,7 +541,7 @@ async def upload_file_stream(
             # but in a way that yields logs from the queue.
             
             # Start the ingestion task
-            ingestion_task = asyncio.create_task(upload_file(file, context, db))
+            ingestion_task = asyncio.create_task(upload_file(file, context, db, current_user))
             
             # While the task is running, yield logs
             while not ingestion_task.done():
@@ -513,6 +561,7 @@ async def upload_file_stream(
                     "id": str(result.id),
                     "original_filename": result.original_filename,
                     "status": result.status,
+                    "description": result.description,
                     "is_duplicate": getattr(result, "is_duplicate", False),
                     "error_message": result.error_message
                 }

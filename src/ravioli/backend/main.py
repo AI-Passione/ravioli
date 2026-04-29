@@ -40,6 +40,7 @@ def _migrate_columns():
         "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS cover JSONB",
         "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS properties JSONB",
         "ALTER TABLE app.knowledge_pages ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES app.knowledge_pages(id)",
+        "ALTER TABLE app.data_sources ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES app.users(id)",
         # Safe type migration for content: wraps existing text in a paragraph block
         "ALTER TABLE app.knowledge_pages ALTER COLUMN content TYPE JSONB USING CASE WHEN content IS NULL THEN '[]'::JSONB WHEN content::text ~ '^[\\[\\{]' THEN content::JSONB ELSE jsonb_build_array(jsonb_build_object('type', 'paragraph', 'paragraph', jsonb_build_object('rich_text', jsonb_build_array(jsonb_build_object('type', 'text', 'text', jsonb_build_object('content', content)))))) END",
     ]

@@ -1,6 +1,6 @@
 import { store } from '../store';
 import { api } from '../services/api';
-import { formatBytes } from '../utils/formatters';
+import { formatBytes, formatDateTime } from '../utils/formatters';
 
 export function renderData() {
   const container = document.createElement('main');
@@ -35,16 +35,17 @@ export function renderData() {
                 <th class="px-8 py-4 font-medium">Type</th>
                 <th class="px-8 py-4 font-medium">Asset Name</th>
                 <th class="px-8 py-4 font-medium">Description</th>
-                <th class="px-8 py-4 font-medium">DuckDB Table</th>
                 <th class="px-8 py-4 font-medium">Rows</th>
                 <th class="px-8 py-4 font-medium">Status</th>
+                <th class="px-8 py-4 font-medium">Timeline</th>
+                <th class="px-8 py-4 font-medium">Author</th>
                 <th class="px-8 py-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-outline/5">
               ${sources.length === 0 ? `
                 <tr>
-                  <td colspan="7" class="px-8 py-20 text-center">
+                  <td colspan="9" class="px-8 py-20 text-center">
                     <div class="flex flex-col items-center justify-center">
                       <div class="w-16 h-16 rounded-2xl bg-surface-container-highest flex items-center justify-center mb-4 opacity-50">
                         <span class="material-symbols-outlined text-3xl">database_off</span>
@@ -92,9 +93,6 @@ export function renderData() {
                       </div>
                     </div>
                   </td>
-                  <td class="px-8 py-5">
-                    <code class="px-2 py-1 rounded bg-surface-container-highest text-primary-fixed-dim text-xs font-mono border border-outline/5">${source.schema_name}.${source.table_name}</code>
-                  </td>
                   <td class="px-8 py-5 text-neutral-300 font-medium">
                     ${source.status === 'pending'
                       ? `<span class="flex items-center gap-1.5">
@@ -125,6 +123,28 @@ export function renderData() {
                         source.status === 'completed' ? 'Completed'   :
                         source.status === 'failed'    ? 'Failed'      : source.status}
                     </span>
+                  </td>
+                  <td class="px-8 py-5">
+                    <div class="flex flex-col gap-0.5 whitespace-nowrap">
+                      <div class="flex items-center gap-1.5 text-[11px] text-neutral-300">
+                        <span class="material-symbols-outlined text-[14px] opacity-50">event</span>
+                        ${formatDateTime(source.created_at)}
+                      </div>
+                      ${source.updated_at !== source.created_at ? `
+                        <div class="flex items-center gap-1.5 text-[9px] text-neutral-500 italic">
+                          <span class="material-symbols-outlined text-[12px] opacity-30">update</span>
+                          Updated ${formatDateTime(source.updated_at)}
+                        </div>
+                      ` : ''}
+                    </div>
+                  </td>
+                  <td class="px-8 py-5">
+                    <div class="flex items-center gap-2">
+                      <div class="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center border border-primary/20">
+                        <span class="text-[10px] font-bold text-primary">${source.owner?.name?.[0] || 'A'}</span>
+                      </div>
+                      <span class="text-xs text-neutral-400 font-medium">${source.owner?.name || 'Admin'}</span>
+                    </div>
                   </td>
                   <td class="px-8 py-5 text-right flex justify-end gap-2">
                     <button class="btn-inspect p-2 rounded-lg hover:bg-primary/10 text-neutral-400 hover:text-primary transition-all" data-table="${source.schema_name}.${source.table_name}" data-filename="${source.original_filename}" title="Preview">
