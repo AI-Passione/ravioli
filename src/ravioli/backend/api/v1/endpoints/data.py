@@ -14,6 +14,8 @@ from sqlalchemy import select
 from ravioli.backend.core import schemas, models
 from ravioli.backend.core.database import get_db, SessionLocal
 from ravioli.backend.core.config import settings
+from ravioli.backend.core.models import DataSource
+from ravioli.backend.data.olap.duckdb_manager import duckdb_manager, data_ingestor
 from ravioli.backend.data.olap.ingestion.ingestor import WFSClient
 from ravioli.backend.data.olap.ingestion.utils import pii_scanner, create_ravioli_pipeline
 
