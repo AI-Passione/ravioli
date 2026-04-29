@@ -34,22 +34,22 @@ async def test_upload_xlsx(client, session, mocker):
     # Mocking OllamaClient to avoid DB config issues
     mocker.patch("ravioli.backend.api.v1.endpoints.data.OllamaClient")
     
-    # Mocking model instantiation to provide an ID
-    from ravioli.backend.core.models import DataSource
+    # Mocking session behavior to avoid DB issues and populate required fields for validation
     import datetime
-    mock_datasource = DataSource(
-        id=uuid.uuid4(), 
-        original_filename="test.xlsx", 
-        status="completed", 
-        row_count=100,
-        filename="internal.xlsx",
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        size_bytes=1024,
-        table_name="test_sheet1__xlsx",
-        created_at=datetime.datetime.now(),
-        updated_at=datetime.datetime.now()
-    )
-    mocker.patch("ravioli.backend.api.v1.endpoints.data.DataSource", return_value=mock_datasource)
+    def mock_session_add(obj):
+        if hasattr(obj, 'id') and not obj.id:
+            obj.id = uuid.uuid4()
+        if hasattr(obj, 'created_at') and not obj.created_at:
+            obj.created_at = datetime.datetime.now()
+        if hasattr(obj, 'updated_at') and not obj.updated_at:
+            obj.updated_at = datetime.datetime.now()
+        if hasattr(obj, 'source_type') and not obj.source_type:
+            obj.source_type = "xlsx"
+        return obj
+
+    session.add.side_effect = mock_session_add
+    session.commit.side_effect = lambda: None
+    session.refresh.side_effect = lambda x: x
     
     # Mocking refresh to do nothing so it doesn't clear our attributes
     session.refresh.side_effect = lambda x: x
@@ -65,7 +65,7 @@ async def test_upload_xlsx(client, session, mocker):
     
     assert response.status_code == 200
     data = response.json()
-    assert data["original_filename"] == "test.xlsx"
+    assert data["original_filename"] == "test.xlsx [Sheet1]"
     assert data["row_count"] == 100
     assert data["status"] == "completed"
     
