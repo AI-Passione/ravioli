@@ -3,8 +3,9 @@ import re
 import logging
 import pandas as pd
 import dlt
+import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 from ravioli.backend.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -96,3 +97,39 @@ def extract_block(df: pd.DataFrame, h_idx: int, d_idx: int, s_col: int, e_col: i
     b = df.iloc[d_idx:, s_col:e_col].copy()
     b.columns = h
     return b.dropna(axis=1, how='all').dropna(axis=0, how='all')
+
+# --- XML Ingestion Utils ---
+def xml_tag_generator(path: Path, tag_name: str, extract_metadata: bool = False):
+    """Generic generator to stream specific XML tags."""
+    context = ET.iterparse(path, events=("end",))
+    for _, elem in context:
+        if elem.tag == tag_name:
+            data = dict(elem.attrib)
+            if extract_metadata:
+                metadata = {c.attrib.get('key'): c.attrib.get('value') for c in elem if c.tag == "MetadataEntry"}
+                if metadata: data['metadata'] = metadata
+            yield data
+            elem.clear()
+
+def xml_full_parse_generator(path: Path, original_filename: str):
+    """Fallback generator for full XML parsing."""
+    tree = ET.parse(path)
+    root = tree.getroot()
+    yield {"filename": original_filename, "root_tag": root.tag, "attribs": dict(root.attrib)}
+
+XML_STRATEGIES = {
+    "apple_health_export": {
+        "match": lambda fn: 'export' in fn and 'cda' not in fn,
+        "tables": [
+            {"tag": "Record", "table_name": "apple_health_records"},
+            {"tag": "Workout", "table_name": "apple_health_workouts", "extract_metadata": True},
+            {"tag": "ActivitySummary", "table_name": "apple_health_activity_summaries"}
+        ]
+    },
+    "apple_health_cda": {
+        "match": lambda fn: 'export_cda' in fn,
+        "tables": [
+            {"tag": None, "table_name": "apple_health_clinical_records"}
+        ]
+    }
+}

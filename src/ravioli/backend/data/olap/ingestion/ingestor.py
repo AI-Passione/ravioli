@@ -9,7 +9,10 @@ from typing import List, Dict, Any, Optional
 
 from ravioli.backend.data.olap.ingestion.utils import (
     create_ravioli_pipeline,
-    process_sheet_with_analysis
+    process_sheet_with_analysis,
+    xml_tag_generator,
+    xml_full_parse_generator,
+    XML_STRATEGIES
 )
 
 logger = logging.getLogger(__name__)
@@ -93,43 +96,43 @@ class DataIngestor:
                 clean_name = "".join(c if c.isalnum() else "_" for c in sheet_name).lower()
                 table_name = f"{base_table_name}_{clean_name}__xlsx"
                 full_table_name = f'"{schema}"."{table_name}"'
-                
                 df_raw_sample = pd.read_excel(file_path, sheet_name=sheet_name, nrows=20, header=None)
                 grid_lines = [f"Row {i}: | " + " | ".join([str(v).strip().replace('\n',' ') for v in row]) + " |" for i, row in df_raw_sample.iterrows()]
-                
                 analysis = await ollama_client.analyze_sheet_structure(sheet_name, "\n".join(grid_lines)) if ollama_client else {"verdict": "ready"}
                 if analysis.get("verdict") == "reject": continue
-                
                 df_final = process_sheet_with_analysis(pd.read_excel(file_path, sheet_name=sheet_name, header=None), analysis)
                 conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM df_final")
-                results.append({
-                    "sheet_name": sheet_name,
-                    "table_name": table_name,
-                    "status": "completed",
-                    "row_count": conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
-                })
+                results.append({"sheet_name": sheet_name, "table_name": table_name, "status": "completed", "row_count": conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]})
         except Exception as e:
             logger.error(f"XLSX Ingestion failed: {e}")
             raise e
         return results
 
     def ingest_xml(self, file_path: Path, original_filename: str, schema: str = "s_manual") -> list:
-        """Generic XML Ingestion (Handles Health Exports, CDA, etc.)."""
+        """Config-driven XML Ingestion (Tooling-agnostic)."""
         fn = original_filename.lower()
-        if 'export_cda' in fn:
-            return self._process_clinical_xml(file_path, original_filename, schema)
-        elif 'export' in fn:
-            return self._process_health_export_xml(file_path, original_filename, schema)
+        strategy = next((s for s in XML_STRATEGIES.values() if s["match"](fn)), None)
         
-        # Fallback for generic XML
-        def generic_gen():
-            root = ET.parse(file_path).getroot()
-            yield {"filename": original_filename, "root_tag": root.tag, "attribs": dict(root.attrib)}
+        results = []
+        pipeline = create_ravioli_pipeline(f"xml_{os.path.getsize(file_path)}", schema)
         
-        p = create_ravioli_pipeline(f"xml_{original_filename}", schema)
-        tn = f"xml_{''.join(c if c.isalnum() else '_' for c in original_filename).lower()[:20]}"
-        p.run(generic_gen(), table_name=tn)
-        return [{"table_name": tn, "row_count": 1, "status": "completed"}]
+        if strategy:
+            for table_cfg in strategy["tables"]:
+                tag = table_cfg.get("tag")
+                tn = table_cfg["table_name"]
+                
+                gen = xml_tag_generator(file_path, tag, table_cfg.get("extract_metadata", False)) if tag else xml_full_parse_generator(file_path, original_filename)
+                pipeline.run(gen, table_name=tn, write_disposition="append" if tag else "replace")
+                
+                count = self.duckdb_manager.connection.execute(f'SELECT COUNT(*) FROM "{schema}"."{tn}"').fetchone()[0]
+                results.append({"table_name": tn, "row_count": count, "status": "completed"})
+        else:
+            # Fallback for unrecognized XML
+            tn = f"xml_{''.join(c if c.isalnum() else '_' for c in original_filename).lower()[:20]}"
+            pipeline.run(xml_full_parse_generator(file_path, original_filename), table_name=tn)
+            results.append({"table_name": tn, "row_count": 1, "status": "completed"})
+            
+        return results
 
     def ingest_gpx(self, file_path: Path, original_filename: str, schema: str = "s_manual") -> list:
         """Ingest spatial data from GPX files."""
@@ -148,36 +151,3 @@ class DataIngestor:
         p.run(parse_gpx(), table_name=tn)
         count = self.duckdb_manager.connection.execute(f'SELECT COUNT(*) FROM "{schema}"."{tn}"').fetchone()[0]
         return [{"table_name": tn, "row_count": count, "status": "completed"}]
-
-    # --- XML Processing Strategies ---
-    def _process_health_export_xml(self, path: Path, fn: str, schema: str) -> list:
-        """Specialized streaming for Health Export XML."""
-        results = []
-        def s_rec():
-            for _, e in ET.iterparse(path, events=("end",)):
-                if e.tag == "Record": yield dict(e.attrib); e.clear()
-        def s_work():
-            for _, e in ET.iterparse(path, events=("end",)):
-                if e.tag == "Workout":
-                    w = dict(e.attrib); m = {c.attrib['key']: c.attrib['value'] for c in e if c.tag == "MetadataEntry"}
-                    if m: w['metadata'] = m
-                    yield w; e.clear()
-        def s_sum():
-            for _, e in ET.iterparse(path, events=("end",)):
-                if e.tag == "ActivitySummary": yield dict(e.attrib); e.clear()
-        
-        p = create_ravioli_pipeline(f"ah_{os.path.getsize(path)}", schema)
-        for tn, gen in [("apple_health_records", s_rec), ("apple_health_workouts", s_work), ("apple_health_activity_summaries", s_sum)]:
-            p.run(gen(), table_name=tn, write_disposition="append")
-            count = self.duckdb_manager.connection.execute(f'SELECT COUNT(*) FROM "{schema}"."{tn}"').fetchone()[0]
-            results.append({"table_name": tn, "row_count": count, "status": "completed"})
-        return results
-
-    def _process_clinical_xml(self, path: Path, fn: str, schema: str) -> list:
-        """Specialized processing for Clinical Document Architecture."""
-        def p_cda():
-            root = ET.parse(path).getroot(); yield {"filename": fn, "root_tag": root.tag, "attribs": dict(root.attrib)}
-        p = create_ravioli_pipeline(f"cda_{fn}", schema)
-        p.run(p_cda(), table_name="apple_health_clinical_records")
-        count = self.duckdb_manager.connection.execute(f'SELECT COUNT(*) FROM "{schema}"."apple_health_clinical_records"').fetchone()[0]
-        return [{"table_name": "apple_health_clinical_records", "row_count": count, "status": "completed"}]
