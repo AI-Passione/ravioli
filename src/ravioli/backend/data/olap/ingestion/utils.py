@@ -215,7 +215,7 @@ def xml_chunk_generator(path: Path, tag_name: str, start: int, end: int, extract
                             if metadata: entry['metadata'] = metadata
                             
                     count += 1
-                    if count % 100000 == 0:
+                    if count % 50000 == 0:
                         logger.info(f"Chunk [{start//1024**2}MB]: Found {count:,} records for {tag_name}...")
                     yield entry
             

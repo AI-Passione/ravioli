@@ -27,16 +27,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 class LogCaptureHandler(logging.Handler):
-    def __init__(self, queue: asyncio.Queue):
+    def __init__(self, queue: asyncio.Queue, loop: asyncio.AbstractEventLoop):
         super().__init__()
         self.queue = queue
-        self.setFormatter(logging.Formatter('%(message)s'))
+        self.loop = loop
+        self.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
 
     def emit(self, record):
         try:
             msg = self.format(record)
-            # Use call_soon_threadsafe to safely push to queue from potentially different threads
-            asyncio.get_event_loop().call_soon_threadsafe(self.queue.put_nowait, msg)
+            self.loop.call_soon_threadsafe(self.queue.put_nowait, msg)
         except Exception:
             self.handleError(record)
 
@@ -597,17 +597,24 @@ async def upload_file_stream(
     Same as upload_file but returns a StreamingResponse with real-time logs.
     """
     log_queue = asyncio.Queue()
-    handler = LogCaptureHandler(log_queue)
+    loop = asyncio.get_event_loop()
+    handler = LogCaptureHandler(log_queue, loop)
     
-    # Attach handler to root ravioli logger to catch all sub-module logs
-    ingestion_logger = logging.getLogger("ravioli")
-    # Ensure level is set to capture everything from children
-    ingestion_logger.setLevel(logging.INFO)
-    ingestion_logger.addHandler(handler)
+    # Capture both app logs and dlt logs
+    ravioli_logger = logging.getLogger("ravioli")
+    dlt_logger = logging.getLogger("dlt")
+    
+    ravioli_logger.addHandler(handler)
+    dlt_logger.addHandler(handler)
+    
+    # Ensure levels are set correctly for capture
+    ravioli_logger.setLevel(logging.INFO)
+    dlt_logger.setLevel(logging.INFO)
 
     async def event_generator():
         temp_path = None
         try:
+            yield f"data: LOG:SYSTEM: Log stream initialized. Ready for ingestion...\n\n"
             # 1. Save file to disk immediately to avoid "read of closed file" error
             # when the request scope ends before the ingestion task completes.
             file_id = uuid.uuid4()
@@ -663,7 +670,8 @@ async def upload_file_stream(
                 yield f"data: ERROR:An internal error occurred: {str(e)}\n\n"
                 
         finally:
-            ingestion_logger.removeHandler(handler)
+            ravioli_logger.removeHandler(handler)
+            dlt_logger.removeHandler(handler)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
