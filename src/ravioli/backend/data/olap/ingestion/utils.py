@@ -157,7 +157,9 @@ def xml_chunk_generator(path: Path, tag_name: str, start: int, end: int, extract
     
     with open(path, "rb") as f:
         with mmap.mmap(f.fileno(), length=0, access=mmap.ACCESS_READ) as mm:
-            view = mm[start:end]
+            # Use memoryview to avoid copying data when slicing
+            mv = memoryview(mm)
+            view = mv[start:end]
             
             if tag_name == "Record":
                 # Allow optional namespace prefix (e.g. <n1:Record ... />)
@@ -218,10 +220,11 @@ def xml_chunk_generator(path: Path, tag_name: str, start: int, end: int, extract
                             if metadata: entry['metadata'] = metadata
                             
                     count += 1
-                    if count % 50000 == 0:
-                        msg = f"Chunk [{start//1024**2}MB]: Found {count:,} records for {tag_name}..."
-                        print(f"DEBUG: xml_chunk_generator print: {msg}", flush=True)
+                    if count % 10000 == 0: # More frequent logs (every 10k)
+                        msg = f"Ingestion Progress: {count:,} records found in chunk {start//1024**2}MB"
                         logger.info(msg)
+                        # Explicitly print for Docker console visibility during debug
+                        print(f"DEBUG: {msg}", flush=True)
                     yield entry
             
             logger.info(f"Chunk completed. Total found: {count:,} records for {tag_name}.")
