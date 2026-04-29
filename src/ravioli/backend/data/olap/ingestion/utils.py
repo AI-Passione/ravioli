@@ -7,7 +7,7 @@ import openpyxl
 import xml.etree.ElementTree as ET
 import concurrent.futures
 from pathlib import Path
-from typing import List, Dict, Any, Callable
+from typing import List, Dict, Callable
 from ravioli.backend.core.config import settings
 
 logger = logging.getLogger(__name__)
