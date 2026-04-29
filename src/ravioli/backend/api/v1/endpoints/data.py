@@ -601,21 +601,27 @@ async def upload_file_stream(
     loop = asyncio.get_running_loop()
     handler = LogCaptureHandler(log_queue, loop)
     
-    # Redundant attachment to ensure coverage
-    loggers_to_capture = [
-        logging.getLogger(),      # root
-        logging.getLogger("ravioli"),
-        logging.getLogger("dlt")
-    ]
+    # SHOTGUN ATTACHMENT: Catch everything in the ravioli and dlt tree
+    loggers_to_capture = [logging.getLogger()] # Always start with root
     
+    # Scan all existing loggers
+    for name in logging.root.manager.loggerDict:
+        if "ravioli" in name or "dlt" in name:
+            loggers_to_capture.append(logging.getLogger(name))
+            
     for l in loggers_to_capture:
-        l.addHandler(handler)
+        # Avoid duplicate handlers if possible
+        if handler not in l.handlers:
+            l.addHandler(handler)
         l.setLevel(logging.INFO)
         l.propagate = True
 
     async def event_generator():
         temp_path = None
         try:
+            # Verification log to prove the handler is attached and working
+            logging.info("[SYSTEM] Ingestion stream started - Logger Verification")
+            
             yield f"data: LOG:INFO: [SYSTEM] System Terminal linked. Capturing ingestion logs...\n\n"
             
             # 1. Save file to disk immediately to avoid "read of closed file" error

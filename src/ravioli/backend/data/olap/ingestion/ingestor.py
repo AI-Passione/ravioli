@@ -140,6 +140,7 @@ class DataIngestor:
         fn = original_filename.lower()
         file_size = os.path.getsize(file_path)
         is_chucking = self._is_chucking(file_path)
+        logger.info(f"Ingestor.ingest_xml started for {original_filename} (Chucking: {is_chucking})")
         
         strategy = next((s for s in XML_STRATEGIES.values() if s["match"](fn)), None)
         results = []
