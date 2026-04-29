@@ -144,6 +144,37 @@ def xml_tag_generator(path: Path, tag_name: str, extract_metadata: bool = False)
                 metadata = {c.attrib.get('key'): c.attrib.get('value') for c in elem if c.tag == "MetadataEntry"}
                 if metadata: data['metadata'] = metadata
             yield data
+        elem.clear()
+
+def xml_chunk_generator(path: Path, tag_name: str, start: int, end: int, extract_metadata: bool = False):
+    """Memory-efficient generator that streams XML tags from a specific byte range."""
+    with path.open("rb") as f:
+        if start > 0:
+            f.seek(start)
+            # Skip until the end of the current tag to avoid partial tags
+            # We read in small chunks to find the next '>'
+            found = False
+            while not found:
+                buf = f.read(1024)
+                if not buf: break
+                idx = buf.find(b'>')
+                if idx != -1:
+                    f.seek(start + idx + 1)
+                    found = True
+                else:
+                    start += 1024
+            
+        context = ET.iterparse(f, events=("end",))
+        for _, elem in context:
+            if f.tell() > end:
+                break
+                
+            if elem.tag == tag_name:
+                data = dict(elem.attrib)
+                if extract_metadata:
+                    metadata = {c.attrib.get('key'): c.attrib.get('value') for c in elem if c.tag == "MetadataEntry"}
+                    if metadata: data['metadata'] = metadata
+                yield data
             elem.clear()
 
 def xml_full_parse_generator(path: Path, original_filename: str):
@@ -235,7 +266,7 @@ XML_STRATEGIES = {
     "apple_health_cda": {
         "match": lambda fn: 'export_cda' in fn,
         "tables": [
-            {"tag": None, "table_name": "apple_health_clinical_records"}
+            {"tag": "ClinicalRecord", "table_name": "apple_health_clinical_records"}
         ]
     }
 }

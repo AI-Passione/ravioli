@@ -13,6 +13,7 @@ from ravioli.backend.data.olap.ingestion.utils import (
     process_sheet_with_analysis,
     xlsx_chunk_generator,
     xml_tag_generator,
+    xml_chunk_generator,
     xml_full_parse_generator,
     parallel_xml_tag_generator,
     XML_STRATEGIES
@@ -151,6 +152,11 @@ class DataIngestor:
             # Collect resources to run them in one go for better worker distribution
             resources = []
             logger.info(f"Strategy found: {strategy['match'].__name__ if hasattr(strategy['match'], '__name__') else 'dynamic'}. Collecting resources...")
+            
+            num_workers = 4
+            chunk_size = file_size // num_workers
+            chunks = [(i * chunk_size, (i + 1) * chunk_size if i < num_workers - 1 else file_size) for i in range(num_workers)]
+
             for table_cfg in strategy["tables"]:
                 tag = table_cfg.get("tag")
                 tn = table_cfg["table_name"]
@@ -158,15 +164,22 @@ class DataIngestor:
                 
                 logger.info(f"Preparing resource for table '{tn}' (Tag: {tag})")
                 if tag:
-                    gen = parallel_xml_tag_generator(file_path, tag, extract_metadata) if is_chucking else xml_tag_generator(file_path, tag, extract_metadata)
+                    if is_chucking:
+                        logger.info(f"Parallelizing {tn} into {num_workers} streaming resources...")
+                        for i, (start, end) in enumerate(chunks):
+                            gen = xml_chunk_generator(file_path, tag, start, end, extract_metadata)
+                            # Using a unique resource name but same table_name for dlt
+                            resources.append(dlt.resource(gen, name=f"{tn}_p{i}", table_name=tn, write_disposition="append"))
+                    else:
+                        gen = xml_tag_generator(file_path, tag, extract_metadata)
+                        resources.append(dlt.resource(gen, name=tn, write_disposition="append"))
                 else:
                     gen = xml_full_parse_generator(file_path, original_filename)
-                
-                resources.append(dlt.resource(gen, name=tn, write_disposition="append" if tag else "replace"))
+                    resources.append(dlt.resource(gen, name=tn, write_disposition="replace"))
             
             # Run all resources together
-            logger.info(f"Executing dlt pipeline with {len(resources)} resources...")
-            load_info = pipeline.run(resources, workers=4 if is_chucking else 1)
+            logger.info(f"Executing dlt pipeline with {len(resources)} parallel resources...")
+            load_info = pipeline.run(resources, workers=num_workers if is_chucking else 1)
             logger.info(f"Pipeline execution completed. Status: {load_info}")
             
             for table_cfg in strategy["tables"]:
