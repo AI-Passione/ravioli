@@ -116,7 +116,7 @@ def xlsx_chunk_generator(path: Path, sheet_name: str, analysis: dict, chunk_size
             break
             
     if not header_row: return
-
+ 
     chunk = []
     total_processed = 0
     for i, row in enumerate(ws.iter_rows(min_row=d_idx + 1, values_only=True)):
@@ -151,83 +151,64 @@ def xml_tag_generator(path: Path, tag_name: str, extract_metadata: bool = False)
         elem.clear()
 
 def xml_chunk_generator(path: Path, tag_name: str, start: int, end: int, extract_metadata: bool = False):
-    """Memory-efficient generator using mmap to scan XML chunks without loading them into RAM."""
+    """Memory-efficient generator that scans specific byte chunks of an XML file."""
     attr_pattern = re.compile(r'(\w+)="([^"]*)"')
     count = 0
     
     with open(path, "rb") as f:
-        with mmap.mmap(f.fileno(), length=0, access=mmap.ACCESS_READ) as mm:
-            if tag_name == "Record":
-                # Allow optional namespace prefix (e.g. <n1:Record ... />)
-                pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>]+)\s*/>'.encode())
-                # Use pattern.finditer(mm, start, end) to avoid slicing (which copies)
-                for match in pattern.finditer(mm, start, end):
-                    attrs_raw = match.group(1).decode('utf-8', errors='ignore')
-                    count += 1
-                    if count % 10000 == 0:
-                        msg = f"Ingestion Progress: {count:,} records found in chunk {start//1024**2}MB"
-                        logger.info(msg)
-                        print(f"DEBUG: {msg}", flush=True)
-                    yield dict(attr_pattern.findall(attrs_raw))
-            else:
-                # Allow optional namespace prefix (e.g. <n1:observation ...> ... </n1:observation>)
-                pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>/]+)\s*(?:/>|>(.*?)</(?:[\w-]+:)?{tag_name}>)'.encode(), re.DOTALL)
-                # Use pattern.finditer(mm, start, end) to avoid slicing (which copies)
-                for match in pattern.finditer(mm, start, end):
-                    attrs_raw = match.group(1).decode('utf-8', errors='ignore')
-                    entry = dict(attr_pattern.findall(attrs_raw))
+        f.seek(start)
+        chunk_bytes = f.read(end - start)
+        
+        if tag_name == "Record":
+            # Allow optional namespace prefix (e.g. <n1:Record ... />)
+            pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>]+)\s*/>'.encode())
+            for match in pattern.finditer(chunk_bytes):
+                attrs_raw = match.group(1).decode('utf-8', errors='ignore')
+                entry = dict(attr_pattern.findall(attrs_raw))
+                
+                count += 1
+                if count % 10000 == 0:
+                    msg = f"Ingestion Progress: {count:,} records found in chunk {start//1024**2}MB"
+                    logger.info(msg)
+                    print(f"DEBUG: {msg}", flush=True)
+                yield entry
+        else:
+            # Allow optional namespace prefix (e.g. <n1:observation ...> ... </n1:observation>)
+            pattern = re.compile(rf'<(?:[\w-]+:)?{tag_name}\s+([^>/]+)\s*(?:/>|>(.*?)</(?:[\w-]+:)?{tag_name}>)'.encode(), re.DOTALL)
+            for match in pattern.finditer(chunk_bytes):
+                attrs_raw = match.group(1).decode('utf-8', errors='ignore')
+                entry = dict(attr_pattern.findall(attrs_raw))
+                
+                if match.group(2):
+                    inner = match.group(2).decode('utf-8', errors='ignore')
                     
-                    if match.group(2):
-                        inner = match.group(2).decode('utf-8', errors='ignore')
+                    # CDA Observation specific extraction
+                    if tag_name == "observation":
+                        # Extract code/value/time attributes
+                        for tag, prefix in [("code", "code_"), ("value", "value_"), ("low", "start_"), ("high", "end_")]:
+                            m = re.search(rf'<{tag}\s+([^>]+)/>', inner)
+                            if m:
+                                for k, v in attr_pattern.findall(m.group(1)):
+                                    entry[f"{prefix}{k}"] = v
                         
-                        # CDA Observation specific extraction
-                        if tag_name == "observation":
-                            # Extract code attributes
-                            code_match = re.search(r'<code\s+([^>]+)/>', inner)
-                            if code_match:
-                                for k, v in attr_pattern.findall(code_match.group(1)):
-                                    entry[f'code_{k}'] = v
-                            
-                            # Extract value attributes
-                            value_match = re.search(r'<value\s+([^>]+)/>', inner)
-                            if value_match:
-                                for k, v in attr_pattern.findall(value_match.group(1)):
-                                    entry[f'value_{k}'] = v
-                                    
-                            # Extract effectiveTime
-                            low_match = re.search(r'<low\s+([^>]+)/>', inner)
-                            if low_match:
-                                for k, v in attr_pattern.findall(low_match.group(1)):
-                                    entry[f'start_{k}'] = v
-                            high_match = re.search(r'<high\s+([^>]+)/>', inner)
-                            if high_match:
-                                for k, v in attr_pattern.findall(high_match.group(1)):
-                                    entry[f'end_{k}'] = v
+                        # Extract text fields
+                        for tag, key in [("sourceName", "source_name"), ("sourceVersion", "source_version"), ("type", "type"), ("unit", "unit")]:
+                            m = re.search(rf'<{tag}>([^<]+)</{tag}>', inner)
+                            if m: entry[key] = m.group(1)
 
-                            # Extract sourceName/sourceVersion from text
-                            source_match = re.search(r'<sourceName>([^<]+)</sourceName>', inner)
-                            if source_match: entry['source_name'] = source_match.group(1)
-                            version_match = re.search(r'<sourceVersion>([^<]+)</sourceVersion>', inner)
-                            if version_match: entry['source_version'] = version_match.group(1)
-                            type_match = re.search(r'<type>([^<]+)</type>', inner)
-                            if type_match: entry['type'] = type_match.group(1)
-                            unit_match = re.search(r'<unit>([^<]+)</unit>', inner)
-                            if unit_match: entry['unit'] = unit_match.group(1)
-
-                        if extract_metadata:
-                            meta_pattern = re.compile(r'<MetadataEntry\s+key="([^"]*)"\s+value="([^"]*)"\s*/>')
-                            metadata = {k: v for k, v in meta_pattern.findall(inner)}
-                            if metadata: entry['metadata'] = metadata
-                            
-                    count += 1
-                    if count % 10000 == 0: # More frequent logs (every 10k)
-                        msg = f"Ingestion Progress: {count:,} records found in chunk {start//1024**2}MB"
-                        logger.info(msg)
-                        # Explicitly print for Docker console visibility during debug
-                        print(f"DEBUG: {msg}", flush=True)
-                    yield entry
-            
-            logger.info(f"Chunk completed. Total found: {count:,} records for {tag_name}.")
+                    if extract_metadata:
+                        meta_pattern = re.compile(r'<MetadataEntry\s+key="([^"]*)"\s+value="([^"]*)"\s*/>')
+                        metadata = {k: v for k, v in meta_pattern.findall(inner)}
+                        if metadata: entry['metadata'] = metadata
+                        
+                count += 1
+                if count % 10000 == 0:
+                    msg = f"Ingestion Progress: {count:,} records found in chunk {start//1024**2}MB"
+                    logger.info(msg)
+                    print(f"DEBUG: {msg}", flush=True)
+                yield entry
+        
+        logger.info(f"Chunk completed. Total found: {count:,} records for {tag_name}.")
 
 def xml_full_parse_generator(path: Path, original_filename: str):
     """Fallback generator for full XML parsing."""
