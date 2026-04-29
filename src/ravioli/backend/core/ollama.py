@@ -157,7 +157,7 @@ Criteria for JSON response:
 2. `header_row`: The 0-indexed row number containing the primary COLUMN NAMES.
 3. `data_start_row`: The 0-indexed row number where the first record of actual data begins.
 4. `is_split`: Boolean. True if the sheet contains side-by-side duplicate table structures.
-5. `split_column_offset`: If `is_split` is true, the 0-indexed column number where the second block starts.
+5. `split_offsets`: If `is_split` is true, a LIST of 0-indexed column numbers where each subsequent block starts (e.g. [4, 8, 12]).
 6. `column_mapping`: A dictionary mapping EXACT original header names to clean, snake_case, SQL-friendly names.
 
 Sample Grid (Row 0 is the first row in Excel):

@@ -147,12 +147,16 @@ class DuckDBManager:
 
         # 1. Extraction Phase
         if is_split:
-            split_offset = analysis.get("split_column_offset")
-            if split_offset:
-                logger.info(f"Reconciling split table with offset {split_offset}...")
-                data = self._reconcile_split_table(df, header_row_idx, data_start_idx, split_offset)
+            # Handle list of offsets or a single offset (for backward compatibility)
+            split_offsets = analysis.get("split_offsets")
+            if not split_offsets and "split_column_offset" in analysis:
+                split_offsets = [analysis["split_column_offset"]]
+                
+            if split_offsets:
+                logger.info(f"Reconciling multi-block split table with offsets {split_offsets}...")
+                data = self._reconcile_split_table(df, header_row_idx, data_start_idx, split_offsets)
             else:
-                logger.warning("Split detected but no split_column_offset provided. Falling back to standard extraction.")
+                logger.warning("Split detected but no split_offsets provided. Falling back to standard extraction.")
                 raw_headers = df.iloc[header_row_idx].tolist()
                 headers = [str(h).strip() if pd.notna(h) else f"col_{i}" for i, h in enumerate(raw_headers)]
                 data = df.iloc[data_start_idx:].copy()
@@ -171,52 +175,68 @@ class DuckDBManager:
         
         # 3. Mapping Phase
         if mapping:
-            # Only map if the original column actually exists in our extracted data
-            # Also handle potential duplicates or variations in naming
             clean_mapping = {k: v for k, v in mapping.items() if k in data.columns}
             if clean_mapping:
                 logger.info(f"Applying AI column mapping: {clean_mapping}")
                 data = data.rename(columns=clean_mapping)
         
         # 4. Final Polish
-        # Remove internal pandas 'Unnamed' artifacts or temporary col_N placeholders
-        # BUT keep columns that were explicitly mapped (even if they were col_N)
         data = data.loc[:, ~data.columns.astype(str).str.contains('^Unnamed|^col_', regex=True) | data.columns.astype(str).isin(mapping.values())]
         
         return data
 
-    def _reconcile_split_table(self, df: pd.DataFrame, header_row: int, data_start: int, split_offset: int) -> pd.DataFrame:
-        """Merge side-by-side table blocks into a single vertical table."""
-        # Block 1: Columns 0 to split_offset-1
-        h1 = df.iloc[header_row, 0:split_offset].tolist()
+    def _reconcile_split_table(self, df: pd.DataFrame, header_row: int, data_start: int, split_offsets: list) -> pd.DataFrame:
+        """Merge multiple side-by-side table blocks into a single vertical table."""
+        if not split_offsets:
+            return df
+            
+        # Ensure offsets are sorted and unique
+        split_offsets = sorted(list(set(split_offsets)))
         
-        # Block 2: Find the next real header in the second block (skip potential empty spacers)
-        h2_slice = df.iloc[header_row, split_offset:]
-        first_valid_h2_idx = None
-        for i, val in enumerate(h2_slice):
-            if pd.notna(val) and str(val).strip():
-                first_valid_h2_idx = split_offset + i
-                break
+        blocks = []
+        # Block 0: from 0 to first offset
+        blocks.append(self._extract_block(df, header_row, data_start, 0, split_offsets[0]))
         
-        if first_valid_h2_idx is None:
-            logger.warning("Could not find second block headers in split table. Returning block 1 only.")
-            block1 = df.iloc[data_start:, 0:split_offset].copy()
-            block1.columns = [str(h).strip() if pd.notna(h) else f"col_{i}" for i, h in enumerate(h1)]
-            return block1
+        # Intermediate blocks
+        for i in range(len(split_offsets) - 1):
+            blocks.append(self._extract_block(df, header_row, data_start, split_offsets[i], split_offsets[i+1]))
+            
+        # Last block
+        blocks.append(self._extract_block(df, header_row, data_start, split_offsets[-1], df.shape[1]))
+        
+        # Filter out empty blocks
+        valid_blocks = [b for b in blocks if b is not None and not b.empty]
+        
+        if not valid_blocks:
+            logger.warning("No valid data blocks found during reconciliation.")
+            return pd.DataFrame()
+            
+        logger.info(f"Successfully reconciled {len(valid_blocks)} data blocks.")
+        return pd.concat(valid_blocks, ignore_index=True)
 
-        h2 = df.iloc[header_row, first_valid_h2_idx:].tolist()
+    def _extract_block(self, df: pd.DataFrame, header_row: int, data_start: int, start_col: int, end_col: int) -> pd.DataFrame:
+        """Helper to extract and clean a single block from a split table."""
+        if start_col >= df.shape[1]:
+            return None
+            
+        raw_headers = df.iloc[header_row, start_col:end_col].tolist()
         
-        # Extract data blocks
-        block1 = df.iloc[data_start:, 0:split_offset].copy()
-        block2 = df.iloc[data_start:, first_valid_h2_idx:].copy()
+        # Check if this is a "spacer" block (all NaNs or empty strings)
+        if all(pd.isna(h) or str(h).strip() == "" for h in raw_headers):
+            # Check a few rows of data too
+            sample_data = df.iloc[data_start:data_start+5, start_col:end_col]
+            if sample_data.isna().all().all():
+                return None
+
+        headers = [str(h).strip() if pd.notna(h) else f"col_{i}" for i, h in enumerate(raw_headers)]
+        block = df.iloc[data_start:, start_col:end_col].copy()
+        block.columns = headers
         
-        # Clean headers
-        block1.columns = [str(h).strip() if pd.notna(h) else f"col_{i}" for i, h in enumerate(h1)]
-        block2.columns = [str(h).strip() if pd.notna(h) else f"col_{i}" for i, h in enumerate(h2)]
+        # Drop completely empty columns/rows from block
+        block = block.dropna(axis=1, how='all')
+        block = block.dropna(axis=0, how='all')
         
-        # Vertical stack
-        logger.info(f"Stacking blocks: B1({len(block1)} rows), B2({len(block2)} rows)")
-        return pd.concat([block1, block2], ignore_index=True)
+        return block
         
     def query(self, sql: str):
         """
