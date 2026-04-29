@@ -77,7 +77,7 @@ class WFSClient:
 
 # --- Main Data Ingestor ---
 class DataIngestor:
-    CHUCKING_THRESHOLD = 1024 * 1024 * 1024  # 1GB
+    CHUCKING_THRESHOLD = 1_000_000_000 # 1GB (Decimal)
 
     def __init__(self, duckdb_manager):
         self.duckdb_manager = duckdb_manager
