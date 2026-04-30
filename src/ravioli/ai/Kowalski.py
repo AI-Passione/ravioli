@@ -102,9 +102,6 @@ class KowalskiAgent:
 
     # --- Infrastructure ---
 
-    async def check_ollama_connection(self):
-        return await self.ollama_client.check_connection()
-
     def _setup_agent(self):
         schemas = "public,marts,s_spotify,s_linkedin,s_substack,s_telegram,s_bolt,s_apple_health,s_google_sheet"
         db_uri = f"{settings.database_url}?options=-csearch_path%3D{schemas}"
@@ -126,7 +123,7 @@ async def main():
     parser.add_argument("--interactive", action="store_true")
     args = parser.parse_args()
     agent = KowalskiAgent()
-    if not await agent.check_ollama_connection(): return
+    if not await agent.ollama_client.check_connection(): return
     if args.interactive:
         while True:
             u = input(">> ")

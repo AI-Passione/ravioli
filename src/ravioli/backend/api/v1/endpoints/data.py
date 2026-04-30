@@ -21,7 +21,7 @@ from ravioli.backend.data.olap.ingestion.ingestor import WFSClient
 from ravioli.backend.data.olap.ingestion.utils import pii_scanner, create_ravioli_pipeline
 
 import logging
-from ravioli.ai.agents.Kowalski import KowalskiAgent
+from ravioli.ai.Kowalski import KowalskiAgent
 from ravioli.ai.skills import communication as skill_comm
 
 logger = logging.getLogger(__name__)
