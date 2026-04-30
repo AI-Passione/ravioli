@@ -12,7 +12,7 @@ from langchain_community.llms import Ollama
 
 # Core Imports
 from ravioli.backend.core.config import settings
-from ravioli.backend.core.ollama import OllamaClient, KOWALSKI_PERSONA
+from ravioli.backend.core.ollama import OllamaClient
 
 # Tools Imports
 from ravioli.ai.tools.sql import create_sql_agent_executor, get_query_database_tool
@@ -39,10 +39,35 @@ class KowalskiAgent:
         self._ollama_client = OllamaClient(db_session)
         self.model_sql = "duckdb-nsql"
         self.model_persona = "gemma3:4b"
-        self.persona = KOWALSKI_PERSONA
+        self.persona = self._load_persona()
         self.llm = Ollama(model=model_name) # For the ReAct agent
         self.agent = self._setup_agent()
         logger.info(f"KowalskiAgent: Unified intelligence initialized. Mode: {self._ollama_client.mode}")
+
+    def _load_persona(self) -> str:
+        """Loads Kowalski's soul and skills from the local filesystem."""
+        from pathlib import Path
+        persona = "You are Kowalski, a lead analytics specialist. Clinical and precise."
+        skills = ""
+        
+        try:
+            # Resolve path to src/ravioli/ai/
+            # parents[1] is src/ravioli/ai/
+            base_ai_path = Path(__file__).resolve().parents[1]
+            
+            # Resolve path to src/ravioli/ai/agents/soul.md
+            persona_path = base_ai_path / "agents" / "soul.md"
+            if persona_path.exists():
+                persona = persona_path.read_text()
+                
+            # Resolve path to src/ravioli/ai/skills/skills.md
+            skills_path = base_ai_path / "skills" / "skills.md"
+            if skills_path.exists():
+                skills = skills_path.read_text()
+        except Exception as e:
+            logger.warning(f"KowalskiAgent: [WARNING] Failed to load dossier/skills: {e}")
+        
+        return f"{persona}\n\n## SPECIALIZED SKILLS\n{skills}" if skills else persona
 
     async def _generate(self, prompt_text: str, task_name: str, model: str, temperature: float = 0.1, parser: Any = None) -> Union[str, Dict]:
         """Internal helper that routes to the proven OllamaClient._generate with persona injection."""
