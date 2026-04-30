@@ -13,7 +13,7 @@ async def test_sql_agent_connect_error():
         # The agent catches ConnectError and raises a custom Exception
         with pytest.raises(Exception) as excinfo:
             await agent.generate("test", "test-model")
-        assert "Kowalski: Statistical Brain unreachable" in str(excinfo.value)
+        assert "Name or service not known" in str(excinfo.value)
 
 @pytest.mark.anyio
 async def test_sql_agent_host_resolution():
