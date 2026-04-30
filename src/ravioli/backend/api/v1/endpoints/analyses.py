@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from ravioli.backend.core.database import get_db, SessionLocal
 from ravioli.backend.core import models, schemas
-from ravioli.ai.agents.Kowalski import KowalskiAgent
+from ravioli.ai.Kowalski import KowalskiAgent
 from ravioli.ai.skills import communication as skill_comm
 from ravioli.ai.skills import analysis as skill_analysis
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager

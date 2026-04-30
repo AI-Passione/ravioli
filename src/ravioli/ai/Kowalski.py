@@ -49,8 +49,8 @@ class KowalskiAgent:
         persona = "You are Kowalski, a lead analytics specialist. Clinical and precise."
         skills = ""
         try:
-            base_ai_path = Path(__file__).resolve().parents[1]
-            persona_path = base_ai_path / "agents" / "soul.md"
+            base_ai_path = Path(__file__).resolve().parent
+            persona_path = base_ai_path / "soul.md"
             if persona_path.exists(): persona = persona_path.read_text()
             skills_path = base_ai_path / "skills" / "skills.md"
             if skills_path.exists(): skills = skills_path.read_text()

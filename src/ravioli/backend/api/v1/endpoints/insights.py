@@ -7,7 +7,7 @@ from datetime import datetime, UTC, timedelta
 
 from ravioli.backend.core.database import get_db
 from ravioli.backend.core import models, schemas
-from ravioli.ai.agents.Kowalski import KowalskiAgent
+from ravioli.ai.Kowalski import KowalskiAgent
 from ravioli.ai.skills import analysis as skill_analysis
 
 router = APIRouter()
