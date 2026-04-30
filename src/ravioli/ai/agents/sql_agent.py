@@ -12,7 +12,7 @@ from ravioli.backend.core.models import SystemSetting
 from ravioli.backend.core.encryption import decrypt_value
 
 # LangChain Imports
-from langchain_ollama import ChatOllama
+from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 
@@ -32,8 +32,7 @@ class AnalysisDecision(BaseModel):
 class KowalskiSQLAgent:
     """
     A surgical SQL agent for Kowalski.
-    Uses ChatOllama (LangChain) and LCEL for simplified, declarative logic.
-    Centralizes invocations in _generate for testability and lifecycle control.
+    Uses OllamaLLM (LangChain) for consistent /api/generate behavior.
     """
 
     def __init__(self, db_session=None):
@@ -41,6 +40,11 @@ class KowalskiSQLAgent:
         self._config = self._load_config()
         self.model_sql = "duckdb-nsql"
         self.model_persona = "gemma3:4b"
+        
+        # Diagnostic logging
+        mode = self.mode
+        has_key = bool(self.api_key)
+        logger.info(f"KowalskiSQLAgent: Initialized in {mode} mode. API Key present: {has_key}")
 
     def _load_config(self) -> Dict[str, Any]:
         """Load Ollama configuration from the database."""
@@ -84,24 +88,34 @@ class KowalskiSQLAgent:
         return url
 
     def _get_llm(self, model: str, temperature: float = 0.1, keep_alive: Any = "5m"):
-        """Creates a LangChain ChatOllama instance."""
-        return ChatOllama(
+        """Creates a LangChain OllamaLLM instance."""
+        headers = {}
+        if self.mode == "cloud" and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            
+        return OllamaLLM(
             model=model,
             base_url=self.ollama_host,
             temperature=temperature,
             keep_alive=keep_alive if self.mode != "cloud" else "5m",
-            headers={"Authorization": f"Bearer {self.api_key}"} if self.mode == "cloud" and self.api_key else {}
+            headers=headers
         )
 
     async def _generate(self, prompt_text: str, model: str, temperature: float = 0.1, keep_alive: Any = "5m", parser: Any = None) -> Union[str, Dict]:
-        """Internal helper for LLM generation. Supports both string and JSON parsing."""
+        """Internal helper for LLM generation."""
         llm = self._get_llm(model, temperature=temperature, keep_alive=keep_alive)
         if parser:
             chain = llm | parser
         else:
             chain = llm | StrOutputParser()
         
-        return await chain.ainvoke(prompt_text)
+        try:
+            return await chain.ainvoke(prompt_text)
+        except Exception as e:
+            if "401" in str(e) or "unauthorized" in str(e).lower():
+                logger.error(f"KowalskiSQLAgent: Authentication failed for {self.ollama_host}. Mode: {self.mode}")
+                raise Exception("Ollama Cloud authentication failed. Please verify your API key in Settings.")
+            raise e
 
     async def unload_model(self, model: str):
         """Explicitly unloads a model from RAM."""
@@ -152,7 +166,6 @@ Your query should be compatible with DuckDB. Use the provided schema.
             )
             
             sql = response.strip()
-            # Preamble Cleaning
             if "```" in sql:
                 match = re.search(r"```(?:sql)?\s*(.*?)\s*```", sql, re.DOTALL)
                 if match: sql = match.group(1).strip()
