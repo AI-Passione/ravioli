@@ -3,8 +3,8 @@ import re
 from typing import Optional, Any
 from langchain_core.prompts import PromptTemplate
 from langchain_community.agent_toolkits import create_sql_agent, SQLDatabaseToolkit
-from langchain.agents import AgentType
-from langchain.tools import Tool as LangChainTool
+from langchain_classic.agents import AgentType
+from langchain_core.tools import Tool as LangChainTool
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
 
 logger = logging.getLogger(__name__)

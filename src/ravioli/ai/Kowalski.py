@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 # LangChain Imports
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-from langchain.agents import initialize_agent, AgentType
+from langchain_classic.agents import initialize_agent, AgentType
 from langchain_community.utilities import SQLDatabase
 from langchain_community.llms import Ollama
 

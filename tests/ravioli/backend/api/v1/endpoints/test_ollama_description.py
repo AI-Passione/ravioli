@@ -39,10 +39,9 @@ async def test_generate_file_description(client, session, mocker):
     mock_conn.execute.return_value.fetchdf.return_value = mock_df
     mock_df.to_csv.return_value = "col1,col2\nval1,val2"
     
-    # Mock OllamaClient
-    mock_ollama_client = mocker.patch("ravioli.backend.api.v1.endpoints.data.OllamaClient")
-    mock_instance = mock_ollama_client.return_value
-    mock_instance.generate_description = AsyncMock(return_value="A generated description")
+    # Mock AI Agent and Skill
+    mocker.patch("ravioli.backend.api.v1.endpoints.data.KowalskiAgent")
+    mock_skill = mocker.patch("ravioli.backend.api.v1.endpoints.data.skill_analysis.generate_description", new_callable=AsyncMock, return_value="A generated description")
     
     response = client.post(f"/api/v1/data/files/{file_id}/generate-description")
     
@@ -50,5 +49,9 @@ async def test_generate_file_description(client, session, mocker):
     assert response.json()["description"] == "A generated description"
     
     # Verify mocks were called
-    mock_instance.generate_description.assert_called_once_with(filename, "col1,col2\nval1,val2")
+    # skill_analysis.generate_description(filename, data_sample, generate_func)
+    mock_skill.assert_called_once()
+    args, kwargs = mock_skill.call_args
+    assert args[0] == filename
+    assert args[1] == "col1,col2\nval1,val2"
     assert session.commit.called

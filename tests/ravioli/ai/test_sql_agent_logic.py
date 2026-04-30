@@ -8,11 +8,11 @@ from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
 mock_connection = MagicMock()
 duckdb_manager._connection = mock_connection
 
-from ravioli.ai.agents.sql_agent import KowalskiSQLAgent
+from ravioli.ai.Kowalski import KowalskiAgent
 
 @pytest.fixture
 def agent():
-    return KowalskiSQLAgent()
+    return KowalskiAgent(MagicMock())
 
 @pytest.mark.anyio
 async def test_get_schema_success(agent):

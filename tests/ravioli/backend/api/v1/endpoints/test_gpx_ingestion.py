@@ -13,10 +13,9 @@ def mock_external_tools(mocker):
     mocker.patch("ravioli.backend.api.v1.endpoints.data.Path.stat", return_value=MagicMock(st_size=1024))
     mocker.patch("ravioli.backend.api.v1.endpoints.data.pii_scanner.scan_dataframe", return_value=False)
     
-    # Mock OllamaClient correctly
-    mock_ollama_cls = mocker.patch("ravioli.backend.api.v1.endpoints.data.OllamaClient")
-    mock_ollama_instance = mock_ollama_cls.return_value
-    mock_ollama_instance.generate_description = AsyncMock(return_value="Mocked GPX Description")
+    # Mock AI Agent and Skill
+    mocker.patch("ravioli.backend.api.v1.endpoints.data.KowalskiAgent")
+    mocker.patch("ravioli.backend.api.v1.endpoints.data.skill_analysis.generate_description", new_callable=AsyncMock, return_value="Mocked GPX Description")
     
     mocker.patch("ravioli.backend.api.v1.endpoints.data.duckdb_manager")
 

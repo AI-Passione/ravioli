@@ -1,6 +1,6 @@
 import logging
-from langchain.tools import tool
-from ravioli.backend.data.olap.ingestion.base import CSVIngestor
+from langchain_core.tools import tool
+from ravioli.backend.data.olap.ingestion.Legacy.base import CSVIngestor
 from ravioli.backend.core.dbt import run_dbt_command
 
 logger = logging.getLogger(__name__)
