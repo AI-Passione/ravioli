@@ -1,19 +1,15 @@
 import json
 import logging
 import re
-import httpx
 import os
 import pandas as pd
 from typing import Dict, Any, List, Optional, AsyncGenerator, Union
 from pydantic import BaseModel, Field
 from ravioli.backend.core.config import settings
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
-from ravioli.backend.core.models import SystemSetting
-from ravioli.backend.core.encryption import decrypt_value
+from ravioli.backend.core.ollama import OllamaClient
 
 # LangChain Imports
-from langchain_core.language_models.llms import BaseLLM
-from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 
@@ -30,134 +26,49 @@ class AnalysisDecision(BaseModel):
     """Decision on whether visualization is needed."""
     requires_viz: bool = Field(description="Whether the question requires a data visualization")
 
-class OllamaCloudLLM(BaseLLM):
-    """
-    A custom LangChain LLM wrapper for Ollama Cloud.
-    Ensures headers (API Key) are correctly passed via httpx.
-    """
-    base_url: str
-    model: str
-    api_key: Optional[str] = None
-    mode: str = "default"
-    temperature: float = 0.1
-    keep_alive: str = "5m"
-
-    def _call(self, prompt: str, stop: Optional[List[str]] = None, run_manager: Optional[CallbackManagerForLLMRun] = None, **kwargs: Any) -> str:
-        """Synchronous call (not used in our async flow but required by interface)."""
-        import asyncio
-        return asyncio.run(self._acall(prompt, stop, run_manager, **kwargs))
-
-    async def _acall(self, prompt: str, stop: Optional[List[str]] = None, run_manager: Optional[CallbackManagerForLLMRun] = None, **kwargs: Any) -> str:
-        """Async call to Ollama API with headers."""
-        url = f"{self.base_url.rstrip('/')}/api/generate"
-        headers = {}
-        if self.mode == "cloud" and self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "keep_alive": self.keep_alive,
-            "options": {"temperature": self.temperature}
-        }
-
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            if response.status_code == 401:
-                raise Exception("Ollama Cloud authentication failed. Check your API key.")
-            response.raise_for_status()
-            return response.json().get("response", "").strip()
-
-    @property
-    def _llm_type(self) -> str:
-        return "ollama_cloud"
-
 class KowalskiSQLAgent:
     """
     A surgical SQL agent for Kowalski.
-    Uses custom OllamaCloudLLM for robust Cloud/Local support.
+    Uses the system's proven OllamaClient for robust LLM communication.
+    Integrates with LangChain for structured reasoning and parsing.
     """
 
     def __init__(self, db_session=None):
         self.db_session = db_session
-        self._config = self._load_config()
+        # Leverage the proven OllamaClient directly
+        self._ollama_client = OllamaClient(db_session)
         self.model_sql = "duckdb-nsql"
         self.model_persona = "gemma3:4b"
-        logger.info(f"KowalskiSQLAgent: Initialized in {self.mode} mode. Key present: {bool(self.api_key)}")
+        logger.info(f"KowalskiSQLAgent: Initialized with direct OllamaClient integration. Mode: {self._ollama_client.mode}")
 
-    def _load_config(self) -> Dict[str, Any]:
-        """Load Ollama configuration from the database."""
-        if self.db_session:
-            try:
-                setting = self.db_session.query(SystemSetting).filter(SystemSetting.key == "ollama").first()
-                if setting and setting.value:
-                    config = dict(setting.value)
-                    if "api_key" in config and config["api_key"]:
-                        try:
-                            config["api_key"] = decrypt_value(config["api_key"])
-                        except Exception as e:
-                            logger.error(f"KowalskiSQLAgent: Decryption failed: {e}")
-                    return config
-            except Exception as e:
-                logger.error(f"KowalskiSQLAgent: Error loading config from DB: {e}")
-
-        return {"mode": "default", "base_url": settings.ollama_host, "default_model": settings.ollama_model, "api_key": ""}
-
-    @property
-    def mode(self) -> str:
-        return self._config.get("mode", "default")
-
-    @property
-    def api_key(self) -> str:
-        return self._config.get("api_key", "")
-
-    @property
-    def ollama_host(self) -> str:
-        if self.mode == "cloud": return "https://api.ollama.com"
-        url = self._config.get("base_url", settings.ollama_host)
-        if "localhost" in url or "127.0.0.1" in url or "ollama" in url:
-            if os.path.exists("/.dockerenv"):
-                return url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal").replace("ollama", "host.docker.internal")
-        return url
-
-    def _get_llm(self, model: str, temperature: float = 0.1, keep_alive: Any = "5m"):
-        """Creates an instance of our custom OllamaCloudLLM."""
-        return OllamaCloudLLM(
-            base_url=self.ollama_host,
-            model=model,
-            api_key=self.api_key,
-            mode=self.mode,
-            temperature=temperature,
-            keep_alive=keep_alive if self.mode != "cloud" else "5m"
-        )
-
-    async def _generate(self, prompt_text: str, model: str, temperature: float = 0.1, keep_alive: Any = "5m", parser: Any = None) -> Union[str, Dict]:
-        """Internal helper for LLM generation."""
-        llm = self._get_llm(model, temperature=temperature, keep_alive=keep_alive)
-        if parser:
-            chain = llm | parser
-        else:
-            chain = llm | StrOutputParser()
-        
+    async def _generate(self, prompt_text: str, task_name: str, model: str, temperature: float = 0.1, parser: Any = None) -> Union[str, Dict]:
+        """
+        Internal helper that routes to the proven OllamaClient._generate.
+        Supports LangChain parsers for structured output.
+        """
         try:
-            return await chain.ainvoke(prompt_text)
+            # Call the battle-tested _generate from ollama.py
+            response_text = await self._ollama_client._generate(
+                prompt=prompt_text,
+                task_name=task_name,
+                model=model,
+                temperature=temperature,
+                num_predict=1000
+            )
+            
+            if parser:
+                # Use LangChain parser to transform the raw text
+                return parser.parse(response_text)
+            
+            return response_text
         except Exception as e:
-            if "401" in str(e) or "unauthorized" in str(e).lower():
-                logger.error(f"KowalskiSQLAgent: Auth failed for {self.ollama_host}.")
-                raise Exception("Ollama Cloud authentication failed. Verify API key in Settings.")
+            logger.error(f"KowalskiSQLAgent: LLM Generation failed ({task_name}): {e}")
             raise e
 
     async def unload_model(self, model: str):
-        """Explicitly unloads a model from RAM."""
-        if self.mode == "cloud": return
-        logger.info(f"Ollama: [RAM OPTIMIZATION] Requesting UNLOAD for model: {model}")
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                await client.post(f"{self.ollama_host.rstrip('/')}/api/generate", json={"model": model, "keep_alive": 0})
-            logger.info(f"Ollama: [RAM OPTIMIZATION] {model} has been evicted.")
-        except Exception as e:
-            logger.warning(f"Ollama: [RAM OPTIMIZATION] Unload failed: {e}")
+        """Explicitly unloads a model from RAM via OllamaClient."""
+        if self._ollama_client.mode == "cloud": return
+        await self._ollama_client.unload_model(model)
 
     def _get_schema(self, table_name: str, schema_name: str = "main") -> str:
         """Extracts table schema for context."""
@@ -182,23 +93,32 @@ Your query should be compatible with DuckDB. Use the provided schema.
 {question}
 ### Response (use duckdb):
 """)
-        target_model = self.model_sql if self.mode != "cloud" else self._config.get("default_model", self.model_persona)
+        target_model = self.model_sql if self._ollama_client.mode != "cloud" else self._ollama_client.model
         try:
-            if self.mode != "cloud": await self.unload_model(self.model_persona)
+            if self._ollama_client.mode != "cloud": await self.unload_model(self.model_persona)
             logger.info(f"Ollama: [BRAIN] Generating surgical SQL via {target_model}...")
-            response = await self._generate(prompt.format(schema=schema, question=question), target_model, keep_alive=0 if self.mode != "cloud" else "5m")
+            
+            response = await self._generate(
+                prompt_text=prompt.format(schema=schema, question=question),
+                task_name="SQL Generation",
+                model=target_model
+            )
+            
             sql = response.strip()
             if "```" in sql:
                 match = re.search(r"```(?:sql)?\s*(.*?)\s*```", sql, re.DOTALL)
                 if match: sql = match.group(1).strip()
+            
             keywords = r"(SELECT|WITH|SHOW|DESCRIBE|CREATE|DROP|INSERT|UPDATE|DELETE|ALTER)"
             match = re.search(rf"({keywords}\s+.*)", sql, re.IGNORECASE | re.DOTALL)
             if match: sql = match.group(1).strip()
+            
             for kw in ["SELECT", "WITH", "SHOW"]:
                 idx = sql.upper().find(kw)
                 if idx != -1: 
                     sql = sql[idx:].strip()
                     break
+
             sql = sql.split(';')[0].strip()
             logger.info(f"Ollama: [BRAIN] SQL Final: {sql}")
             return sql
@@ -212,29 +132,51 @@ Your query should be compatible with DuckDB. Use the provided schema.
             logger.info("Ollama: [VOICE] Kowalski is analyzing query results...")
             df = duckdb_manager.connection.execute(sql).fetchdf()
             if df.empty: return {"type": "error", "message": "Query returned no data."}
+
             for col in df.select_dtypes(include=['datetime64', 'datetimetz']).columns:
                 df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+            
             parser = JsonOutputParser(pydantic_object=VizStrategy)
             prompt = PromptTemplate.from_template("""You are Kowalski, a data visualization expert.
 Question: "{question}"
 Columns: {columns}
 Sample Data: {sample_data}
+
 {format_instructions}
 """)
-            config = await self._generate(prompt.format(question=original_question, columns=df.columns.tolist(), sample_data=json.dumps(df.head(5).to_dict(orient='records')), format_instructions=parser.get_format_instructions()), self.model_persona, temperature=0.1, parser=parser)
+            
+            config = await self._generate(
+                prompt_text=prompt.format(
+                    question=original_question,
+                    columns=df.columns.tolist(),
+                    sample_data=json.dumps(df.head(5).to_dict(orient='records')),
+                    format_instructions=parser.get_format_instructions()
+                ),
+                task_name="Viz Strategy",
+                model=self.model_persona,
+                temperature=0.1,
+                parser=parser
+            )
+
             datasets = []
             colors = ["rgba(0, 245, 212, 0.6)", "rgba(18, 113, 255, 0.6)", "rgba(157, 78, 221, 0.6)", "rgba(255, 0, 110, 0.6)"]
             border_colors = ["rgba(0, 245, 212, 1)", "rgba(18, 113, 255, 1)", "rgba(157, 78, 221, 1)", "rgba(255, 0, 110, 1)"]
             for i, col in enumerate(config["values_columns"]):
                 datasets.append({"label": col, "data": df[col].tolist(), "backgroundColor": colors[i % len(colors)], "borderColor": border_colors[i % len(colors)], "borderWidth": 2, "borderRadius": 8, "tension": 0.4})
+            
             logger.info(f"Ollama: [VOICE] Visualization strategy locked: {config['chart_type']}")
-            return {"type": "chart", "chart_type": config["chart_type"], "title": config["title"], "data": {"labels": df[config["labels_column"]].tolist(), "datasets": datasets}}
+            return {
+                "type": "chart",
+                "chart_type": config["chart_type"],
+                "title": config["title"],
+                "data": {"labels": df[config["labels_column"]].tolist(), "datasets": datasets}
+            }
         except Exception as e:
             logger.error(f"Visualization failed: {e}")
             return {"type": "error", "message": str(e)}
 
     async def process_question(self, question: str, table_name: str, schema_name: str = "main") -> AsyncGenerator[Any, None]:
-        """Decision engine using JsonOutputParser."""
+        """Decision engine using JsonOutputParser and OllamaClient."""
         parser = JsonOutputParser(pydantic_object=AnalysisDecision)
         prompt = PromptTemplate.from_template("""Does this question require a chart or graph to answer?
 Question: "{question}"
@@ -242,7 +184,13 @@ Question: "{question}"
 """)
         logger.info(f"Ollama: [ANALYSIS] Analyzing Operator query: '{question}'")
         try:
-            result = await self._generate(prompt.format(question=question, format_instructions=parser.get_format_instructions()), self.model_persona, parser=parser)
+            result = await self._generate(
+                prompt_text=prompt.format(question=question, format_instructions=parser.get_format_instructions()),
+                task_name="Decision Analysis",
+                model=self.model_persona,
+                parser=parser
+            )
+            
             if result.get("requires_viz"):
                 yield "_[Kowalski is engaging the Statistical Brain for visualization...]_"
                 yield "_[Generating surgical SQL query...]_"
