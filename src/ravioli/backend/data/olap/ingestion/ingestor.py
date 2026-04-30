@@ -18,6 +18,7 @@ from ravioli.backend.data.olap.ingestion.utils import (
     xml_full_parse_generator,
     XML_STRATEGIES
 )
+from ravioli.ai.skills import analysis as skill_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +118,7 @@ class DataIngestor:
                 # Analyze sheet structure regardless of size (using small sample)
                 df_raw_sample = pd.read_excel(file_path, sheet_name=sheet_name, nrows=20, header=None)
                 grid_lines = [f"Row {i}: | " + " | ".join([str(v).strip().replace('\n',' ') for v in row]) + " |" for i, row in df_raw_sample.iterrows()]
-                analysis = await kowalski_agent.analyze_sheet_structure(sheet_name, "\n".join(grid_lines)) if kowalski_agent else {"verdict": "ready"}
+                analysis = await skill_analysis.analyze_sheet_structure(sheet_name, "\n".join(grid_lines), kowalski_agent.generate) if kowalski_agent else {"verdict": "ready"}
                 if analysis.get("verdict") == "reject": continue
 
                 if is_chucking:
