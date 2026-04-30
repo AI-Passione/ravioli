@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 from ravioli.ai.tools.visualization import create_viz_payload
 
 @pytest.mark.anyio
