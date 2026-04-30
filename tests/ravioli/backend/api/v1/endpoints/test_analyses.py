@@ -136,7 +136,7 @@ def test_get_suggested_prompts(client, session, mocker):
     data = response.json()
     assert len(data) == 3
     assert data[0] == "Prompt 1"
-    assert mock_ollama.called
+    assert mock_skill.called
 
 def test_get_suggested_prompts_not_found(client, session):
     # Mock session to return None
