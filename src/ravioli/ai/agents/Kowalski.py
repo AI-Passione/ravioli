@@ -40,7 +40,7 @@ def run_transformations_tool(command: str = "build"):
     """
     return run_dbt_command(command)
 
-class RavioliAgent:
+class KowalskiAgent:
     def __init__(self, model_name: str = "qwen2.5:3b"):
         self.model_name = model_name
         self.llm = Ollama(model=model_name)
@@ -51,9 +51,9 @@ class RavioliAgent:
         """Loads Kowalski's soul and skills."""
         from pathlib import Path
         try:
-            # Relative to src/ravioli/ai/agents/ollama/backend/agent.py
-            # parents[3] is src/ravioli/ai/
-            base_path = Path(__file__).resolve().parents[3]
+            # Relative to src/ravioli/ai/agents/ravioli_agent.py
+            # parents[1] is src/ravioli/ai/
+            base_path = Path(__file__).resolve().parents[1]
             soul = (base_path / "agents" / "soul.md").read_text()
             skills = (base_path / "skills" / "skills.md").read_text()
             return f"{soul}\n\n## SPECIALIZED SKILLS\n{skills}"
@@ -241,7 +241,7 @@ def main():
     
     args = parser.parse_args()
     
-    agent = RavioliAgent(model_name=args.model)
+    agent = KowalskiAgent(model_name=args.model)
 
     if not agent.check_ollama_connection():
         print("\n\033[91mError: Could not connect to Ollama.\033[0m")
