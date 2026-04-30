@@ -36,7 +36,7 @@ async def test_upload_xlsx(client, session, mocker):
     
     # Mock AI Agent and Skill
     mocker.patch("ravioli.backend.api.v1.endpoints.data.KowalskiAgent")
-    mocker.patch("ravioli.backend.api.v1.endpoints.data.skill_analysis.generate_description", new_callable=AsyncMock, return_value="Mocked Description")
+    mocker.patch("ravioli.backend.api.v1.endpoints.data.skill_comm.generate_description", new_callable=AsyncMock, return_value="Mocked Description")
     
     # Mocking session behavior to avoid DB issues and populate required fields for validation
     import datetime
