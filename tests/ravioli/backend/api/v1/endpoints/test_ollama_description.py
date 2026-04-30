@@ -41,7 +41,7 @@ async def test_generate_file_description(client, session, mocker):
     
     # Mock AI Agent and Skill
     mocker.patch("ravioli.backend.api.v1.endpoints.data.KowalskiAgent")
-    mock_skill = mocker.patch("ravioli.backend.api.v1.endpoints.data.skill_analysis.generate_description", new_callable=AsyncMock, return_value="A generated description")
+    mock_skill = mocker.patch("ravioli.backend.api.v1.endpoints.data.skill_comm.generate_description", new_callable=AsyncMock, return_value="A generated description")
     
     response = client.post(f"/api/v1/data/files/{file_id}/generate-description")
     

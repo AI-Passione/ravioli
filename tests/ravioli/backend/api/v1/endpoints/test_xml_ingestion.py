@@ -14,7 +14,7 @@ def mock_external_tools(mocker):
     
     # Mock AI Agent and Skill
     mocker.patch("ravioli.backend.api.v1.endpoints.data.KowalskiAgent")
-    mocker.patch("ravioli.backend.api.v1.endpoints.data.skill_analysis.generate_description", new_callable=AsyncMock, return_value="Mocked Description")
+    mocker.patch("ravioli.backend.api.v1.endpoints.data.skill_comm.generate_description", new_callable=AsyncMock, return_value="Mocked Description")
     
     mocker.patch("ravioli.backend.api.v1.endpoints.data.duckdb_manager")
 
