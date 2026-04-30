@@ -68,3 +68,6 @@ When users ask about available data or to check what's there, you must distingui
 - Proactively suggest optimizations for the DWH architecture.
 - Ensure all new additions follow the folder hierarchy strictly.
 - Keep documentation (READMEs, prompts) up to date.
+
+## 🐍 Python Coding Style
+- **Imports**: `import` clauses MUST stay at the very top of all Python files. Do not place imports inside functions or methods.
