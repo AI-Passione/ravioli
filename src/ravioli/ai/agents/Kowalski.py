@@ -133,16 +133,9 @@ Question: "{question}"
             yield f"> [!ERROR]\n> **Neural Link Failed**: {str(e)}"
             yield {"answer_type": "text", "error": str(e)}
 
-    def check_ollama_connection(self):
+    async def check_ollama_connection(self):
         """Checks if Ollama is reachable."""
-        import httpx
-        try:
-            url = f"{self._ollama_client.base_url.rstrip('/')}/api/tags"
-            with httpx.Client(timeout=5.0) as client:
-                response = client.get(url)
-                return response.status_code == 200
-        except Exception:
-            return False
+        return await self._ollama_client.check_connection()
 
     def _get_sql_agent(self, db):
         """Creates an SQL agent for the ReAct loop."""
@@ -184,7 +177,7 @@ Question: "{question}"
         except Exception as e:
             return f"Error: {e}"
 
-def main():
+async def main():
     parser = argparse.ArgumentParser(description="Ravioli AI Client")
     parser.add_argument("--prompt", type=str, help="The prompt to send to the AI")
     parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
@@ -194,7 +187,7 @@ def main():
     
     agent = KowalskiAgent(model_name=args.model)
 
-    if not agent.check_ollama_connection():
+    if not await agent.check_ollama_connection():
         print("\n\033[91mError: Could not connect to Ollama.\033[0m")
         print("Please ensure Ollama is running by executing: \033[1mollama serve\033[0m")
         print("Keep that terminal open and run this agent in a new terminal.\n")
@@ -214,4 +207,5 @@ def main():
         print("Please provide a prompt using --prompt or run with --interactive")
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())

@@ -98,6 +98,21 @@ class OllamaClient:
     def mode(self) -> str:
         return self._config.get("mode", "default")
 
+    async def check_connection(self) -> bool:
+        """Verifies if the Ollama node is reachable and responding."""
+        url = f"{self.base_url.rstrip('/')}/api/tags"
+        headers = {}
+        if self.mode == "cloud" and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(url, headers=headers)
+                return response.status_code == 200
+        except Exception as e:
+            logger.warning(f"OllamaClient: Connection check failed: {e}")
+            return False
+
     async def unload_model(self, model: str = None):
         """Explicitly unloads a model from RAM."""
         target = model or self.model
