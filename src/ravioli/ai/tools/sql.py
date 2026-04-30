@@ -160,3 +160,19 @@ WORKFLOW:
         max_iterations=10,
         max_execution_time=60,
     )
+
+def get_query_database_tool(executor):
+    """Wraps an SQL executor into a standard LangChain tool."""
+    from langchain.tools import Tool
+    
+    def run_query(q):
+        result = executor.invoke({"input": q})
+        if isinstance(result, dict):
+            return result.get("output", str(result))
+        return str(result)
+        
+    return Tool(
+        name="query_database_tool",
+        description="Useful for when you need to answer questions about data in the Data Warehouse. Input should be a natural language question about the data.",
+        func=run_query
+    )

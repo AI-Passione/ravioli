@@ -15,7 +15,7 @@ from ravioli.backend.core.config import settings
 from ravioli.backend.core.ollama import OllamaClient, KOWALSKI_PERSONA
 
 # Tools Imports
-from ravioli.ai.tools.sql import create_sql_agent_executor
+from ravioli.ai.tools.sql import create_sql_agent_executor, get_query_database_tool
 from ravioli.ai.tools.operations import ingest_data_tool, run_transformations_tool
 from ravioli.ai.tools import generate_sql as tool_generate_sql
 from ravioli.ai.tools import create_viz_payload as tool_create_viz_payload
@@ -155,18 +155,7 @@ Question: "{question}"
         db = SQLDatabase.from_uri(db_uri)
 
         sql_agent_executor = self._get_sql_agent(db)
-
-        @tool
-        def query_database_tool(query_description: str):
-            """Useful for when you need to answer questions about data in the Data Warehouse. 
-            Input should be a natural language question about the data."""
-            try:
-                result = sql_agent_executor.invoke({"input": query_description})
-                if isinstance(result, dict):
-                    return result.get("output", str(result))
-                return str(result)
-            except Exception as e:
-                return f"Error querying database: {str(e)}"
+        query_database_tool = get_query_database_tool(sql_agent_executor)
 
         tools = [ingest_data_tool, run_transformations_tool, query_database_tool]
 
