@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 class KowalskiSQLAgent:
     """
     A surgical SQL agent for Kowalski.
-    Uses duckdb-nsql to generate DuckDB-compatible SQL from natural language.
+    Uses duckdb-nsql for SQL generation and gemma3:4b for reasoning/formatting.
+    Implements aggressive RAM optimization by swapping models.
     """
 
     def __init__(self, db_session=None):
@@ -21,17 +22,8 @@ class KowalskiSQLAgent:
         self.model_sql = "duckdb-nsql"
         self.model_persona = "gemma3:4b"
 
-    async def _generate(self, prompt: str, model: str, temperature: float = 0.1) -> str:
+    async def _generate(self, prompt: str, model: str, temperature: float = 0.1, keep_alive: Any = "5m") -> str:
         url = f"{self.ollama_host.rstrip('/')}/api/generate"
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": temperature,
-                "num_predict": 1000
-            }
-        }
         
         # Handle Docker-to-Host communication for Ollama
         if "localhost" in url or "127.0.0.1" in url:
@@ -39,15 +31,45 @@ class KowalskiSQLAgent:
             if os.path.exists("/.dockerenv"):
                 url = url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal")
 
+        logger.info(f"Ollama: [RAM OPTIMIZATION] Loading {model} (keep_alive={keep_alive})...")
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "keep_alive": keep_alive,
+            "options": {
+                "temperature": temperature,
+                "num_predict": 1000
+            }
+        }
+        
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
+            logger.info(f"Ollama: [SUCCESS] Task completed by {model}")
             return response.json().get("response", "").strip()
+
+    async def unload_model(self, model: str):
+        """Explicitly unloads a model from RAM."""
+        logger.info(f"Ollama: [RAM OPTIMIZATION] Requesting UNLOAD for model: {model}")
+        url = f"{self.ollama_host.rstrip('/')}/api/generate"
+        
+        if "localhost" in url or "127.0.0.1" in url:
+            import os
+            if os.path.exists("/.dockerenv"):
+                url = url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal")
+
+        payload = {"model": model, "keep_alive": 0}
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(url, json=payload)
+            logger.info(f"Ollama: [RAM OPTIMIZATION] {model} has been evicted from RAM.")
+        except Exception as e:
+            logger.warning(f"Ollama: [RAM OPTIMIZATION] Failed to unload {model}: {e}")
 
     def _get_schema(self, table_name: str, schema_name: str = "main") -> str:
         """Extracts the CREATE TABLE statement for context."""
         try:
-            # DuckDB specific way to get schema
             sql = f'SHOW CREATE TABLE "{schema_name}"."{table_name}"'
             result = duckdb_manager.connection.execute(sql).fetchone()
             if result:
@@ -70,7 +92,13 @@ Your query should be compatible with DuckDB. Use the provided schema.
 ### Response (use duckdb):
 """
         try:
-            response = await self._generate(prompt, self.model_sql)
+            # RAM Swap: Unload persona model before loading SQL brain
+            await self.unload_model(self.model_persona)
+            
+            # Generate SQL with immediate unload
+            logger.info("Ollama: [BRAIN] Generating surgical SQL via duckdb-nsql...")
+            response = await self._generate(prompt, self.model_sql, keep_alive=0)
+            
             # Extract SQL from potential markdown or prefixes
             sql = response.strip()
             if "```sql" in sql:
@@ -78,8 +106,8 @@ Your query should be compatible with DuckDB. Use the provided schema.
             elif "```" in sql:
                 sql = re.search(r"```\s*(.*?)\s*```", sql, re.DOTALL).group(1)
             
-            # Clean up trailing semicolons or prefix words
             sql = sql.replace("SELECT", "SELECT").strip("; ")
+            logger.info(f"Ollama: [BRAIN] SQL generated successfully: {sql}")
             return sql
         except Exception as e:
             logger.error(f"SQL Generation failed: {e}")
@@ -90,18 +118,19 @@ Your query should be compatible with DuckDB. Use the provided schema.
         Executes SQL and uses LLM to decide on best chart type and formatting.
         """
         try:
+            # Load Persona model for formatting/decision
+            logger.info("Ollama: [VOICE] Kowalski is analyzing query results for visualization...")
+            
             df = duckdb_manager.connection.execute(sql).fetchdf()
             if df.empty:
                 return {"type": "error", "message": "Query returned no data."}
 
-            # Convert types for JSON serialization
             for col in df.select_dtypes(include=['datetime64', 'datetimetz']).columns:
                 df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
             
             data_sample = df.head(5).to_dict(orient='records')
             columns = df.columns.tolist()
 
-            # Ask gemma3 to decide on the best chart type
             prompt = f"""You are Kowalski, a data visualization expert.
 Based on this data sample and the user's question, decide on the BEST Chart.js configuration.
 Question: "{original_question}"
@@ -119,7 +148,6 @@ JSON:"""
             viz_config_raw = await self._generate(prompt, self.model_persona, temperature=0.1)
             match = re.search(r'\{.*\}', viz_config_raw, re.DOTALL)
             if not match:
-                # Fallback to simple bar chart
                 config = {
                     "chart_type": "bar",
                     "labels_column": columns[0],
@@ -129,16 +157,21 @@ JSON:"""
             else:
                 config = json.loads(match.group(0))
 
-            # Build the Chart.js compatible payload
             labels = df[config["labels_column"]].tolist()
             datasets = []
             
-            # AI Passione Palette
+            # AI Passione Palette (Premium Neons/Teals)
             colors = [
-                "rgba(0, 150, 136, 0.8)",  # Teal
-                "rgba(33, 150, 243, 0.8)",  # Blue
-                "rgba(156, 39, 176, 0.8)",  # Purple
-                "rgba(255, 152, 0, 0.8)",   # Orange
+                "rgba(0, 245, 212, 0.6)",  # Neon Teal
+                "rgba(18, 113, 255, 0.6)",  # Electric Blue
+                "rgba(157, 78, 221, 0.6)",  # Deep Purple
+                "rgba(255, 0, 110, 0.6)",   # Magenta
+            ]
+            border_colors = [
+                "rgba(0, 245, 212, 1)",
+                "rgba(18, 113, 255, 1)",
+                "rgba(157, 78, 221, 1)",
+                "rgba(255, 0, 110, 1)",
             ]
 
             for i, col in enumerate(config["values_columns"]):
@@ -146,10 +179,13 @@ JSON:"""
                     "label": col,
                     "data": df[col].tolist(),
                     "backgroundColor": colors[i % len(colors)],
-                    "borderColor": colors[i % len(colors)].replace("0.8", "1.0"),
-                    "borderWidth": 1
+                    "borderColor": border_colors[i % len(colors)],
+                    "borderWidth": 2,
+                    "borderRadius": 8,
+                    "tension": 0.4 
                 })
 
+            logger.info(f"Ollama: [VOICE] Visualization strategy locked: {config['chart_type']} ({config['title']})")
             return {
                 "type": "chart",
                 "chart_type": config["chart_type"],
@@ -165,14 +201,15 @@ JSON:"""
 
     async def process_question(self, question: str, table_name: str, schema_name: str = "main") -> Dict[str, Any]:
         """High-level entry point to process a question and get either text or viz."""
-        # 1. Decide if it's a visualization question
         prompt = f"""Is this a question that requires a data visualization (chart, plot, graph)? 
 Question: "{question}"
 Respond ONLY with 'YES' or 'NO'."""
         
+        logger.info(f"Ollama: [ANALYSIS] Analyzing Operator query: '{question}'")
         decision = await self._generate(prompt, self.model_persona)
         
         if "YES" in decision.upper():
+            logger.info("Ollama: [ANALYSIS] Visualization required. Engaging SQL Brain.")
             sql = await self.generate_sql(question, table_name, schema_name)
             if sql:
                 viz_payload = await self.create_viz_payload(sql, question)
@@ -182,4 +219,5 @@ Respond ONLY with 'YES' or 'NO'."""
                     "viz": viz_payload
                 }
         
+        logger.info("Ollama: [ANALYSIS] Standard textual response sufficient.")
         return {"answer_type": "text"}

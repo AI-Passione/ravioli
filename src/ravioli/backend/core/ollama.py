@@ -87,6 +87,19 @@ class OllamaClient:
     def mode(self) -> str:
         return self._config.get("mode", "default")
 
+    async def unload_model(self, model: str = None):
+        """Explicitly unloads a model from RAM."""
+        target = model or self.model
+        logger.info(f"OllamaClient: [RAM OPTIMIZATION] Requesting UNLOAD for model: {target}")
+        url = f"{self.base_url.rstrip('/')}/api/generate"
+        payload = {"model": target, "keep_alive": 0}
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(url, json=payload)
+            logger.info(f"OllamaClient: [RAM OPTIMIZATION] Unload command sent for {target}")
+        except Exception as e:
+            logger.warning(f"OllamaClient: [RAM OPTIMIZATION] Unload failed for {target}: {e}")
+
     async def generate_description(self, filename: str, sample_data: str, context: str = None) -> str:
         """
         Generate a professional, concise description for a data asset based on its name, content, and optional context.
@@ -215,6 +228,7 @@ JSON:"""
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            "keep_alive": "5m", # Default to 5 mins
             "options": {
                 "temperature": temperature,
                 "num_predict": num_predict
@@ -511,6 +525,7 @@ Answer:"""
             "model": self.model,
             "prompt": prompt,
             "stream": True,
+            "keep_alive": "5m",
             "options": {
                 "temperature": 0.4,
                 "num_predict": 1000
