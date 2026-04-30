@@ -70,7 +70,7 @@ async def test_generate_success(mock_db, mocker):
     mock_httpx = mocker.patch("httpx.AsyncClient.post", new_callable=AsyncMock)
     mock_httpx.return_value = mock_response
     
-    res = await client.generate("test prompt")
+    res = await client.generate("test prompt", "Test Task")
     assert res == "AI output"
     
     # Verify headers (Auth should be present in cloud mode)

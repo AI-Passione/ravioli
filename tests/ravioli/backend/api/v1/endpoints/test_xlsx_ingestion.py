@@ -88,9 +88,9 @@ async def test_quick_insight_xlsx(client, session, mocker):
     df.to_excel(xlsx_buffer, index=False)
     xlsx_buffer.seek(0)
     
-    # Mock AI Agent and Skill
+    # Mock AI Agent and Local Skill Function
     mocker.patch("ravioli.backend.api.v1.endpoints.analyses.KowalskiAgent")
-    mocker.patch("ravioli.backend.api.v1.endpoints.analyses.skill_analysis.generate_summary", new_callable=AsyncMock, return_value=("Mock Summary", ["Question 1?"]))
+    mocker.patch("ravioli.backend.api.v1.endpoints.analyses.generate_summary", new_callable=AsyncMock, return_value=("Mock Summary", ["Question 1?"]))
     mocker.patch("ravioli.backend.api.v1.endpoints.analyses.extract_and_store_insights")
     
     # Mocking Analysis instantiation to provide an ID
