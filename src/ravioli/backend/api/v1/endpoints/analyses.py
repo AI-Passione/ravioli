@@ -313,7 +313,6 @@ async def stream_question(
             role = "Operator" if log.log_type == "user_query" else "Kowalski"
             context_str += f"{role}: {log.content}\n"
 
-        client = OllamaClient(db)
         sql_agent = KowalskiAgent(db)
         full_response = ""
         
@@ -344,7 +343,7 @@ async def stream_question(
                         break
 
             # 2. Stream the textual answer from Gemma (persona)
-            async for token in client.stream_answer(filename, summary, context_str, question):
+            async for token in sql_agent.stream_answer(filename, summary, context_str, question):
                 full_response += token
                 yield f"data: {token}\n\n"
             

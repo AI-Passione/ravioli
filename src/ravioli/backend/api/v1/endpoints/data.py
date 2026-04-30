@@ -21,7 +21,7 @@ from ravioli.backend.data.olap.ingestion.ingestor import WFSClient
 from ravioli.backend.data.olap.ingestion.utils import pii_scanner, create_ravioli_pipeline
 
 import logging
-from ravioli.backend.core.ollama import OllamaClient
+from ravioli.ai.agents.Kowalski import KowalskiAgent
 
 logger = logging.getLogger(__name__)
 
@@ -155,10 +155,10 @@ async def upload_file(
                 
                 # Auto-description for CSV
                 try:
-                    ollama_client = OllamaClient(db)
+                    kowalski_agent = KowalskiAgent(db)
                     full_table_name = f'"s_manual"."{table_name}"'
                     df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 5').fetchdf()
-                    db_source.description = await ollama_client.generate_description(db_source.original_filename, df_sample.to_csv(index=False), context=context)
+                    db_source.description = await kowalski_agent.generate_description(db_source.original_filename, df_sample.to_csv(index=False), context=context)
                 except Exception as e:
                     logger.warning("Auto-description failed for CSV: %s", e)
             elif extension in ['.xml', '.gpx']:
@@ -182,11 +182,11 @@ async def upload_file(
                     
                     # AI Description for primary
                     try:
-                        ollama_client = OllamaClient(db)
+                        kowalski_agent = KowalskiAgent(db)
                         # For XML/GPX, we read the first 2000 chars as the "sample"
                         with file_path.open("r", errors="ignore") as f:
                             sample_text = f.read(2000)
-                        db_source.description = await ollama_client.generate_description(db_source.original_filename, sample_text, context=context)
+                        db_source.description = await kowalski_agent.generate_description(db_source.original_filename, sample_text, context=context)
                     except Exception as e:
                         logger.warning("Auto-description failed for XML/GPX: %s", e)
                         
@@ -223,14 +223,14 @@ async def upload_file(
                         
                         # AI Description for other
                         try:
-                            other_source.description = await ollama_client.generate_description(other_source.original_filename, sample_text, context=context)
+                            other_source.description = await kowalski_agent.generate_description(other_source.original_filename, sample_text, context=context)
                         except Exception as e:
                             logger.warning("Auto-description failed for table %s: %s", other["table_name"], e)
                             
                         db.add(other_source)
             else: # .xlsx
-                ollama_client = OllamaClient(db)
-                xlsx_results = await data_ingestor.ingest_xlsx(file_path, table_name, schema="s_manual", ollama_client=ollama_client)
+                kowalski_agent = KowalskiAgent(db)
+                xlsx_results = await data_ingestor.ingest_xlsx(file_path, table_name, schema="s_manual", kowalski_agent=kowalski_agent)
                 
                 valid_results = [r for r in xlsx_results if r["status"] == "completed"]
                 
@@ -246,12 +246,11 @@ async def upload_file(
                     db_source.original_filename = f"{file.filename} [{first['sheet_name']}]"
                     db_source.status = "completed"
                     
-                    # Auto-description for primary
                     try:
-                        ollama_client = OllamaClient(db)
+                        kowalski_agent = KowalskiAgent(db)
                         full_table_name = f'"s_manual"."{db_source.table_name}"'
                         df_sample = duckdb_manager.connection.execute(f'SELECT * FROM {full_table_name} LIMIT 5').fetchdf()
-                        db_source.description = await ollama_client.generate_description(db_source.original_filename, df_sample.to_csv(index=False), context=context)
+                        db_source.description = await kowalski_agent.generate_description(db_source.original_filename, df_sample.to_csv(index=False), context=context)
                     except Exception as e:
                         logger.warning("Auto-description failed for primary sheet: %s", e)
                     

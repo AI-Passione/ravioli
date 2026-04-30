@@ -43,9 +43,9 @@ async def get_insights_summary(days: int = 7, db: Session = Depends(get_db)):
     )
     contents = [i.content for i in insights]
 
-    from ravioli.backend.core.ollama import OllamaClient
-    client = OllamaClient(db)
-    summary = await client.generate_insights_summary(contents, days)
+    from ravioli.ai.agents.Kowalski import KowalskiAgent
+    agent = KowalskiAgent(db)
+    summary = await agent.generate_insights_summary(contents, days)
     return {"summary": summary, "insight_count": len(contents), "days": days}
 
 
