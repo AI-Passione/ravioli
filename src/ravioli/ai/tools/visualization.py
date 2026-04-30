@@ -1,5 +1,6 @@
 import json
 import logging
+import pandas as pd
 from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 from langchain_core.prompts import PromptTemplate
@@ -30,7 +31,6 @@ async def create_viz_payload(
         for col in df.select_dtypes(include=['datetime64', 'datetimetz']).columns:
             df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
             
-        import pandas as pd
         df = df.astype(object).where(pd.notna(df), None)
         
         parser = JsonOutputParser(pydantic_object=VizStrategy)
