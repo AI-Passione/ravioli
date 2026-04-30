@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Any, Optional, AsyncGenerator, Union
 from pydantic import BaseModel, Field
-from ravioli.backend.core.ollama import OllamaClient
+from ravioli.backend.core.ollama import OllamaClient, KOWALSKI_PERSONA
 
 # LangChain Imports
 from langchain_core.prompts import PromptTemplate
@@ -38,9 +38,12 @@ class KowalskiSQLAgent:
         Supports LangChain parsers for structured output.
         """
         try:
+            # Inject Kowalski's persona and specialized skills into every request
+            full_prompt = f"{KOWALSKI_PERSONA}\n\nTask: {prompt_text}"
+            
             # Call the battle-tested _generate from ollama.py
             response_text = await self._ollama_client._generate(
-                prompt=prompt_text,
+                prompt=full_prompt,
                 task_name=task_name,
                 model=model,
                 temperature=temperature,

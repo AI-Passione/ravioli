@@ -44,7 +44,21 @@ class RavioliAgent:
     def __init__(self, model_name: str = "qwen2.5:3b"):
         self.model_name = model_name
         self.llm = Ollama(model=model_name)
+        self.persona = self._load_persona()
         self.agent = self._setup_agent()
+
+    def _load_persona(self) -> str:
+        """Loads Kowalski's soul and skills."""
+        from pathlib import Path
+        try:
+            # Relative to src/ravioli/ai/agents/ollama/backend/agent.py
+            # parents[3] is src/ravioli/ai/
+            base_path = Path(__file__).resolve().parents[3]
+            soul = (base_path / "agents" / "soul.md").read_text()
+            skills = (base_path / "skills" / "skills.md").read_text()
+            return f"{soul}\n\n## SPECIALIZED SKILLS\n{skills}"
+        except Exception:
+            return "You are Kowalski, a clinical data analyst."
 
     def check_ollama_connection(self):
         """Checks if Ollama is reachable."""
@@ -85,7 +99,9 @@ class RavioliAgent:
             return query.strip("` \n\t;")
 
         # Custom prefix to teach the agent about the data warehouse schema structure
-        sql_prefix = """You are an agent designed to interact with a SQL database.
+        sql_prefix = f"""{self.persona}
+        
+You are an agent designed to interact with a SQL database.
 All relevant schemas (marts, s_*) are in your search path.
 
 DATA CATEGORIZATION:

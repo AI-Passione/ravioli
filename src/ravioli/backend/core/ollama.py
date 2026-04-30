@@ -14,17 +14,28 @@ import logging
 logger = logging.getLogger(__name__)
 
 def _load_kowalski_persona() -> str:
-    """Loads the Kowalski persona dossier from the AI agents directory."""
-    try:
-        # Resolve path to src/ravioli/ai/agents/Kowalski.md
-        persona_path = Path(__file__).resolve().parents[3] / "ai" / "agents" / "Kowalski.md"
-        if persona_path.exists():
-            return persona_path.read_text()
-    except Exception as e:
-        logger.warning(f"OllamaClient: [WARNING] Failed to load Kowalski dossier: {e}")
+    """Loads the Kowalski persona dossier and specialized skills."""
+    persona = "You are Kowalski, a lead analytics specialist. Clinical and precise."
+    skills = ""
     
-    # Minimal fallback if file is missing
-    return "You are Kowalski, a lead analytics specialist. Clinical and precise. Punctuate with varied Polish analytical confirmations (Tak, Zrozumiałem, Oczywiście, etc.) to signal clinical status."
+    try:
+        # Resolve path to src/ravioli/ai/
+        base_ai_path = Path(__file__).resolve().parents[2] / "ai"
+        
+        # Resolve path to src/ravioli/ai/agents/soul.md
+        persona_path = base_ai_path / "agents" / "soul.md"
+        if persona_path.exists():
+            persona = persona_path.read_text()
+            
+        # Resolve path to src/ravioli/ai/skills/skills.md
+        skills_path = base_ai_path / "skills" / "skills.md"
+        if skills_path.exists():
+            skills = skills_path.read_text()
+    except Exception as e:
+        logger.warning(f"OllamaClient: [WARNING] Failed to load dossier/skills: {e}")
+    
+    combined = f"{persona}\n\n## SPECIALIZED SKILLS\n{skills}" if skills else persona
+    return combined
 
 KOWALSKI_PERSONA = _load_kowalski_persona()
 
