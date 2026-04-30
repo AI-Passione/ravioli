@@ -27,6 +27,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide": "^1.8.0",
-    "markdown-it": "^14.1.1"
+    "markdown-it": "^14.1.1",
+    "chart.js": "^4.4.0"
   }
 }
