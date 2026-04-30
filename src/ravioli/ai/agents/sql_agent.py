@@ -4,7 +4,8 @@ import re
 import httpx
 import os
 import pandas as pd
-from typing import Dict, Any, List, Optional, AsyncGenerator
+from typing import Dict, Any, List, Optional, AsyncGenerator, Union
+from pydantic import BaseModel, Field
 from ravioli.backend.core.config import settings
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
 from ravioli.backend.core.models import SystemSetting
@@ -13,15 +14,26 @@ from ravioli.backend.core.encryption import decrypt_value
 # LangChain Imports
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 
 logger = logging.getLogger(__name__)
+
+class VizStrategy(BaseModel):
+    """Structured output for chart configuration."""
+    chart_type: str = Field(description="The type of chart: 'bar', 'line', 'pie', or 'scatter'")
+    labels_column: str = Field(description="The column name to use for the X-axis labels")
+    values_columns: List[str] = Field(description="List of column names to use for the Y-axis values")
+    title: str = Field(description="A clinical title for the chart")
+
+class AnalysisDecision(BaseModel):
+    """Decision on whether visualization is needed."""
+    requires_viz: bool = Field(description="Whether the question requires a data visualization")
 
 class KowalskiSQLAgent:
     """
     A surgical SQL agent for Kowalski.
-    Uses ChatOllama (LangChain) for SQL generation and reasoning.
-    Implements aggressive RAM optimization by swapping models.
+    Uses ChatOllama (LangChain) and LCEL for simplified, declarative logic.
+    Centralizes invocations in _generate for testability and lifecycle control.
     """
 
     def __init__(self, db_session=None):
@@ -31,7 +43,7 @@ class KowalskiSQLAgent:
         self.model_persona = "gemma3:4b"
 
     def _load_config(self) -> Dict[str, Any]:
-        """Load Ollama configuration from the database, falling back to app settings."""
+        """Load Ollama configuration from the database."""
         if self.db_session:
             try:
                 setting = self.db_session.query(SystemSetting).filter(SystemSetting.key == "ollama").first()
@@ -65,7 +77,6 @@ class KowalskiSQLAgent:
     def ollama_host(self) -> str:
         if self.mode == "cloud":
             return "https://api.ollama.com"
-            
         url = self._config.get("base_url", settings.ollama_host)
         if "localhost" in url or "127.0.0.1" in url or "ollama" in url:
             if os.path.exists("/.dockerenv"):
@@ -73,77 +84,67 @@ class KowalskiSQLAgent:
         return url
 
     def _get_llm(self, model: str, temperature: float = 0.1, keep_alive: Any = "5m"):
-        """Creates a LangChain ChatOllama instance with current config."""
+        """Creates a LangChain ChatOllama instance."""
         return ChatOllama(
             model=model,
             base_url=self.ollama_host,
             temperature=temperature,
             keep_alive=keep_alive if self.mode != "cloud" else "5m",
-            # Pass API key via headers for cloud mode
             headers={"Authorization": f"Bearer {self.api_key}"} if self.mode == "cloud" and self.api_key else {}
         )
 
-    async def _generate(self, prompt_text: str, model: str, temperature: float = 0.1, keep_alive: Any = "5m") -> str:
-        """Helper to maintain compatibility with internal generation logic and tests."""
+    async def _generate(self, prompt_text: str, model: str, temperature: float = 0.1, keep_alive: Any = "5m", parser: Any = None) -> Union[str, Dict]:
+        """Internal helper for LLM generation. Supports both string and JSON parsing."""
         llm = self._get_llm(model, temperature=temperature, keep_alive=keep_alive)
-        response = await llm.ainvoke(prompt_text)
-        return response.content.strip()
+        if parser:
+            chain = llm | parser
+        else:
+            chain = llm | StrOutputParser()
+        
+        return await chain.ainvoke(prompt_text)
 
     async def unload_model(self, model: str):
-        """Explicitly unloads a model from RAM. SKIPPED in Cloud mode."""
-        if self.mode == "cloud":
-            return
-            
+        """Explicitly unloads a model from RAM."""
+        if self.mode == "cloud": return
         logger.info(f"Ollama: [RAM OPTIMIZATION] Requesting UNLOAD for model: {model}")
         url = f"{self.ollama_host.rstrip('/')}/api/generate"
-        
-        payload = {"model": model, "keep_alive": 0}
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                await client.post(url, json=payload)
-            logger.info(f"Ollama: [RAM OPTIMIZATION] {model} has been evicted from RAM.")
+                await client.post(url, json={"model": model, "keep_alive": 0})
+            logger.info(f"Ollama: [RAM OPTIMIZATION] {model} has been evicted.")
         except Exception as e:
-            logger.warning(f"Ollama: [RAM OPTIMIZATION] Failed to unload {model}: {e}")
+            logger.warning(f"Ollama: [RAM OPTIMIZATION] Unload failed: {e}")
 
     def _get_schema(self, table_name: str, schema_name: str = "main") -> str:
-        """Extracts the CREATE TABLE statement for context."""
+        """Extracts table schema for context."""
         try:
             sql = "SELECT sql FROM duckdb_tables WHERE schema_name = ? AND table_name = ?"
             result = duckdb_manager.connection.execute(sql, [schema_name, table_name]).fetchone()
-            if result and result[0]:
-                return result[0]
-            
+            if result and result[0]: return result[0]
             cols = duckdb_manager.connection.execute(f'DESCRIBE "{schema_name}"."{table_name}"').fetchall()
             return f"Table {table_name} columns: {', '.join([c[0] for c in cols])}"
         except Exception as e:
-            logger.error(f"Error getting schema for {table_name}: {e}")
-            return f"Error retrieving schema for {table_name}."
+            logger.error(f"Error getting schema: {e}")
+            return "Error retrieving schema."
 
     async def generate_sql(self, question: str, table_name: str, schema_name: str = "main") -> Optional[str]:
-        """Generates SQL using LangChain and duckdb-nsql."""
+        """Generates SQL with aggressive cleaning."""
         schema = self._get_schema(table_name, schema_name)
-        
-        template = """### Instruction:
+        prompt = PromptTemplate.from_template("""### Instruction:
 Your query should be compatible with DuckDB. Use the provided schema.
 ### Schema:
 {schema}
 ### Question:
 {question}
 ### Response (use duckdb):
-"""
-        prompt = PromptTemplate.from_template(template)
+""")
         
-        target_model = self.model_sql
-        if self.mode == "cloud":
-            target_model = self._config.get("default_model", self.model_persona)
+        target_model = self.model_sql if self.mode != "cloud" else self._config.get("default_model", self.model_persona)
 
         try:
-            if self.mode != "cloud":
-                await self.unload_model(self.model_persona)
-            
+            if self.mode != "cloud": await self.unload_model(self.model_persona)
             logger.info(f"Ollama: [BRAIN] Generating surgical SQL via {target_model}...")
             
-            # Using _generate to maintain test compatibility and clean invocation
             response = await self._generate(
                 prompt.format(schema=schema, question=question),
                 target_model,
@@ -151,26 +152,22 @@ Your query should be compatible with DuckDB. Use the provided schema.
             )
             
             sql = response.strip()
-            # Handle markdown wrapping
-            if "```sql" in sql:
-                sql = re.search(r"```sql\s*(.*?)\s*```", sql, re.DOTALL).group(1)
-            elif "```" in sql:
-                sql = re.search(r"```\s*(.*?)\s*```", sql, re.DOTALL).group(1)
+            # Preamble Cleaning
+            if "```" in sql:
+                match = re.search(r"```(?:sql)?\s*(.*?)\s*```", sql, re.DOTALL)
+                if match: sql = match.group(1).strip()
             
-            # Remove hallucinations like "duckdb" or preamble text
-            sql_keywords = r"(SELECT|WITH|SHOW|DESCRIBE|CREATE|DROP|INSERT|UPDATE|DELETE|ALTER)"
-            select_match = re.search(rf"({sql_keywords}\s+.*)", sql, re.IGNORECASE | re.DOTALL)
-            if select_match:
-                sql = select_match.group(1).strip()
+            keywords = r"(SELECT|WITH|SHOW|DESCRIBE|CREATE|DROP|INSERT|UPDATE|DELETE|ALTER)"
+            match = re.search(rf"({keywords}\s+.*)", sql, re.IGNORECASE | re.DOTALL)
+            if match: sql = match.group(1).strip()
             
-            for kw in ["SELECT", "WITH", "SHOW", "DESCRIBE"]:
+            for kw in ["SELECT", "WITH", "SHOW"]:
                 idx = sql.upper().find(kw)
-                if idx != -1:
+                if idx != -1: 
                     sql = sql[idx:].strip()
                     break
 
             sql = sql.split(';')[0].strip()
-            
             logger.info(f"Ollama: [BRAIN] SQL Final: {sql}")
             return sql
         except Exception as e:
@@ -178,57 +175,37 @@ Your query should be compatible with DuckDB. Use the provided schema.
             return None
 
     async def create_viz_payload(self, sql: str, original_question: str) -> Dict[str, Any]:
-        """
-        Executes SQL and uses LangChain to decide on best chart type and formatting.
-        """
+        """Uses JsonOutputParser for robust strategy assembly."""
         try:
-            logger.info("Ollama: [VOICE] Kowalski is analyzing query results for visualization...")
-            
+            logger.info("Ollama: [VOICE] Kowalski is analyzing query results...")
             df = duckdb_manager.connection.execute(sql).fetchdf()
-            if df.empty:
-                return {"type": "error", "message": "Query returned no data."}
+            if df.empty: return {"type": "error", "message": "Query returned no data."}
 
             for col in df.select_dtypes(include=['datetime64', 'datetimetz']).columns:
                 df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
             
-            data_sample = df.head(5).to_dict(orient='records')
-            columns = df.columns.tolist()
-
-            template = """You are Kowalski, a data visualization expert.
-Based on this data sample and the user's question, decide on the BEST Chart.js configuration.
+            parser = JsonOutputParser(pydantic_object=VizStrategy)
+            prompt = PromptTemplate.from_template("""You are Kowalski, a data visualization expert.
 Question: "{question}"
 Columns: {columns}
 Sample Data: {sample_data}
 
-Respond ONLY with a JSON object containing:
-- "chart_type": "bar", "line", "pie", or "scatter"
-- "labels_column": The column name for X-axis
-- "values_columns": List of column names for Y-axis
-- "title": A clinical title for the chart
-
-JSON:"""
-            prompt = PromptTemplate.from_template(template)
+{format_instructions}
+""")
             
-            viz_config_raw = await self._generate(
-                prompt.format(question=original_question, columns=columns, sample_data=json.dumps(data_sample)),
+            config = await self._generate(
+                prompt.format(
+                    question=original_question,
+                    columns=df.columns.tolist(),
+                    sample_data=json.dumps(df.head(5).to_dict(orient='records')),
+                    format_instructions=parser.get_format_instructions()
+                ),
                 self.model_persona,
-                temperature=0.1
+                temperature=0.1,
+                parser=parser
             )
 
-            match = re.search(r'\{.*\}', viz_config_raw, re.DOTALL)
-            if not match:
-                config = {
-                    "chart_type": "bar",
-                    "labels_column": columns[0],
-                    "values_columns": [columns[1]] if len(columns) > 1 else [],
-                    "title": "Data Visualization"
-                }
-            else:
-                config = json.loads(match.group(0))
-
-            labels = df[config["labels_column"]].tolist()
             datasets = []
-            
             colors = ["rgba(0, 245, 212, 0.6)", "rgba(18, 113, 255, 0.6)", "rgba(157, 78, 221, 0.6)", "rgba(255, 0, 110, 0.6)"]
             border_colors = ["rgba(0, 245, 212, 1)", "rgba(18, 113, 255, 1)", "rgba(157, 78, 221, 1)", "rgba(255, 0, 110, 1)"]
 
@@ -243,43 +220,35 @@ JSON:"""
                     "tension": 0.4 
                 })
 
-            logger.info(f"Ollama: [VOICE] Visualization strategy locked: {config['chart_type']} ({config['title']})")
+            logger.info(f"Ollama: [VOICE] Visualization strategy locked: {config['chart_type']}")
             return {
                 "type": "chart",
                 "chart_type": config["chart_type"],
                 "title": config["title"],
-                "data": {
-                    "labels": labels,
-                    "datasets": datasets
-                }
+                "data": {"labels": df[config["labels_column"]].tolist(), "datasets": datasets}
             }
         except Exception as e:
-            logger.error(f"Visualization payload creation failed: {e}")
+            logger.error(f"Visualization failed: {e}")
             return {"type": "error", "message": str(e)}
 
     async def process_question(self, question: str, table_name: str, schema_name: str = "main") -> AsyncGenerator[Any, None]:
-        """
-        High-level entry point to process a question and get either text or viz.
-        Yields strings (status updates) and finally a dict (result).
-        """
-        template = """Is this a question that requires a data visualization (chart, plot, graph)? 
+        """Decision engine using JsonOutputParser."""
+        parser = JsonOutputParser(pydantic_object=AnalysisDecision)
+        prompt = PromptTemplate.from_template("""Does this question require a chart or graph to answer?
 Question: "{question}"
-Respond ONLY with 'YES' or 'NO'."""
-        prompt = PromptTemplate.from_template(template)
-        llm = self._get_llm(self.model_persona)
-        chain = prompt | llm | StrOutputParser()
+{format_instructions}
+""")
         
         logger.info(f"Ollama: [ANALYSIS] Analyzing Operator query: '{question}'")
         try:
-            decision = await self._generate(
-                prompt.format(question=question),
-                self.model_persona
+            result = await self._generate(
+                prompt.format(question=question, format_instructions=parser.get_format_instructions()),
+                self.model_persona,
+                parser=parser
             )
             
-            if "YES" in decision.upper():
+            if result.get("requires_viz"):
                 yield "_[Kowalski is engaging the Statistical Brain for visualization...]_"
-                logger.info("Ollama: [ANALYSIS] Visualization required. Engaging SQL Brain.")
-                
                 yield "_[Generating surgical SQL query...]_"
                 sql = await self.generate_sql(question, table_name, schema_name)
                 
@@ -288,21 +257,15 @@ Respond ONLY with 'YES' or 'NO'."""
                     viz_payload = await self.create_viz_payload(sql, question)
                     
                     if viz_payload.get("type") == "error":
-                        logger.error(f"Visualization failed: {viz_payload.get('message')}")
-                        yield f"> [!WARNING]\n> **Visualization Bypass**: {viz_payload.get('message')}\n\nFalling back to textual analysis. Zrozumiałem."
+                        yield f"> [!WARNING]\n> **Visualization Bypass**: {viz_payload.get('message')}\n\nFalling back to textual analysis."
                     else:
-                        yield {
-                            "answer_type": "viz",
-                            "sql": sql,
-                            "viz": viz_payload
-                        }
+                        yield {"answer_type": "viz", "sql": sql, "viz": viz_payload}
                         return
                 else:
-                    yield f"> [!WARNING]\n> **Neural Synthesis Failed**: Could not translate the request into a valid query. Falling back to textual reasoning."
+                    yield f"> [!WARNING]\n> **Neural Synthesis Failed**: Valid query could not be constructed."
             
-            logger.info("Ollama: [ANALYSIS] Standard textual response sufficient.")
             yield {"answer_type": "text"}
         except Exception as e:
-            logger.error(f"Ollama: [ERROR] Process question failed: {e}")
+            logger.error(f"Process question failed: {e}")
             yield f"> [!ERROR]\n> **Neural Link Failed**: {str(e)}"
             yield {"answer_type": "text", "error": str(e)}

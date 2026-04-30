@@ -68,7 +68,7 @@ async def test_create_viz_payload_logic(agent):
         "title": "Test Chart"
     }
     
-    with patch.object(agent, "_generate", return_value=json.dumps(viz_config)):
+    with patch.object(agent, "_generate", return_value=viz_config):
         payload = await agent.create_viz_payload("SELECT * FROM test", "test question")
         
         assert payload["type"] == "chart"
@@ -79,7 +79,7 @@ async def test_create_viz_payload_logic(agent):
 @pytest.mark.anyio
 async def test_process_question_generator(agent):
     """Verify that process_question yields status updates before the result."""
-    with patch.object(agent, "_generate", return_value="YES"):
+    with patch.object(agent, "_generate", return_value={"requires_viz": True}):
         with patch.object(agent, "generate_sql", return_value="SELECT 1"):
             with patch.object(agent, "create_viz_payload", return_value={"type": "chart"}):
                 updates = []
