@@ -13,32 +13,11 @@ from langchain_community.llms import Ollama
 from langchain.agents import initialize_agent, Tool, AgentType
 from langchain.tools import tool
 from langchain_community.utilities import SQLDatabase
-from langchain_community.agent_toolkits import create_sql_agent
 
 from ravioli.backend.core.config import settings
-from ravioli.backend.data.olap.ingestion.base import CSVIngestor
-from ravioli.backend.core.dbt import run_dbt_command
+from ravioli.ai.tools.sql import create_sql_agent_executor
+from ravioli.ai.tools.operations import ingest_data_tool, run_transformations_tool
 
-@tool
-def ingest_data_tool(file_path: str):
-    """
-    Ingests a CSV file into the database. 
-    Input should be the full absolute path to the CSV file.
-    """
-    ingestor = CSVIngestor(schema_name="staging", table_name="raw_ingestion")
-    try:
-        ingestor.run(file_path)
-        return f"Successfully ingested {file_path}"
-    except Exception as e:
-        return f"Error: {e}"
-
-@tool
-def run_transformations_tool(command: str = "build"):
-    """
-    Runs dbt transformations to process data. 
-    Input can be 'run' or 'build'. Default is 'build'.
-    """
-    return run_dbt_command(command)
 
 class KowalskiAgent:
     def __init__(self, model_name: str = "qwen2.5:3b"):
@@ -73,99 +52,7 @@ class KowalskiAgent:
 
     def _get_sql_agent(self, db):
         """Creates an SQL agent for querying the database."""
-        # Custom error handler for parsing errors
-        def handle_parsing_error(error) -> str:
-            error_str = str(error)
-            if "SELECT" in error_str or "Action:" in error_str:
-                return f"I had a parsing error. I will try to be more concise. Error: {error_str[:50]}"
-            return f"I encountered an issue. Let me try a simpler approach. Error: {error_str[:100]}"
-        
-        # Helper to clean SQL from the agent
-        def clean_sql(query: str) -> str:
-            query = query.strip()
-            # Remove markdown code blocks if present
-            if "```" in query:
-                import re
-                match = re.search(r"```(?:sql)?\s*(.*?)\s*```", query, re.DOTALL | re.IGNORECASE)
-                if match:
-                    query = match.group(1)
-                else:
-                    query = query.replace("```sql", "").replace("```", "")
-            
-            # Remove leading "sql" if the model adds it outside backticks
-            if query.lower().startswith("sql"):
-                query = query[3:].strip()
-                
-            return query.strip("` \n\t;")
-
-        # Custom prefix to teach the agent about the data warehouse schema structure
-        sql_prefix = f"""{self.persona}
-        
-You are an agent designed to interact with a SQL database.
-All relevant schemas (marts, s_*) are in your search path.
-
-DATA CATEGORIZATION:
-1. RAW DATA: Located in `s_` schemas (e.g., s_substack, s_linkedin). This is the landing zone for the ingestion system.
-2. CURATED DATA: Located in the `marts` schema. This is cleaned, modeled data ready for insight generation and analysis.
-
-CRITICAL SCHEMA PRIORITIES:
-1. MART SYSTEM: Use the `marts` schema for all analytical questions and insights. This is your primary source of truth.
-2. INGESTION SYSTEM: Use the `s_` schemas only when asked for "raw data" or when debugging ingestion.
-3. IGNORE: Do NOT use or refer to the `staging` or `intermediate` schemas.
-
-CRITICAL RULES:
-1. When asked "what data is there" or to "check data", you MUST list tables from both `marts` and `s_` schemas. 
-2. Explicitly label tables as "Raw Data" or "Curated/Ready for Insights".
-3. SOURCE ATTRIBUTION: For "Raw Data", identify the source application based on the schema (e.g., `s_linkedin` is LinkedIn, `s_spotify` is Spotify, `s_substack` is Substack, `s_bolt` is Bolt, `s_apple_health` is Apple Health). Tell the user which app generated the data.
-4. HALLUCINATION PREVENTION: If a schema (e.g., `marts`) is empty or `sql_db_list_tables` returns nothing, state clearly that no data is available. DO NOT invent information.
-5. RESPONSE FORMAT: Always provide a concise **Executive Summary** followed by **Bullet Points**.
-6. NEVER include markdown backticks (```) or the word "sql" in your tool inputs. Only provide raw SQL.
-7. PUBLIC SCHEMA IS EMPTY. Do NOT query `information_schema` filtering for `table_schema = 'public'`.
-
-WORKFLOW:
-1. Use `sql_db_list_tables` to see available tables.
-2. Categorize them into Raw (s_*) and Curated (marts).
-3. Tell the user what raw data is available and what curated data is ready for insight generation.
-4. Execute queries on `marts` for insights.
-"""
-
-        # Custom Toolkit with cleaned query tool
-        from langchain_community.agent_toolkits import SQLDatabaseToolkit
-        from langchain.tools import Tool as LangChainTool
-        
-        toolkit = SQLDatabaseToolkit(db=db, llm=self.llm)
-        original_tools = toolkit.get_tools()
-        cleaned_tools = []
-        
-        for t in original_tools:
-            if t.name == "sql_db_query":
-                # Create a wrapper that cleans the SQL before calling the original tool
-                def wrapped_query(query: str, tool=t):
-                    cleaned = clean_sql(query)
-                    return tool.run(cleaned)
-                
-                # Create a new Tool with the same metadata but our wrapped function
-                new_tool = LangChainTool(
-                    name=t.name,
-                    description=t.description,
-                    func=wrapped_query
-                )
-                cleaned_tools.append(new_tool)
-            else:
-                cleaned_tools.append(t)
-
-        return create_sql_agent(
-            llm=self.llm,
-            toolkit=None,  # Pass tools directly
-            tools=cleaned_tools,
-            db=db,
-            verbose=True,
-            agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-            handle_parsing_errors=handle_parsing_error,
-            prefix=sql_prefix,
-            max_iterations=10,
-            max_execution_time=60,
-        )
+        return create_sql_agent_executor(db=db, llm=self.llm, persona=self.persona)
 
     def _setup_agent(self):
         # Define the schemas we want to include in our search path (Focusing only on what matters)
