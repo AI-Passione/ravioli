@@ -1,4 +1,7 @@
 import logging
+import argparse
+import asyncio
+from pathlib import Path
 from typing import Dict, Any, Optional, AsyncGenerator, Union, List
 from pydantic import BaseModel, Field
 
@@ -12,10 +15,6 @@ from langchain_community.llms import Ollama
 # Core Imports
 from ravioli.backend.core.config import settings
 from ravioli.backend.core.ollama import OllamaClient
-
-# Skills Imports
-from ravioli.ai.skills import analysis as skill_analysis
-from ravioli.ai.skills import communication as skill_comm
 
 # Tools Imports
 from ravioli.ai.tools.sql import create_sql_agent_executor, get_query_database_tool
@@ -37,7 +36,7 @@ class KowalskiAgent:
     def __init__(self, db_session=None, model_name: str = "qwen2.5:3b"):
         self.db_session = db_session
         self.model_name = model_name
-        self._ollama_client = OllamaClient(db_session)
+        self.ollama_client = OllamaClient(db_session)
         self.model_sql = "duckdb-nsql"
         self.model_persona = "gemma3:4b"
         self.persona = self._load_persona()
@@ -47,7 +46,6 @@ class KowalskiAgent:
 
     def _load_persona(self) -> str:
         """Loads Kowalski's soul and skills from the local filesystem."""
-        from pathlib import Path
         persona = "You are Kowalski, a lead analytics specialist. Clinical and precise."
         skills = ""
         try:
@@ -60,11 +58,11 @@ class KowalskiAgent:
             logger.warning(f"KowalskiAgent: [WARNING] Failed to load dossier/skills: {e}")
         return f"{persona}\n\n## SPECIALIZED SKILLS\n{skills}" if skills else persona
 
-    async def _generate(self, prompt_text: str, task_name: str, temperature: float = 0.1, parser: Any = None) -> Union[str, Dict]:
+    async def generate(self, prompt_text: str, task_name: str, temperature: float = 0.1, parser: Any = None) -> Union[str, Dict]:
         """Internal helper for persona-injected generation."""
         try:
             full_prompt = f"{self.persona}\n\nTask: {prompt_text}"
-            response_text = await self._ollama_client.generate(
+            response_text = await self.ollama_client.generate(
                 prompt=full_prompt,
                 task_name=task_name,
                 temperature=temperature,
@@ -76,56 +74,20 @@ class KowalskiAgent:
             logger.error(f"KowalskiAgent: LLM Generation failed ({task_name}): {e}")
             raise e
 
-    # --- Delegated Skills ---
-
-    async def analyze_sheet_structure(self, sheet_name: str, sample_grid: str) -> Dict[str, Any]:
-        return await skill_analysis.analyze_sheet_structure(sheet_name, sample_grid, self._generate)
-
-    async def generate_quick_insight(self, filename: str, sample_data: str) -> str:
-        return await skill_analysis.generate_quick_insight(filename, sample_data, self._generate)
-
-    async def generate_assumptions(self, filename: str, sample_data: str) -> str:
-        return await skill_analysis.generate_assumptions(filename, sample_data, self._generate)
-
-    async def generate_limitations(self, filename: str, sample_data: str) -> str:
-        return await skill_analysis.generate_limitations(filename, sample_data, self._generate)
-
-    async def extract_insights(self, result_markdown: str) -> dict:
-        return await skill_analysis.extract_insights(result_markdown, self._generate)
-
-    async def generate_insights_summary(self, insights: list[str], days: int) -> str:
-        return await skill_analysis.generate_insights_summary(insights, days, self._generate)
-
-    async def generate_description(self, filename: str, sample_data: str, context: str = None) -> str:
-        return await skill_comm.generate_description(filename, sample_data, self._generate, context)
-
-    async def generate_followup_questions(self, filename: str, summary: str, sample_data: str) -> List[str]:
-        return await skill_comm.generate_followup_questions(filename, summary, sample_data, self._generate)
-
-    async def generate_suggested_prompts(self, filename: str, summary: str, context: str) -> List[str]:
-        return await skill_comm.generate_suggested_prompts(filename, summary, context, self._generate)
-
-    async def generate_answer(self, filename: str, summary: str, context: str, question: str) -> str:
-        return await skill_comm.generate_answer(filename, summary, context, question, self._generate)
-
-    async def stream_answer(self, filename: str, summary: str, context: str, question: str) -> AsyncGenerator[str, None]:
-        async for token in skill_comm.stream_answer(filename, summary, context, question, self.persona, self._ollama_client.stream):
-            yield token
-
     # --- Intelligence Orchestration ---
 
     async def generate_sql(self, question: str, table_name: str, schema_name: str = "main") -> Optional[str]:
-        target_model = self.model_sql if self._ollama_client.mode != "cloud" else self._ollama_client.model
-        return await tool_generate_sql(question, table_name, self._generate, target_model, schema_name)
+        target_model = self.ollama_client.model if self.ollama_client.mode != "cloud" else self.ollama_client.model
+        return await tool_generate_sql(question, table_name, self.generate, target_model, schema_name)
 
     async def create_viz_payload(self, sql: str, original_question: str) -> Dict[str, Any]:
-        return await tool_create_viz_payload(sql, original_question, self._generate, self.model_persona)
+        return await tool_create_viz_payload(sql, original_question, self.generate, self.model_persona)
 
     async def process_question(self, question: str, table_name: str, schema_name: str = "main") -> AsyncGenerator[Any, None]:
         parser = JsonOutputParser(pydantic_object=AnalysisDecision)
         prompt = PromptTemplate.from_template("Does this require a chart?\nQuestion: \"{question}\"\n{format_instructions}")
         try:
-            result = await self._generate(prompt.format(question=question, format_instructions=parser.get_format_instructions()), "Decision", parser=parser)
+            result = await self.generate(prompt.format(question=question, format_instructions=parser.get_format_instructions()), "Decision", parser=parser)
             if result.get("requires_viz"):
                 yield "_[Engaging Statistical Brain...]_"
                 sql = await self.generate_sql(question, table_name, schema_name)
@@ -141,7 +103,7 @@ class KowalskiAgent:
     # --- Infrastructure ---
 
     async def check_ollama_connection(self):
-        return await self._ollama_client.check_connection()
+        return await self.ollama_client.check_connection()
 
     def _setup_agent(self):
         schemas = "public,marts,s_spotify,s_linkedin,s_substack,s_telegram,s_bolt,s_apple_health,s_google_sheet"
@@ -159,7 +121,6 @@ class KowalskiAgent:
         except Exception as e: return f"Error: {e}"
 
 async def main():
-    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--prompt", type=str)
     parser.add_argument("--interactive", action="store_true")
@@ -174,5 +135,4 @@ async def main():
     elif args.prompt: print(agent.chat(args.prompt))
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
