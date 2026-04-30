@@ -10,12 +10,17 @@ from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
 from ravioli.backend.core.models import SystemSetting
 from ravioli.backend.core.encryption import decrypt_value
 
+# LangChain Imports
+from langchain_ollama import ChatOllama
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
 logger = logging.getLogger(__name__)
 
 class KowalskiSQLAgent:
     """
     A surgical SQL agent for Kowalski.
-    Uses duckdb-nsql for SQL generation and gemma3:4b for reasoning/formatting.
+    Uses ChatOllama (LangChain) for SQL generation and reasoning.
     Implements aggressive RAM optimization by swapping models.
     """
 
@@ -32,7 +37,6 @@ class KowalskiSQLAgent:
                 setting = self.db_session.query(SystemSetting).filter(SystemSetting.key == "ollama").first()
                 if setting and setting.value:
                     config = dict(setting.value)
-                    # Decrypt API key if present
                     if "api_key" in config and config["api_key"]:
                         try:
                             config["api_key"] = decrypt_value(config["api_key"])
@@ -63,45 +67,27 @@ class KowalskiSQLAgent:
             return "https://api.ollama.com"
             
         url = self._config.get("base_url", settings.ollama_host)
-        # Handle Docker-to-Host communication
         if "localhost" in url or "127.0.0.1" in url or "ollama" in url:
             if os.path.exists("/.dockerenv"):
                 return url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal").replace("ollama", "host.docker.internal")
         return url
 
-    async def _generate(self, prompt: str, model: str, temperature: float = 0.1, keep_alive: Any = "5m") -> str:
-        url = f"{self.ollama_host.rstrip('/')}/api/generate"
-        headers = {}
-        if self.mode == "cloud" and self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+    def _get_llm(self, model: str, temperature: float = 0.1, keep_alive: Any = "5m"):
+        """Creates a LangChain ChatOllama instance with current config."""
+        return ChatOllama(
+            model=model,
+            base_url=self.ollama_host,
+            temperature=temperature,
+            keep_alive=keep_alive if self.mode != "cloud" else "5m",
+            # Pass API key via headers for cloud mode
+            headers={"Authorization": f"Bearer {self.api_key}"} if self.mode == "cloud" and self.api_key else {}
+        )
 
-        # Only log RAM optimization for local mode
-        if self.mode != "cloud":
-            logger.info(f"Ollama: [RAM OPTIMIZATION] Loading {model} (keep_alive={keep_alive})...")
-        
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "keep_alive": keep_alive if self.mode != "cloud" else "5m",
-            "options": {
-                "temperature": temperature,
-                "num_predict": 1000
-            }
-        }
-        
-        try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                logger.info(f"Ollama: [SUCCESS] Task completed by {model} ({self.mode})")
-                return response.json().get("response", "").strip()
-        except httpx.ConnectError as e:
-            logger.error(f"Ollama: [ERROR] Connection failed to {url}. Is Ollama running? Error: {e}")
-            raise Exception(f"Kowalski: Statistical Brain unreachable at {self.ollama_host}. Ensure AI node is active.")
-        except Exception as e:
-            logger.error(f"Ollama: [EXCEPTION] {e}")
-            raise e
+    async def _generate(self, prompt_text: str, model: str, temperature: float = 0.1, keep_alive: Any = "5m") -> str:
+        """Helper to maintain compatibility with internal generation logic and tests."""
+        llm = self._get_llm(model, temperature=temperature, keep_alive=keep_alive)
+        response = await llm.ainvoke(prompt_text)
+        return response.content.strip()
 
     async def unload_model(self, model: str):
         """Explicitly unloads a model from RAM. SKIPPED in Cloud mode."""
@@ -134,10 +120,10 @@ class KowalskiSQLAgent:
             return f"Error retrieving schema for {table_name}."
 
     async def generate_sql(self, question: str, table_name: str, schema_name: str = "main") -> Optional[str]:
-        """Generates SQL using duckdb-nsql (or default model in cloud)."""
+        """Generates SQL using LangChain and duckdb-nsql."""
         schema = self._get_schema(table_name, schema_name)
         
-        prompt = f"""### Instruction:
+        template = """### Instruction:
 Your query should be compatible with DuckDB. Use the provided schema.
 ### Schema:
 {schema}
@@ -145,6 +131,8 @@ Your query should be compatible with DuckDB. Use the provided schema.
 {question}
 ### Response (use duckdb):
 """
+        prompt = PromptTemplate.from_template(template)
+        
         target_model = self.model_sql
         if self.mode == "cloud":
             target_model = self._config.get("default_model", self.model_persona)
@@ -154,7 +142,13 @@ Your query should be compatible with DuckDB. Use the provided schema.
                 await self.unload_model(self.model_persona)
             
             logger.info(f"Ollama: [BRAIN] Generating surgical SQL via {target_model}...")
-            response = await self._generate(prompt, target_model, keep_alive=0 if self.mode != "cloud" else "5m")
+            
+            # Using _generate to maintain test compatibility and clean invocation
+            response = await self._generate(
+                prompt.format(schema=schema, question=question),
+                target_model,
+                keep_alive=0 if self.mode != "cloud" else "5m"
+            )
             
             sql = response.strip()
             # Handle markdown wrapping
@@ -164,21 +158,17 @@ Your query should be compatible with DuckDB. Use the provided schema.
                 sql = re.search(r"```\s*(.*?)\s*```", sql, re.DOTALL).group(1)
             
             # Remove hallucinations like "duckdb" or preamble text
-            # We look for the first occurrence of a SQL keyword
             sql_keywords = r"(SELECT|WITH|SHOW|DESCRIBE|CREATE|DROP|INSERT|UPDATE|DELETE|ALTER)"
             select_match = re.search(rf"({sql_keywords}\s+.*)", sql, re.IGNORECASE | re.DOTALL)
             if select_match:
                 sql = select_match.group(1).strip()
             
-            # Strip anything before the first keyword manually if regex missed it
-            # (e.g. if LLM said "duckdb SELECT ...")
             for kw in ["SELECT", "WITH", "SHOW", "DESCRIBE"]:
                 idx = sql.upper().find(kw)
                 if idx != -1:
                     sql = sql[idx:].strip()
                     break
 
-            # Clean trailing characters and comments that might be at the very start
             sql = sql.split(';')[0].strip()
             
             logger.info(f"Ollama: [BRAIN] SQL Final: {sql}")
@@ -189,7 +179,7 @@ Your query should be compatible with DuckDB. Use the provided schema.
 
     async def create_viz_payload(self, sql: str, original_question: str) -> Dict[str, Any]:
         """
-        Executes SQL and uses LLM to decide on best chart type and formatting.
+        Executes SQL and uses LangChain to decide on best chart type and formatting.
         """
         try:
             logger.info("Ollama: [VOICE] Kowalski is analyzing query results for visualization...")
@@ -204,11 +194,11 @@ Your query should be compatible with DuckDB. Use the provided schema.
             data_sample = df.head(5).to_dict(orient='records')
             columns = df.columns.tolist()
 
-            prompt = f"""You are Kowalski, a data visualization expert.
+            template = """You are Kowalski, a data visualization expert.
 Based on this data sample and the user's question, decide on the BEST Chart.js configuration.
-Question: "{original_question}"
+Question: "{question}"
 Columns: {columns}
-Sample Data: {json.dumps(data_sample)}
+Sample Data: {sample_data}
 
 Respond ONLY with a JSON object containing:
 - "chart_type": "bar", "line", "pie", or "scatter"
@@ -217,8 +207,14 @@ Respond ONLY with a JSON object containing:
 - "title": A clinical title for the chart
 
 JSON:"""
+            prompt = PromptTemplate.from_template(template)
             
-            viz_config_raw = await self._generate(prompt, self.model_persona, temperature=0.1)
+            viz_config_raw = await self._generate(
+                prompt.format(question=original_question, columns=columns, sample_data=json.dumps(data_sample)),
+                self.model_persona,
+                temperature=0.1
+            )
+
             match = re.search(r'\{.*\}', viz_config_raw, re.DOTALL)
             if not match:
                 config = {
@@ -233,18 +229,8 @@ JSON:"""
             labels = df[config["labels_column"]].tolist()
             datasets = []
             
-            colors = [
-                "rgba(0, 245, 212, 0.6)",  # Neon Teal
-                "rgba(18, 113, 255, 0.6)",  # Electric Blue
-                "rgba(157, 78, 221, 0.6)",  # Deep Purple
-                "rgba(255, 0, 110, 0.6)",   # Magenta
-            ]
-            border_colors = [
-                "rgba(0, 245, 212, 1)",
-                "rgba(18, 113, 255, 1)",
-                "rgba(157, 78, 221, 1)",
-                "rgba(255, 0, 110, 1)",
-            ]
+            colors = ["rgba(0, 245, 212, 0.6)", "rgba(18, 113, 255, 0.6)", "rgba(157, 78, 221, 0.6)", "rgba(255, 0, 110, 0.6)"]
+            border_colors = ["rgba(0, 245, 212, 1)", "rgba(18, 113, 255, 1)", "rgba(157, 78, 221, 1)", "rgba(255, 0, 110, 1)"]
 
             for i, col in enumerate(config["values_columns"]):
                 datasets.append({
@@ -276,13 +262,19 @@ JSON:"""
         High-level entry point to process a question and get either text or viz.
         Yields strings (status updates) and finally a dict (result).
         """
-        prompt = f"""Is this a question that requires a data visualization (chart, plot, graph)? 
+        template = """Is this a question that requires a data visualization (chart, plot, graph)? 
 Question: "{question}"
 Respond ONLY with 'YES' or 'NO'."""
+        prompt = PromptTemplate.from_template(template)
+        llm = self._get_llm(self.model_persona)
+        chain = prompt | llm | StrOutputParser()
         
         logger.info(f"Ollama: [ANALYSIS] Analyzing Operator query: '{question}'")
         try:
-            decision = await self._generate(prompt, self.model_persona)
+            decision = await self._generate(
+                prompt.format(question=question),
+                self.model_persona
+            )
             
             if "YES" in decision.upper():
                 yield "_[Kowalski is engaging the Statistical Brain for visualization...]_"
