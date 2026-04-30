@@ -198,14 +198,15 @@ class DataIngestor:
                     results.append({"table_name": tn, "row_count": 0, "status": "no_data_found"})
         else:
             # Fallback for unrecognized XML
-            tn = f"xml_{''.join(c if c.isalnum() else '_' for c in original_filename).lower()[:20]}"
+            sanitized_fn = "".join(c if c.isalnum() else "_" for c in original_filename).lower()
+            tn = f"xml_{sanitized_fn[:40]}".rstrip("_")
             gen = xml_full_parse_generator(file_path, original_filename)
             pipeline.run(dlt.resource(gen, name=tn))
             results.append({"table_name": tn, "row_count": 1, "status": "completed"})
             
         return results
 
-    def ingest_gpx(self, file_path: Path, original_filename: str, schema: str = "s_manual") -> list:
+    def ingest_gpx(self, file_path: Path, original_filename: str, table_name: str = None, schema: str = "s_manual") -> list:
         """Ingest spatial data from GPX files."""
         def parse_gpx():
             for _, e in ET.iterparse(file_path, events=("end",)):
@@ -217,8 +218,12 @@ class DataIngestor:
                         elif ct == "ele": p["elevation"] = float(c.text) if c.text else None
                     yield p; e.clear()
         
-        tn = f"route_{''.join(c if c.isalnum() else '_' for c in original_filename).lower()[:20]}"
-        p = create_ravioli_pipeline(f"gpx_{original_filename}", schema)
-        p.run(parse_gpx(), table_name=tn)
+        if not table_name:
+            sanitized_fn = "".join(c if c.isalnum() else "_" for c in original_filename).lower()
+            table_name = f"route_{sanitized_fn[:40]}".rstrip("_")
+            
+        tn = table_name
+        p = create_ravioli_pipeline(f"gpx_{uuid.uuid4().hex[:8]}_{original_filename}", schema)
+        p.run(dlt.resource(parse_gpx(), name=tn), table_name=tn)
         count = self.duckdb_manager.connection.execute(f'SELECT COUNT(*) FROM "{schema}"."{tn}"').fetchone()[0]
         return [{"table_name": tn, "row_count": count, "status": "completed"}]
