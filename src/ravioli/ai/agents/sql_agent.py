@@ -164,15 +164,24 @@ Your query should be compatible with DuckDB. Use the provided schema.
                 sql = re.search(r"```\s*(.*?)\s*```", sql, re.DOTALL).group(1)
             
             # Remove hallucinations like "duckdb" or preamble text
-            # Find the first occurrence of SELECT
-            select_match = re.search(r"(SELECT\s+.*)", sql, re.IGNORECASE | re.DOTALL)
+            # We look for the first occurrence of a SQL keyword
+            sql_keywords = r"(SELECT|WITH|SHOW|DESCRIBE|CREATE|DROP|INSERT|UPDATE|DELETE|ALTER)"
+            select_match = re.search(rf"({sql_keywords}\s+.*)", sql, re.IGNORECASE | re.DOTALL)
             if select_match:
                 sql = select_match.group(1).strip()
             
-            # Clean trailing characters
+            # Strip anything before the first keyword manually if regex missed it
+            # (e.g. if LLM said "duckdb SELECT ...")
+            for kw in ["SELECT", "WITH", "SHOW", "DESCRIBE"]:
+                idx = sql.upper().find(kw)
+                if idx != -1:
+                    sql = sql[idx:].strip()
+                    break
+
+            # Clean trailing characters and comments that might be at the very start
             sql = sql.split(';')[0].strip()
             
-            logger.info(f"Ollama: [BRAIN] SQL generated successfully: {sql}")
+            logger.info(f"Ollama: [BRAIN] SQL Final: {sql}")
             return sql
         except Exception as e:
             logger.error(f"SQL Generation failed: {e}")
