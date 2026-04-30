@@ -8,6 +8,7 @@ from typing import Dict, Any, List, Optional, AsyncGenerator
 from ravioli.backend.core.config import settings
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
 from ravioli.backend.core.models import SystemSetting
+from ravioli.backend.core.encryption import decrypt_value
 
 logger = logging.getLogger(__name__)
 
@@ -30,17 +31,37 @@ class KowalskiSQLAgent:
             try:
                 setting = self.db_session.query(SystemSetting).filter(SystemSetting.key == "ollama").first()
                 if setting and setting.value:
-                    return dict(setting.value)
+                    config = dict(setting.value)
+                    # Decrypt API key if present
+                    if "api_key" in config and config["api_key"]:
+                        try:
+                            config["api_key"] = decrypt_value(config["api_key"])
+                        except Exception as e:
+                            logger.error(f"KowalskiSQLAgent: Decryption failed: {e}")
+                    return config
             except Exception as e:
                 logger.error(f"KowalskiSQLAgent: Error loading config from DB: {e}")
 
         return {
+            "mode": "default",
             "base_url": settings.ollama_host,
-            "default_model": settings.ollama_model
+            "default_model": settings.ollama_model,
+            "api_key": ""
         }
 
     @property
+    def mode(self) -> str:
+        return self._config.get("mode", "default")
+
+    @property
+    def api_key(self) -> str:
+        return self._config.get("api_key", "")
+
+    @property
     def ollama_host(self) -> str:
+        if self.mode == "cloud":
+            return "https://api.ollama.com"
+            
         url = self._config.get("base_url", settings.ollama_host)
         # Handle Docker-to-Host communication
         if "localhost" in url or "127.0.0.1" in url or "ollama" in url:
@@ -50,13 +71,19 @@ class KowalskiSQLAgent:
 
     async def _generate(self, prompt: str, model: str, temperature: float = 0.1, keep_alive: Any = "5m") -> str:
         url = f"{self.ollama_host.rstrip('/')}/api/generate"
+        headers = {}
+        if self.mode == "cloud" and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        # Only log RAM optimization for local mode
+        if self.mode != "cloud":
+            logger.info(f"Ollama: [RAM OPTIMIZATION] Loading {model} (keep_alive={keep_alive})...")
         
-        logger.info(f"Ollama: [RAM OPTIMIZATION] Loading {model} (keep_alive={keep_alive})...")
         payload = {
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "keep_alive": keep_alive,
+            "keep_alive": keep_alive if self.mode != "cloud" else "5m",
             "options": {
                 "temperature": temperature,
                 "num_predict": 1000
@@ -65,9 +92,9 @@ class KowalskiSQLAgent:
         
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(url, json=payload)
+                response = await client.post(url, json=payload, headers=headers)
                 response.raise_for_status()
-                logger.info(f"Ollama: [SUCCESS] Task completed by {model}")
+                logger.info(f"Ollama: [SUCCESS] Task completed by {model} ({self.mode})")
                 return response.json().get("response", "").strip()
         except httpx.ConnectError as e:
             logger.error(f"Ollama: [ERROR] Connection failed to {url}. Is Ollama running? Error: {e}")
@@ -77,7 +104,10 @@ class KowalskiSQLAgent:
             raise e
 
     async def unload_model(self, model: str):
-        """Explicitly unloads a model from RAM."""
+        """Explicitly unloads a model from RAM. SKIPPED in Cloud mode."""
+        if self.mode == "cloud":
+            return
+            
         logger.info(f"Ollama: [RAM OPTIMIZATION] Requesting UNLOAD for model: {model}")
         url = f"{self.ollama_host.rstrip('/')}/api/generate"
         
@@ -104,7 +134,7 @@ class KowalskiSQLAgent:
             return f"Error retrieving schema for {table_name}."
 
     async def generate_sql(self, question: str, table_name: str, schema_name: str = "main") -> Optional[str]:
-        """Generates SQL using duckdb-nsql."""
+        """Generates SQL using duckdb-nsql (or default model in cloud)."""
         schema = self._get_schema(table_name, schema_name)
         
         prompt = f"""### Instruction:
@@ -115,10 +145,17 @@ Your query should be compatible with DuckDB. Use the provided schema.
 {question}
 ### Response (use duckdb):
 """
+        # In cloud mode, we might want to use a more capable general model if duckdb-nsql isn't available
+        target_model = self.model_sql
+        if self.mode == "cloud":
+            target_model = self._config.get("default_model", self.model_persona)
+
         try:
-            await self.unload_model(self.model_persona)
-            logger.info("Ollama: [BRAIN] Generating surgical SQL via duckdb-nsql...")
-            response = await self._generate(prompt, self.model_sql, keep_alive=0)
+            if self.mode != "cloud":
+                await self.unload_model(self.model_persona)
+            
+            logger.info(f"Ollama: [BRAIN] Generating surgical SQL via {target_model}...")
+            response = await self._generate(prompt, target_model, keep_alive=0 if self.mode != "cloud" else "5m")
             
             sql = response.strip()
             if "```sql" in sql:
