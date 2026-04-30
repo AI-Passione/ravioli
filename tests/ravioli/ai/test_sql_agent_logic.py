@@ -92,3 +92,13 @@ async def test_process_question_generator(agent):
                 assert "Kowalski is engaging" in updates[0]
                 assert isinstance(updates[-1], dict)
                 assert updates[-1]["answer_type"] == "viz"
+
+@pytest.mark.anyio
+async def test_generate_sql_strips_preamble(agent):
+    """Verify that generate_sql strips preamble text like 'duckdb -- ...'."""
+    with patch.object(agent, "_get_schema", return_value="CREATE TABLE test (val INT)"):
+        # Mock Ollama returning preamble + SQL
+        mock_response = "duckdb -- helpful comment\nSELECT * FROM test;"
+        with patch.object(agent, "_generate", return_value=mock_response):
+            sql = await agent.generate_sql("show me data", "test")
+            assert sql == "SELECT * FROM test"

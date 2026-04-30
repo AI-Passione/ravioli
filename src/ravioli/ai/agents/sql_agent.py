@@ -145,7 +145,6 @@ Your query should be compatible with DuckDB. Use the provided schema.
 {question}
 ### Response (use duckdb):
 """
-        # In cloud mode, we might want to use a more capable general model if duckdb-nsql isn't available
         target_model = self.model_sql
         if self.mode == "cloud":
             target_model = self._config.get("default_model", self.model_persona)
@@ -158,12 +157,21 @@ Your query should be compatible with DuckDB. Use the provided schema.
             response = await self._generate(prompt, target_model, keep_alive=0 if self.mode != "cloud" else "5m")
             
             sql = response.strip()
+            # Handle markdown wrapping
             if "```sql" in sql:
                 sql = re.search(r"```sql\s*(.*?)\s*```", sql, re.DOTALL).group(1)
             elif "```" in sql:
                 sql = re.search(r"```\s*(.*?)\s*```", sql, re.DOTALL).group(1)
             
-            sql = sql.replace("SELECT", "SELECT").strip("; ")
+            # Remove hallucinations like "duckdb" or preamble text
+            # Find the first occurrence of SELECT
+            select_match = re.search(r"(SELECT\s+.*)", sql, re.IGNORECASE | re.DOTALL)
+            if select_match:
+                sql = select_match.group(1).strip()
+            
+            # Clean trailing characters
+            sql = sql.split(';')[0].strip()
+            
             logger.info(f"Ollama: [BRAIN] SQL generated successfully: {sql}")
             return sql
         except Exception as e:
@@ -252,7 +260,7 @@ JSON:"""
             }
         except Exception as e:
             logger.error(f"Visualization payload creation failed: {e}")
-            return {"type": "error", "message": f"Visualization failed: {str(e)}"}
+            return {"type": "error", "message": str(e)}
 
     async def process_question(self, question: str, table_name: str, schema_name: str = "main") -> AsyncGenerator[Any, None]:
         """
@@ -277,15 +285,23 @@ Respond ONLY with 'YES' or 'NO'."""
                 if sql:
                     yield f"_[Executing query and assembling vision strategy...]_"
                     viz_payload = await self.create_viz_payload(sql, question)
-                    yield {
-                        "answer_type": "viz",
-                        "sql": sql,
-                        "viz": viz_payload
-                    }
-                    return
+                    
+                    if viz_payload.get("type") == "error":
+                        logger.error(f"Visualization failed: {viz_payload.get('message')}")
+                        yield f"> [!WARNING]\n> **Visualization Bypass**: {viz_payload.get('message')}\n\nFalling back to textual analysis. Zrozumiałem."
+                    else:
+                        yield {
+                            "answer_type": "viz",
+                            "sql": sql,
+                            "viz": viz_payload
+                        }
+                        return
+                else:
+                    yield f"> [!WARNING]\n> **Neural Synthesis Failed**: Could not translate the request into a valid query. Falling back to textual reasoning."
             
             logger.info("Ollama: [ANALYSIS] Standard textual response sufficient.")
             yield {"answer_type": "text"}
         except Exception as e:
             logger.error(f"Ollama: [ERROR] Process question failed: {e}")
+            yield f"> [!ERROR]\n> **Neural Link Failed**: {str(e)}"
             yield {"answer_type": "text", "error": str(e)}
