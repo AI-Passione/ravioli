@@ -342,6 +342,11 @@ async def stream_question(
                     elif isinstance(update, dict):
                         if update.get("answer_type") == "viz":
                             viz_payload = update.get("viz")
+                            if viz_payload and viz_payload.get("type") == "error":
+                                context_str += f"\nSystem: Data visualization failed due to error: {viz_payload.get('message')}. Please inform the user that their request cannot be done due to this error.\n"
+                        elif update.get("answer_type") == "error":
+                            error_msg = update.get("message")
+                            context_str += f"\nSystem: Data visualization failed due to error: {error_msg}. Please inform the user that their request cannot be done due to this error.\n"
                         break
 
             # 2. Stream the textual answer from Gemma (persona)

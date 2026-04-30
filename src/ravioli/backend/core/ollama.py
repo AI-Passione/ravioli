@@ -93,7 +93,7 @@ class OllamaClient:
         except Exception as e:
             logger.warning(f"OllamaClient: Failed to unload model: {e}")
 
-    async def generate(self, prompt: str, task_name: str, temperature: float = 0.5, num_predict: int = 300) -> str:
+    async def generate(self, prompt: str, task_name: str, temperature: float = 0.5, num_predict: int = 300, model: str = None) -> str:
         """Raw generation engine for synchronous calls."""
         start_time = time.time()
         url = f"{self.base_url.rstrip('/')}/api/generate"
@@ -106,7 +106,7 @@ class OllamaClient:
             prompt = prompt[:100000] + "\n... [TRUNCATED] ..."
 
         payload = {
-            "model": self.model,
+            "model": model or self.model,
             "prompt": prompt,
             "stream": False,
             "keep_alive": "5m",

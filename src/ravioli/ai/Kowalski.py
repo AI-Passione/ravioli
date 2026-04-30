@@ -58,15 +58,16 @@ class KowalskiAgent:
             logger.warning(f"KowalskiAgent: [WARNING] Failed to load dossier/skills: {e}")
         return f"{persona}\n\n## SPECIALIZED SKILLS\n{skills}" if skills else persona
 
-    async def generate(self, prompt_text: str, task_name: str, temperature: float = 0.1, parser: Any = None) -> Union[str, Dict]:
+    async def generate(self, prompt_text: str, task_name: str, temperature: float = 0.1, parser: Any = None, model: str = None, inject_persona: bool = True) -> Union[str, Dict]:
         """Internal helper for persona-injected generation."""
         try:
-            full_prompt = f"{self.persona}\n\nTask: {prompt_text}"
+            full_prompt = f"{self.persona}\n\nTask: {prompt_text}" if inject_persona else prompt_text
             response_text = await self.ollama_client.generate(
                 prompt=full_prompt,
                 task_name=task_name,
                 temperature=temperature,
-                num_predict=1000
+                num_predict=1000,
+                model=model
             )
             if parser: return parser.parse(response_text)
             return response_text
@@ -77,8 +78,13 @@ class KowalskiAgent:
     # --- Intelligence Orchestration ---
 
     async def generate_sql(self, question: str, table_name: str, schema_name: str = "main") -> Optional[str]:
-        target_model = self.ollama_client.model if self.ollama_client.mode != "cloud" else self.ollama_client.model
-        return await tool_generate_sql(question, table_name, self.generate, target_model, schema_name)
+        target_model = self.model_sql if self.ollama_client.mode != "cloud" else self.ollama_client.model
+        
+        # Create a wrapper that forces inject_persona=False for SQL generation
+        async def sql_generate_wrapper(prompt_text: str, task_name: str, model: str):
+            return await self.generate(prompt_text, task_name, model=model, inject_persona=False)
+            
+        return await tool_generate_sql(question, table_name, sql_generate_wrapper, target_model, schema_name)
 
     async def create_viz_payload(self, sql: str, original_question: str) -> Dict[str, Any]:
         return await tool_create_viz_payload(sql, original_question, self.generate, self.model_persona)
@@ -97,8 +103,8 @@ class KowalskiAgent:
                     yield {"answer_type": "viz", "sql": sql, "viz": viz}
                     return
             yield {"answer_type": "text"}
-        except Exception:
-            yield {"answer_type": "text"}
+        except Exception as e:
+            yield {"answer_type": "error", "message": str(e)}
 
     # --- Infrastructure ---
 

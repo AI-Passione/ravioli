@@ -30,13 +30,18 @@ async def generate_sql(
 ) -> Optional[str]:
     """Generates SQL with aggressive cleaning."""
     schema = get_schema(table_name, schema_name)
-    prompt = PromptTemplate.from_template("""### Instruction:
-Your query should be compatible with DuckDB. Use the provided schema.
+    prompt = PromptTemplate.from_template("""### System:
+You are an expert DuckDB SQL generator. You must output ONLY raw, executable SQL. 
+Do not include any explanations, markdown formatting, or conversational text.
+Your query must be compatible with DuckDB. Use the provided schema.
+
 ### Schema:
 {schema}
+
 ### Question:
 {question}
-### Response (use duckdb):
+
+### Response:
 """)
     
     try:
@@ -64,11 +69,16 @@ Your query should be compatible with DuckDB. Use the provided schema.
                 break
 
         sql = sql.split(';')[0].strip()
+        
+        valid_starts = ["SELECT", "WITH", "SHOW", "DESCRIBE"]
+        if not any(sql.upper().startswith(kw) for kw in valid_starts):
+            raise ValueError(f"Model failed to generate valid SQL. Output: {sql[:100]}")
+            
         logger.info(f"Ollama: [BRAIN] SQL Final: {sql}")
         return sql
     except Exception as e:
         logger.error(f"SQL Generation failed: {e}")
-        return None
+        raise e
 
 def clean_sql_query(query: str) -> str:
     """Helper to clean SQL from the agent."""
