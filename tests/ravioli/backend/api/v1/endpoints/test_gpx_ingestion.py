@@ -2,10 +2,8 @@ import uuid
 import io
 import pytest
 import datetime
-import os
 from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock
-from ravioli.backend.data.olap.ingestion.ingestor import DataIngestor
 
 @pytest.fixture
 def mock_external_tools(mocker):
