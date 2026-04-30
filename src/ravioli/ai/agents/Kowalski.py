@@ -1,64 +1,156 @@
+import logging
+from typing import Dict, Any, Optional, AsyncGenerator, Union, List
+from pydantic import BaseModel, Field
 
-import os
-import sys
-import argparse
-from typing import Optional
-
-import os
-import sys
-import argparse
-from typing import Optional
-
-from langchain_community.llms import Ollama
+# LangChain Imports
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
 from langchain.agents import initialize_agent, Tool, AgentType
 from langchain.tools import tool
 from langchain_community.utilities import SQLDatabase
+from langchain_community.llms import Ollama
 
+# Core Imports
 from ravioli.backend.core.config import settings
+from ravioli.backend.core.ollama import OllamaClient, KOWALSKI_PERSONA
+
+# Tools Imports
 from ravioli.ai.tools.sql import create_sql_agent_executor
 from ravioli.ai.tools.operations import ingest_data_tool, run_transformations_tool
+from ravioli.ai.tools import generate_sql as tool_generate_sql
+from ravioli.ai.tools import create_viz_payload as tool_create_viz_payload
+
+logger = logging.getLogger(__name__)
+
+class AnalysisDecision(BaseModel):
+    """Decision on whether visualization is needed."""
+    requires_viz: bool = Field(description="Whether the question requires a data visualization")
 
 
 class KowalskiAgent:
-    def __init__(self, model_name: str = "qwen2.5:3b"):
+    """
+    The Unified Intelligence entry point for Kowalski.
+    Combines surgical SQL generation with a general-purpose ReAct agent.
+    """
+    def __init__(self, db_session=None, model_name: str = "qwen2.5:3b"):
+        self.db_session = db_session
         self.model_name = model_name
-        self.llm = Ollama(model=model_name)
-        self.persona = self._load_persona()
+        # Leverage the proven OllamaClient directly
+        self._ollama_client = OllamaClient(db_session)
+        self.model_sql = "duckdb-nsql"
+        self.model_persona = "gemma3:4b"
+        self.persona = KOWALSKI_PERSONA
+        self.llm = Ollama(model=model_name) # For the ReAct agent
         self.agent = self._setup_agent()
+        logger.info(f"KowalskiAgent: Unified intelligence initialized. Mode: {self._ollama_client.mode}")
 
-    def _load_persona(self) -> str:
-        """Loads Kowalski's soul and skills."""
-        from pathlib import Path
+    async def _generate(self, prompt_text: str, task_name: str, model: str, temperature: float = 0.1, parser: Any = None) -> Union[str, Dict]:
+        """Internal helper that routes to the proven OllamaClient._generate with persona injection."""
         try:
-            # Relative to src/ravioli/ai/agents/ravioli_agent.py
-            # parents[1] is src/ravioli/ai/
-            base_path = Path(__file__).resolve().parents[1]
-            soul = (base_path / "agents" / "soul.md").read_text()
-            skills = (base_path / "skills" / "skills.md").read_text()
-            return f"{soul}\n\n## SPECIALIZED SKILLS\n{skills}"
-        except Exception:
-            return "You are Kowalski, a clinical data analyst."
+            # Inject Kowalski's persona and specialized skills into every request
+            full_prompt = f"{self.persona}\n\nTask: {prompt_text}"
+            
+            response_text = await self._ollama_client._generate(
+                prompt=full_prompt,
+                task_name=task_name,
+                model=model,
+                temperature=temperature,
+                num_predict=1000
+            )
+            
+            if parser:
+                return parser.parse(response_text)
+            return response_text
+        except Exception as e:
+            logger.error(f"KowalskiAgent: LLM Generation failed ({task_name}): {e}")
+            raise e
+
+    async def unload_model(self, model: str):
+        """Explicitly unloads a model from RAM via OllamaClient."""
+        if self._ollama_client.mode == "cloud": return
+        await self._ollama_client.unload_model(model)
+
+    async def generate_sql(self, question: str, table_name: str, schema_name: str = "main") -> Optional[str]:
+        """Generates SQL with aggressive cleaning using specialized tools."""
+        target_model = self.model_sql if self._ollama_client.mode != "cloud" else self._ollama_client.model
+        try:
+            if self._ollama_client.mode != "cloud": 
+                await self.unload_model(self.model_persona)
+            
+            return await tool_generate_sql(
+                question=question,
+                table_name=table_name,
+                generate_fn=self._generate,
+                model=target_model,
+                schema_name=schema_name
+            )
+        except Exception as e:
+            logger.error(f"SQL Generation failed: {e}")
+            return None
+
+    async def create_viz_payload(self, sql: str, original_question: str) -> Dict[str, Any]:
+        """Uses visualization tool for robust strategy assembly."""
+        return await tool_create_viz_payload(
+            sql=sql,
+            original_question=original_question,
+            generate_fn=self._generate,
+            model=self.model_persona
+        )
+
+    async def process_question(self, question: str, table_name: str, schema_name: str = "main") -> AsyncGenerator[Any, None]:
+        """Surgical decision engine for streaming backend responses."""
+        parser = JsonOutputParser(pydantic_object=AnalysisDecision)
+        prompt = PromptTemplate.from_template("""Does this question require a chart or graph to answer?
+Question: "{question}"
+{format_instructions}
+""")
+        logger.info(f"Ollama: [ANALYSIS] Kowalski is analyzing Operator query: '{question}'")
+        try:
+            result = await self._generate(
+                prompt_text=prompt.format(question=question, format_instructions=parser.get_format_instructions()),
+                task_name="Decision Analysis",
+                model=self.model_persona,
+                parser=parser
+            )
+            
+            if result.get("requires_viz"):
+                yield "_[Kowalski is engaging the Statistical Brain for visualization...]_"
+                yield "_[Generating surgical SQL query...]_"
+                sql = await self.generate_sql(question, table_name, schema_name)
+                if sql:
+                    yield f"_[Executing query and assembling vision strategy...]_"
+                    viz_payload = await self.create_viz_payload(sql, question)
+                    if viz_payload.get("type") == "error":
+                        yield f"> [!WARNING]\n> **Visualization Bypass**: {viz_payload.get('message')}\n\nFalling back to textual analysis."
+                    else:
+                        yield {"answer_type": "viz", "sql": sql, "viz": viz_payload}
+                        return
+                else:
+                    yield f"> [!WARNING]\n> **Neural Synthesis Failed**: Valid query could not be constructed."
+            yield {"answer_type": "text"}
+        except Exception as e:
+            logger.error(f"Process question failed: {e}")
+            yield f"> [!ERROR]\n> **Neural Link Failed**: {str(e)}"
+            yield {"answer_type": "text", "error": str(e)}
 
     def check_ollama_connection(self):
         """Checks if Ollama is reachable."""
+        import httpx
         try:
-            import requests
-            response = requests.get("http://localhost:11434")
-            if response.status_code == 200:
-                return True
+            url = f"{self._ollama_client.base_url.rstrip('/')}/api/tags"
+            with httpx.Client(timeout=5.0) as client:
+                response = client.get(url)
+                return response.status_code == 200
         except Exception:
-            pass
-        return False
+            return False
 
     def _get_sql_agent(self, db):
-        """Creates an SQL agent for querying the database."""
+        """Creates an SQL agent for the ReAct loop."""
         return create_sql_agent_executor(db=db, llm=self.llm, persona=self.persona)
 
     def _setup_agent(self):
-        # Define the schemas we want to include in our search path (Focusing only on what matters)
+        # Define the schemas we want to include in our search path
         schemas = "public,marts,s_spotify,s_linkedin,s_substack,s_telegram,s_bolt,s_apple_health,s_google_sheet"
-        
-        # Update URI to include search_path
         db_uri = f"{settings.database_url}?options=-csearch_path%3D{schemas}"
         db = SQLDatabase.from_uri(db_uri)
 
@@ -76,13 +168,8 @@ class KowalskiAgent:
             except Exception as e:
                 return f"Error querying database: {str(e)}"
 
-        tools = [
-            ingest_data_tool,
-            run_transformations_tool,
-            query_database_tool
-        ]
+        tools = [ingest_data_tool, run_transformations_tool, query_database_tool]
 
-        # Custom error handler for the main agent
         def handle_main_agent_error(error) -> str:
             return f"I had trouble processing that. Let me try again with a simpler approach."
 
@@ -96,26 +183,14 @@ class KowalskiAgent:
             max_execution_time=120,
         )
 
-
     def chat(self, prompt: str, callbacks=None):
-        """Sends a message to the agent and returns the response.
-        
-        Args:
-            prompt: The user's question/prompt
-            callbacks: Optional list of LangChain callbacks for streaming output
-            
-        Returns:
-            tuple: (response_text, intermediate_steps) if callbacks provided, else just response_text
-        """
+        """Sends a message to the ReAct agent."""
         try:
             config = {"callbacks": callbacks} if callbacks else {}
             response = self.agent.invoke({"input": prompt}, config=config)
-            
-            # Return both output and intermediate steps if available
             if isinstance(response, dict):
                 output = response.get('output', str(response))
-                intermediate_steps = response.get('intermediate_steps', [])
-                return output if not callbacks else (output, intermediate_steps)
+                return output
             return str(response)
         except Exception as e:
             return f"Error: {e}"

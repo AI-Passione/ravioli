@@ -15,7 +15,7 @@ from sqlalchemy import select
 from ravioli.backend.core.database import get_db, SessionLocal
 from ravioli.backend.core import models, schemas
 from ravioli.backend.core.ollama import OllamaClient
-from ravioli.ai.agents.sql_agent import KowalskiSQLAgent
+from ravioli.ai.agents.Kowalski import KowalskiAgent
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
 from ydata_profiling import ProfileReport
 
@@ -314,7 +314,7 @@ async def stream_question(
             context_str += f"{role}: {log.content}\n"
 
         client = OllamaClient(db)
-        sql_agent = KowalskiSQLAgent(db)
+        sql_agent = KowalskiAgent(db)
         full_response = ""
         
         # Determine table context if available
