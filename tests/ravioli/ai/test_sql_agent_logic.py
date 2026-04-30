@@ -12,7 +12,8 @@ from ravioli.ai.Kowalski import KowalskiAgent
 
 @pytest.fixture
 def agent():
-    return KowalskiAgent(MagicMock())
+    with patch.object(KowalskiAgent, '_setup_agent', return_value=MagicMock()):
+        return KowalskiAgent(MagicMock())
 
 @pytest.mark.anyio
 async def test_get_schema_success():

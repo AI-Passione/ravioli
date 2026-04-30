@@ -6,7 +6,8 @@ from ravioli.ai.Kowalski import KowalskiAgent
 @pytest.mark.anyio
 async def test_sql_agent_connect_error():
     """Verify that SQL agent handles httpx.ConnectError and raises a descriptive Exception."""
-    agent = KowalskiAgent(MagicMock())
+    with patch.object(KowalskiAgent, '_setup_agent', return_value=MagicMock()):
+        agent = KowalskiAgent(MagicMock())
     
     # Mock httpx to raise ConnectError
     with patch("httpx.AsyncClient.post", side_effect=httpx.ConnectError("Name or service not known")):
@@ -18,7 +19,8 @@ async def test_sql_agent_connect_error():
 @pytest.mark.anyio
 async def test_sql_agent_host_resolution():
     """Verify that SQL agent correctly resolves host.docker.internal in Docker."""
-    agent = KowalskiAgent(MagicMock())
+    with patch.object(KowalskiAgent, '_setup_agent', return_value=MagicMock()):
+        agent = KowalskiAgent(MagicMock())
     # Mock the config which the property uses
     agent.ollama_client._config = {"base_url": "http://localhost:11434"}
     
