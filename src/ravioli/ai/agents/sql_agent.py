@@ -2,10 +2,12 @@ import json
 import logging
 import re
 import httpx
+import os
 import pandas as pd
 from typing import Dict, Any, List, Optional
 from ravioli.backend.core.config import settings
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
+from ravioli.backend.core.models import SystemSetting
 
 logger = logging.getLogger(__name__)
 
@@ -18,19 +20,39 @@ class KowalskiSQLAgent:
 
     def __init__(self, db_session=None):
         self.db_session = db_session
-        self.ollama_host = settings.ollama_host
+        self._config = self._load_config()
         self.model_sql = "duckdb-nsql"
         self.model_persona = "gemma3:4b"
+
+    def _load_config(self) -> Dict[str, Any]:
+        """Load Ollama configuration from the database, falling back to app settings."""
+        if self.db_session:
+            try:
+                setting = self.db_session.query(SystemSetting).filter(SystemSetting.key == "ollama").first()
+                if setting and setting.value:
+                    return dict(setting.value)
+            except Exception as e:
+                logger.error(f"KowalskiSQLAgent: Error loading config from DB: {e}")
+
+        return {
+            "base_url": settings.ollama_host,
+            "default_model": settings.ollama_model
+        }
+
+    @property
+    def ollama_host(self) -> str:
+        url = self._config.get("base_url", settings.ollama_host)
+        # Handle Docker-to-Host communication
+        if "localhost" in url or "127.0.0.1" in url or "ollama" in url:
+            if os.path.exists("/.dockerenv"):
+                # If we are in docker and trying to reach localhost or the 'ollama' placeholder,
+                # we likely want the host machine where Ollama is actually running.
+                return url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal").replace("ollama", "host.docker.internal")
+        return url
 
     async def _generate(self, prompt: str, model: str, temperature: float = 0.1, keep_alive: Any = "5m") -> str:
         url = f"{self.ollama_host.rstrip('/')}/api/generate"
         
-        # Handle Docker-to-Host communication for Ollama
-        if "localhost" in url or "127.0.0.1" in url:
-            import os
-            if os.path.exists("/.dockerenv"):
-                url = url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal")
-
         logger.info(f"Ollama: [RAM OPTIMIZATION] Loading {model} (keep_alive={keep_alive})...")
         payload = {
             "model": model,
@@ -43,22 +65,24 @@ class KowalskiSQLAgent:
             }
         }
         
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            logger.info(f"Ollama: [SUCCESS] Task completed by {model}")
-            return response.json().get("response", "").strip()
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                logger.info(f"Ollama: [SUCCESS] Task completed by {model}")
+                return response.json().get("response", "").strip()
+        except httpx.ConnectError as e:
+            logger.error(f"Ollama: [ERROR] Connection failed to {url}. Is Ollama running? Error: {e}")
+            raise Exception(f"Kowalski: Statistical Brain unreachable at {self.ollama_host}. Ensure AI node is active.")
+        except Exception as e:
+            logger.error(f"Ollama: [EXCEPTION] {e}")
+            raise e
 
     async def unload_model(self, model: str):
         """Explicitly unloads a model from RAM."""
         logger.info(f"Ollama: [RAM OPTIMIZATION] Requesting UNLOAD for model: {model}")
         url = f"{self.ollama_host.rstrip('/')}/api/generate"
         
-        if "localhost" in url or "127.0.0.1" in url:
-            import os
-            if os.path.exists("/.dockerenv"):
-                url = url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal")
-
         payload = {"model": model, "keep_alive": 0}
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -206,18 +230,22 @@ Question: "{question}"
 Respond ONLY with 'YES' or 'NO'."""
         
         logger.info(f"Ollama: [ANALYSIS] Analyzing Operator query: '{question}'")
-        decision = await self._generate(prompt, self.model_persona)
-        
-        if "YES" in decision.upper():
-            logger.info("Ollama: [ANALYSIS] Visualization required. Engaging SQL Brain.")
-            sql = await self.generate_sql(question, table_name, schema_name)
-            if sql:
-                viz_payload = await self.create_viz_payload(sql, question)
-                return {
-                    "answer_type": "viz",
-                    "sql": sql,
-                    "viz": viz_payload
-                }
-        
-        logger.info("Ollama: [ANALYSIS] Standard textual response sufficient.")
-        return {"answer_type": "text"}
+        try:
+            decision = await self._generate(prompt, self.model_persona)
+            
+            if "YES" in decision.upper():
+                logger.info("Ollama: [ANALYSIS] Visualization required. Engaging SQL Brain.")
+                sql = await self.generate_sql(question, table_name, schema_name)
+                if sql:
+                    viz_payload = await self.create_viz_payload(sql, question)
+                    return {
+                        "answer_type": "viz",
+                        "sql": sql,
+                        "viz": viz_payload
+                    }
+            
+            logger.info("Ollama: [ANALYSIS] Standard textual response sufficient.")
+            return {"answer_type": "text"}
+        except Exception as e:
+            logger.error(f"Ollama: [ERROR] Process question failed: {e}")
+            return {"answer_type": "text", "error": str(e)}

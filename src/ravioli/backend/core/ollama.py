@@ -69,10 +69,10 @@ class OllamaClient:
             
         url = self._config.get("base_url", settings.ollama_host)
         # Handle Docker-to-Host communication
-        if "localhost" in url or "127.0.0.1" in url:
+        if "localhost" in url or "127.0.0.1" in url or "ollama" in url:
             # Check if running inside a container
             if os.path.exists("/.dockerenv"):
-                return url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal")
+                return url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal").replace("ollama", "host.docker.internal")
         return url
 
     @property
