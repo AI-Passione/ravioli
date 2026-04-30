@@ -1,21 +1,21 @@
 import logging
-import json
-import re
-import time
 from typing import Dict, Any, Optional, AsyncGenerator, Union, List
 from pydantic import BaseModel, Field
 
 # LangChain Imports
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-from langchain.agents import initialize_agent, Tool, AgentType
-from langchain.tools import tool
+from langchain.agents import initialize_agent, AgentType
 from langchain_community.utilities import SQLDatabase
 from langchain_community.llms import Ollama
 
 # Core Imports
 from ravioli.backend.core.config import settings
 from ravioli.backend.core.ollama import OllamaClient
+
+# Skills Imports
+from ravioli.ai.skills import analysis as skill_analysis
+from ravioli.ai.skills import communication as skill_comm
 
 # Tools Imports
 from ravioli.ai.tools.sql import create_sql_agent_executor, get_query_database_tool
@@ -32,7 +32,7 @@ class AnalysisDecision(BaseModel):
 class KowalskiAgent:
     """
     The Unified Intelligence entry point for Kowalski.
-    Combines surgical SQL generation, data analysis, and general-purpose ReAct orchestration.
+    Acts as an orchestrator for various specialized skills (analysis, communication, etc.)
     """
     def __init__(self, db_session=None, model_name: str = "qwen2.5:3b"):
         self.db_session = db_session
@@ -60,7 +60,7 @@ class KowalskiAgent:
             logger.warning(f"KowalskiAgent: [WARNING] Failed to load dossier/skills: {e}")
         return f"{persona}\n\n## SPECIALIZED SKILLS\n{skills}" if skills else persona
 
-    async def _generate(self, prompt_text: str, task_name: str, model: str = None, temperature: float = 0.1, parser: Any = None) -> Union[str, Dict]:
+    async def _generate(self, prompt_text: str, task_name: str, temperature: float = 0.1, parser: Any = None) -> Union[str, Dict]:
         """Internal helper for persona-injected generation."""
         try:
             full_prompt = f"{self.persona}\n\nTask: {prompt_text}"
@@ -76,154 +76,43 @@ class KowalskiAgent:
             logger.error(f"KowalskiAgent: LLM Generation failed ({task_name}): {e}")
             raise e
 
-    # --- Analytical Skills ---
+    # --- Delegated Skills ---
 
     async def analyze_sheet_structure(self, sheet_name: str, sample_grid: str) -> Dict[str, Any]:
-        """Methodically analyze Excel sheet structure for ingestion."""
-        prompt = f"""Task: Methodically analyze the structural integrity and layout of Excel sheet "{sheet_name}".
-Context: You are inspecting a VISUAL GRID of the first 20 rows of an Excel sheet. 
-Criteria for JSON: verdict ("ready", "needs_fix", "split_table", "reject"), header_row, data_start_row, is_split, column_mapping.
-Grid:
-{sample_grid}
-Return ONLY clinical JSON."""
-        try:
-            content = await self._generate(prompt, "Structural Analysis", temperature=0.1)
-            match = re.search(r'\{.*\}', content, re.DOTALL)
-            if match: return json.loads(match.group(0))
-            return {"verdict": "reject", "reason": "Parse failure"}
-        except Exception:
-            return {"verdict": "ready", "header_row": 0, "data_start_row": 1, "is_split": False, "column_mapping": {}}
+        return await skill_analysis.analyze_sheet_structure(sheet_name, sample_grid, self._generate)
 
     async def generate_quick_insight(self, filename: str, sample_data: str) -> str:
-        """Analyze statistical profile and provide 3-5 concise insights."""
-        prompt = f"""Task: Analyze the statistical profile of "{filename}" and provide 3-5 high-impact, extremely concise clinical insights.
-Dataset:
-{sample_data}
-Insights:"""
-        try:
-            return await self._generate(prompt, "Quick Insight", temperature=0.5)
-        except Exception:
-            return "> [!IMPORTANT]\n> Baseline patterns inferred due to engine timeout."
-
-    async def generate_followup_questions(self, filename: str, summary: str, sample_data: str) -> list[str]:
-        """Generate insightful follow-up questions."""
-        prompt = f"""Task: Based on Summary and Profile for "{filename}", generate 3 extremely concise, professional follow-up questions.
-Summary: {summary}
-Follow-up Questions (bullet points only):"""
-        try:
-            content = await self._generate(prompt, "Follow-up Questions", temperature=0.6)
-            return [q.strip("- ").strip() for q in content.split('\n') if q.strip().startswith("-")][:4]
-        except Exception:
-            return ["What are the primary drivers behind the observed trends?"]
-
-    async def generate_description(self, filename: str, sample_data: str, context: str = None) -> str:
-        """Generate a clinical description for a data asset."""
-        prompt = f"""Task: Provide a clinical, precise description for the dataset "{filename}".
-Dataset Sample:
-{sample_data[:5000]}
-Context: {context or "No additional context."}
-Description (max 2 sentences):"""
-        try:
-            return await self._generate(prompt, "Generate Description", temperature=0.3)
-        except Exception:
-            return f"Clinical data asset: {filename}"
+        return await skill_analysis.generate_quick_insight(filename, sample_data, self._generate)
 
     async def generate_assumptions(self, filename: str, sample_data: str) -> str:
-        """Generate potential assumptions made during data analysis."""
-        prompt = f"""Task: Analyze the statistical profile of "{filename}" and provide 2 extremely concise clinical assumptions.
-Dataset Profile:
-{sample_data[:5000]}
-Assumptions (bullet points only):"""
-        try:
-            return await self._generate(prompt, "Assumptions", temperature=0.4)
-        except Exception:
-            return "- Data is representative of the period/context specified."
+        return await skill_analysis.generate_assumptions(filename, sample_data, self._generate)
 
     async def generate_limitations(self, filename: str, sample_data: str) -> str:
-        """Generate potential limitations and issues for the data."""
-        prompt = f"""Task: Analyze the statistical profile of "{filename}" and identify 1-2 critical clinical limitations.
-Dataset Profile:
-{sample_data[:5000]}
-Limitations (bullet points only):"""
-        try:
-            return await self._generate(prompt, "Limitations", temperature=0.4)
-        except Exception:
-            return "- Limited context on data collection methodology."
-
-    async def generate_suggested_prompts(self, filename: str, summary: str, context: str) -> list[str]:
-        """Generate high-impact analytical prompts based on summary and context."""
-        prompt = f"""Task: Based on Summary and Conversation History for dataset "{filename}", generate 3 high-impact analytical prompts.
-Summary: {summary}
-Conversation History: {context}
-Prompts (bullet points only):"""
-        try:
-            content = await self._generate(prompt, "Suggested Prompts", temperature=0.7)
-            return [p.strip("- ").strip() for p in content.split('\n') if p.strip().startswith("-")][:3]
-        except Exception:
-            return ["Analyze the primary volume drivers."]
-
-    async def generate_answer(self, filename: str, summary: str, context: str, question: str) -> str:
-        """Generate a clinical, precise answer to a user question."""
-        prompt = f"Context: Analyzing dataset \"{filename}\".\nSummary: {summary}\nConversation: {context}\nQuestion: {question}\nAnswer (max 3 sentences):"
-        try:
-            return await self._generate(prompt, "Agent Answer", temperature=0.4)
-        except Exception as e:
-            return f"> [!WARNING]\n> **Neural Link Interrupted**: {str(e)}"
+        return await skill_analysis.generate_limitations(filename, sample_data, self._generate)
 
     async def extract_insights(self, result_markdown: str) -> dict:
-        """Parse a quick-insight markdown result into structured sections."""
-        sections: dict[str, str] = {}
-        current: str | None = None
-        buf: list[str] = []
-        for line in result_markdown.splitlines():
-            heading = re.match(r"^##\s+(.+)", line)
-            if heading:
-                if current is not None: sections[current] = "\n".join(buf).strip()
-                current = heading.group(1).strip()
-                buf = []
-            else: buf.append(line)
-        if current is not None: sections[current] = "\n".join(buf).strip()
-
-        def get_section(*names: str) -> str:
-            for n in names:
-                for k, v in sections.items():
-                    if n.lower() in k.lower(): return v
-            return ""
-
-        key_insights_raw = get_section("Key Insights")
-        bullets = [line.lstrip("-*• ").strip() for line in key_insights_raw.splitlines() if re.match(r"^\s*[-*•]\s+.{10,}", line)]
-        
-        if not bullets:
-            prompt = f"Extract 3-7 standalone insights from:\n{key_insights_raw or result_markdown[:4000]}\nInsights (bullet points only):"
-            try:
-                raw = await self._generate(prompt, "Extract Insights", temperature=0.3)
-                bullets = [line.lstrip("-*• ").strip() for line in raw.splitlines() if re.match(r"^\s*[-*•]\s+.{10,}", line)]
-            except Exception: pass
-
-        return {
-            "bullets": bullets[:20],
-            "assumptions": get_section("Assumptions"),
-            "limitations": get_section("Known Limitation", "Limitations"),
-            "metadata": {"basic_stats": get_section("Basic Stats"), "appendix": get_section("Appendix")},
-        }
+        return await skill_analysis.extract_insights(result_markdown, self._generate)
 
     async def generate_insights_summary(self, insights: list[str], days: int) -> str:
-        """Generate an executive AI summary synthesizing all verified insights."""
-        if not insights: return "> [!NOTE]\n> No verified insights available."
-        bullet_block = "\n".join(f"- {i}" for i in insights)
-        prompt = f"Synthesize these verified insights from the last {days} day(s) into an executive brief (bullet points only):\n{bullet_block}"
-        try:
-            return await self._generate(prompt, "Insights Summary", temperature=0.5)
-        except Exception:
-            return "\n".join(f"- {i}" for i in insights[:10])
+        return await skill_analysis.generate_insights_summary(insights, days, self._generate)
+
+    async def generate_description(self, filename: str, sample_data: str, context: str = None) -> str:
+        return await skill_comm.generate_description(filename, sample_data, self._generate, context)
+
+    async def generate_followup_questions(self, filename: str, summary: str, sample_data: str) -> List[str]:
+        return await skill_comm.generate_followup_questions(filename, summary, sample_data, self._generate)
+
+    async def generate_suggested_prompts(self, filename: str, summary: str, context: str) -> List[str]:
+        return await skill_comm.generate_suggested_prompts(filename, summary, context, self._generate)
+
+    async def generate_answer(self, filename: str, summary: str, context: str, question: str) -> str:
+        return await skill_comm.generate_answer(filename, summary, context, question, self._generate)
 
     async def stream_answer(self, filename: str, summary: str, context: str, question: str) -> AsyncGenerator[str, None]:
-        """Stream a clinical, precise answer to a user question."""
-        prompt = f"{self.persona}\n\nContext: Analyzing dataset \"{filename}\".\nSummary: {summary}\nConversation: {context}\nQuestion: {question}\nAnswer:"
-        async for token in self._ollama_client.stream(prompt):
+        async for token in skill_comm.stream_answer(filename, summary, context, question, self.persona, self._ollama_client.stream):
             yield token
 
-    # --- Data Intelligence ---
+    # --- Intelligence Orchestration ---
 
     async def generate_sql(self, question: str, table_name: str, schema_name: str = "main") -> Optional[str]:
         target_model = self.model_sql if self._ollama_client.mode != "cloud" else self._ollama_client.model
