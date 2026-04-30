@@ -64,6 +64,11 @@ Your query should be compatible with DuckDB. Use the provided schema.
                 break
 
         sql = sql.split(';')[0].strip()
+        
+        valid_starts = ["SELECT", "WITH", "SHOW", "DESCRIBE"]
+        if not any(sql.upper().startswith(kw) for kw in valid_starts):
+            raise ValueError(f"Model failed to generate valid SQL. Output: {sql[:100]}")
+            
         logger.info(f"Ollama: [BRAIN] SQL Final: {sql}")
         return sql
     except Exception as e:
