@@ -2,7 +2,7 @@ import logging
 import argparse
 import asyncio
 from pathlib import Path
-from typing import Dict, Any, Optional, AsyncGenerator, Union, List
+from typing import Dict, Any, Optional, AsyncGenerator, Union
 from pydantic import BaseModel, Field
 
 # LangChain Imports
