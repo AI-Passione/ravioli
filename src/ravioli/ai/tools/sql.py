@@ -30,13 +30,18 @@ async def generate_sql(
 ) -> Optional[str]:
     """Generates SQL with aggressive cleaning."""
     schema = get_schema(table_name, schema_name)
-    prompt = PromptTemplate.from_template("""### Instruction:
-Your query should be compatible with DuckDB. Use the provided schema.
+    prompt = PromptTemplate.from_template("""### System:
+You are an expert DuckDB SQL generator. You must output ONLY raw, executable SQL. 
+Do not include any explanations, markdown formatting, or conversational text.
+Your query must be compatible with DuckDB. Use the provided schema.
+
 ### Schema:
 {schema}
+
 ### Question:
 {question}
-### Response (use duckdb):
+
+### Response:
 """)
     
     try:
