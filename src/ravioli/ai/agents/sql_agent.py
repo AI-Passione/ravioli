@@ -94,11 +94,15 @@ class KowalskiSQLAgent:
     def _get_schema(self, table_name: str, schema_name: str = "main") -> str:
         """Extracts the CREATE TABLE statement for context."""
         try:
-            sql = f'SHOW CREATE TABLE "{schema_name}"."{table_name}"'
-            result = duckdb_manager.connection.execute(sql).fetchone()
-            if result:
+            # More reliable way to get DDL in DuckDB
+            sql = "SELECT sql FROM duckdb_tables WHERE schema_name = ? AND table_name = ?"
+            result = duckdb_manager.connection.execute(sql, [schema_name, table_name]).fetchone()
+            if result and result[0]:
                 return result[0]
-            return f"Table {table_name} exists but schema could not be retrieved."
+            
+            # Fallback to column info if SQL is missing
+            cols = duckdb_manager.connection.execute(f'DESCRIBE "{schema_name}"."{table_name}"').fetchall()
+            return f"Table {table_name} columns: {', '.join([c[0] for c in cols])}"
         except Exception as e:
             logger.error(f"Error getting schema for {table_name}: {e}")
             return f"Error retrieving schema for {table_name}."
