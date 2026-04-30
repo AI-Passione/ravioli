@@ -5,6 +5,8 @@ import asyncio
 import io
 import logging
 import uuid
+import json
+import re
 from typing import List
 from uuid import UUID
 from pathlib import Path
@@ -13,7 +15,9 @@ from sqlalchemy import select
 
 from ravioli.backend.core.database import get_db, SessionLocal
 from ravioli.backend.core import models, schemas
-from ravioli.backend.core.ollama import OllamaClient
+from ravioli.ai.Kowalski import KowalskiAgent
+from ravioli.ai.skills import communication as skill_comm
+from ravioli.ai.skills import analysis as skill_analysis
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
 from ydata_profiling import ProfileReport
 
@@ -82,10 +86,10 @@ async def get_suggested_prompts(
         role = role_map.get(log.log_type, "Kowalski")
         context_str += f"{role}: {log.content}\n"
         
-    client = OllamaClient(db)
+    agent = KowalskiAgent(db)
     
     try:
-        prompts = await client.generate_suggested_prompts(filename, summary, context_str)
+        prompts = await skill_comm.generate_suggested_prompts(filename, summary, context_str, agent.generate)
         return prompts
     except Exception as e:
         logger.error(f"Error generating suggested prompts: {e}")
@@ -155,8 +159,8 @@ async def extract_and_store_insights(analysis_id: str, result_markdown: str, tit
         if db.query(models.Insight).filter(models.Insight.analysis_id == analysis_uuid).first():
             return
 
-        client = OllamaClient(db)
-        parsed = await client.extract_insights(result_markdown)
+        agent = KowalskiAgent(db)
+        parsed = await skill_analysis.extract_insights(result_markdown, agent.generate)
 
         bullets: list[str] = parsed.get("bullets", [])
         assumptions: str = parsed.get("assumptions", "")
@@ -252,8 +256,8 @@ async def process_analysis_question(analysis_id: str, question: str):
             context_str += f"{role}: {log.content}\n"
 
         # Generate answer
-        client = OllamaClient(db)
-        answer = await client.generate_answer(filename, summary, context_str, question)
+        agent = KowalskiAgent(db)
+        answer = await skill_comm.generate_answer(filename, summary, context_str, question, agent.generate)
         
         # Save answer
         agent_log = models.AnalysisLog(
@@ -311,13 +315,43 @@ async def stream_question(
             role = "Operator" if log.log_type == "user_query" else "Kowalski"
             context_str += f"{role}: {log.content}\n"
 
-        client = OllamaClient(db)
+        sql_agent = KowalskiAgent(db)
         full_response = ""
         
+        # Determine table context if available
+        table_name = None
+        schema_name = "main"
+        file_id = analysis.analysis_metadata.get("file_id")
+        if file_id:
+            try:
+                source = db.query(models.DataSource).filter(models.DataSource.id == UUID(file_id)).first()
+                if source:
+                    table_name = source.table_name
+                    schema_name = source.schema_name
+            except Exception as e:
+                logger.error(f"Error resolving table context for analysis {analysis_id}: {e}")
+
         try:
-            async for token in client.stream_answer(filename, summary, context_str, question):
+            # 1. Engage the SQL Agent with progress streaming
+            viz_payload = None
+            if table_name:
+                async for update in sql_agent.process_question(question, table_name, schema_name):
+                    if isinstance(update, str):
+                        # Yield status update to user
+                        yield f"data: {update}\n\n"
+                    elif isinstance(update, dict):
+                        if update.get("answer_type") == "viz":
+                            viz_payload = update.get("viz")
+                        break
+
+            # 2. Stream the textual answer from Gemma (persona)
+            async for token in skill_comm.stream_answer(filename, summary, context_str, question, sql_agent.persona, sql_agent.ollama_client.stream):
                 full_response += token
                 yield f"data: {token}\n\n"
+            
+            # 3. If visualization was generated, send it at the end
+            if viz_payload:
+                yield f"data: [VIZ]{json.dumps(viz_payload)}\n\n"
             
             # Persistence at the end
             async_db = SessionLocal()
@@ -325,7 +359,8 @@ async def stream_question(
                 agent_log = models.AnalysisLog(
                     analysis_id=analysis_id,
                     log_type="thought",
-                    content=full_response
+                    content=full_response,
+                    data=viz_payload # Store the viz data in the log
                 )
                 async_db.add(agent_log)
                 
@@ -465,12 +500,12 @@ async def generate_summary(db: Session, filename: str, row_count: int, col_count
 
     # Use Ollama for key insights, assumptions, and limitations
     try:
-        client = OllamaClient(db)
+        agent = KowalskiAgent(db)
         # Run in parallel for better performance
         key_insights, assumptions, limitations = await asyncio.gather(
-            client.generate_quick_insight(filename, sample_data),
-            client.generate_assumptions(filename, sample_data),
-            client.generate_limitations(filename, sample_data)
+            skill_analysis.generate_quick_insight(filename, sample_data, agent.generate),
+            skill_analysis.generate_assumptions(filename, sample_data, agent.generate),
+            skill_analysis.generate_limitations(filename, sample_data, agent.generate)
         )
     except Exception as e:
         print(f"Error generating insights with Ollama: {e}")
@@ -487,7 +522,6 @@ async def generate_summary(db: Session, filename: str, row_count: int, col_count
         limitations = "- Limited context on data collection methodology.\n- Sample size may not capture all edge case variance."
 
     # Highlight numbers with backticks for visibility
-    import re
     summary = template.format(
         filename=filename,
         row_count=row_count,
@@ -502,7 +536,7 @@ async def generate_summary(db: Session, filename: str, row_count: int, col_count
     
     # Generate follow-up questions
     try:
-        followup_questions = await client.generate_followup_questions(filename, summary, sample_data)
+        followup_questions = await skill_comm.generate_followup_questions(filename, summary, sample_data, agent.generate)
     except Exception:
         followup_questions = [
             "What are the primary drivers behind the observed volume concentration?",

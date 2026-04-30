@@ -18,6 +18,7 @@ from ravioli.backend.data.olap.ingestion.utils import (
     xml_full_parse_generator,
     XML_STRATEGIES
 )
+from ravioli.ai.skills import analysis as skill_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ class DataIngestor:
         conn.execute(f"CREATE OR REPLACE TABLE {full_table_name} AS SELECT * FROM read_csv_auto('{file_path}')")
         return conn.execute(f"SELECT COUNT(*) FROM {full_table_name}").fetchone()[0]
 
-    async def ingest_xlsx(self, file_path: Path, base_table_name: str, schema: str = "main", ollama_client=None) -> list:
+    async def ingest_xlsx(self, file_path: Path, base_table_name: str, schema: str = "main", kowalski_agent=None) -> list:
         """XLSX Ingestion with AI analysis."""
         conn = self.duckdb_manager.connection
         conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
@@ -117,7 +118,7 @@ class DataIngestor:
                 # Analyze sheet structure regardless of size (using small sample)
                 df_raw_sample = pd.read_excel(file_path, sheet_name=sheet_name, nrows=20, header=None)
                 grid_lines = [f"Row {i}: | " + " | ".join([str(v).strip().replace('\n',' ') for v in row]) + " |" for i, row in df_raw_sample.iterrows()]
-                analysis = await ollama_client.analyze_sheet_structure(sheet_name, "\n".join(grid_lines)) if ollama_client else {"verdict": "ready"}
+                analysis = await skill_analysis.analyze_sheet_structure(sheet_name, "\n".join(grid_lines), kowalski_agent.generate) if kowalski_agent else {"verdict": "ready"}
                 if analysis.get("verdict") == "reject": continue
 
                 if is_chucking:

@@ -13,27 +13,14 @@ async def test_ollama_connection(db: Session = Depends(get_db)):
     """Test connection to Ollama based on current database settings."""
     try:
         client = OllamaClient(db)
-        # Use httpx to check if the server is up and responding
-        import httpx
-        url = f"{client.base_url.rstrip('/')}/api/tags"
-        headers = {}
-        if client.mode == "cloud" and client.api_key:
-            headers["Authorization"] = f"Bearer {client.api_key}"
-            
-        async with httpx.AsyncClient(timeout=10.0) as http_client:
-            response = await http_client.get(url, headers=headers)
-            if response.status_code == 200:
-                data = response.json()
-                models = [m.get("name") for m in data.get("models", [])]
-                return {
-                    "status": "success", 
-                    "message": "Successfully connected to Ollama!",
-                    "models": models[:5]  # Show first 5 models
-                }
-            elif response.status_code == 401:
-                raise HTTPException(status_code=401, detail="Authentication failed. Please check your API key.")
-            else:
-                raise HTTPException(status_code=response.status_code, detail=f"Ollama returned error: {response.text}")
+        is_connected = await client.check_connection()
+        if is_connected:
+            return {
+                "status": "success", 
+                "message": "Successfully connected to Ollama!"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to connect to Ollama node.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -34,8 +34,9 @@ async def test_upload_xlsx(client, session, mocker):
     # Mocking PII scan
     mocker.patch("ravioli.backend.api.v1.endpoints.data.pii_scanner.scan_dataframe", return_value=False)
     
-    # Mocking OllamaClient to avoid DB config issues
-    mocker.patch("ravioli.backend.api.v1.endpoints.data.OllamaClient")
+    # Mock AI Agent and Skill
+    mocker.patch("ravioli.backend.api.v1.endpoints.data.KowalskiAgent")
+    mocker.patch("ravioli.backend.api.v1.endpoints.data.skill_comm.generate_description", new_callable=AsyncMock, return_value="Mocked Description")
     
     # Mocking session behavior to avoid DB issues and populate required fields for validation
     import datetime
@@ -87,8 +88,9 @@ async def test_quick_insight_xlsx(client, session, mocker):
     df.to_excel(xlsx_buffer, index=False)
     xlsx_buffer.seek(0)
     
-    # Mocking Ollama/Summary generation
-    mocker.patch("ravioli.backend.api.v1.endpoints.analyses.generate_summary", return_value=("Mock Summary", ["Question 1?"]))
+    # Mock AI Agent and Local Skill Function
+    mocker.patch("ravioli.backend.api.v1.endpoints.analyses.KowalskiAgent")
+    mocker.patch("ravioli.backend.api.v1.endpoints.analyses.generate_summary", new_callable=AsyncMock, return_value=("Mock Summary", ["Question 1?"]))
     mocker.patch("ravioli.backend.api.v1.endpoints.analyses.extract_and_store_insights")
     
     # Mocking Analysis instantiation to provide an ID

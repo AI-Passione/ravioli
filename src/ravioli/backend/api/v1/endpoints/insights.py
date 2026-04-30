@@ -7,6 +7,8 @@ from datetime import datetime, UTC, timedelta
 
 from ravioli.backend.core.database import get_db
 from ravioli.backend.core import models, schemas
+from ravioli.ai.Kowalski import KowalskiAgent
+from ravioli.ai.skills import analysis as skill_analysis
 
 router = APIRouter()
 
@@ -43,9 +45,8 @@ async def get_insights_summary(days: int = 7, db: Session = Depends(get_db)):
     )
     contents = [i.content for i in insights]
 
-    from ravioli.backend.core.ollama import OllamaClient
-    client = OllamaClient(db)
-    summary = await client.generate_insights_summary(contents, days)
+    agent = KowalskiAgent(db)
+    summary = await skill_analysis.generate_insights_summary(contents, days, agent.generate)
     return {"summary": summary, "insight_count": len(contents), "days": days}
 
 

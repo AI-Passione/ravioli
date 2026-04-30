@@ -31,10 +31,9 @@ def test_get_insight_stats(client, session):
 
 @pytest.mark.anyio
 async def test_get_insights_summary(client, session, mocker):
-    # Mock OllamaClient at its source since it's imported locally in the endpoint
-    mock_ollama = mocker.patch("ravioli.backend.core.ollama.OllamaClient")
-    mock_client = mock_ollama.return_value
-    mock_client.generate_insights_summary = AsyncMock(return_value="* Point 1\n* Point 2\n* Point 3\n* Point 4\n* Point 5")
+    # Mock AI Agent and Skill
+    mocker.patch("ravioli.backend.api.v1.endpoints.insights.KowalskiAgent")
+    mocker.patch("ravioli.backend.api.v1.endpoints.insights.skill_analysis.generate_insights_summary", new_callable=AsyncMock, return_value="* Point 1\n* Point 2\n* Point 3\n* Point 4\n* Point 5")
     
     # Mock DB query for insights
     mock_insight = create_mock_insight(is_verified=True)

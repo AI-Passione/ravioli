@@ -3,6 +3,12 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import uuid
+from sqlalchemy import text
+from ravioli.backend.core import models
+from ravioli.backend.core.database import engine, Base, SessionLocal
+from ravioli.backend.data.oltp.session import ensure_schema
+from ravioli.backend.api.v1.api import api_router
 
 # Configure logging
 logging.basicConfig(
@@ -11,13 +17,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from ravioli.backend.core.database import engine, Base
-from ravioli.backend.data.oltp.session import ensure_schema
-
 # Create tables in the specified schemas
 # Note: schemas must exist before create_all is called for tables in those schemas
 def init_db():
-    from ravioli.backend.core import models # Ensure models are registered
     try:
         # Ensure 'app' schema exists
         ensure_schema("app")
@@ -33,10 +35,6 @@ def init_db():
 
 def seed_db():
     """Create initial dummy records if they don't exist."""
-    from ravioli.backend.core import models
-    from ravioli.backend.core.database import SessionLocal
-    import uuid
-    
     db = SessionLocal()
     try:
         email = "jimmypang@aipassione.com"
@@ -65,7 +63,6 @@ def seed_db():
 
 def _migrate_columns():
     """Add new columns to existing tables using IF NOT EXISTS (idempotent)."""
-    from sqlalchemy import text
     migrations = [
         "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS assumptions TEXT",
         "ALTER TABLE app.insights ADD COLUMN IF NOT EXISTS limitations TEXT",
@@ -114,7 +111,6 @@ def read_root():
     return {"message": "Welcome to Ravioli API", "status": "online"}
 
 # Include v1 routers
-from ravioli.backend.api.v1.api import api_router
 app.include_router(api_router, prefix="/api/v1")
 
 if __name__ == "__main__":

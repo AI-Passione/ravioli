@@ -156,6 +156,7 @@ async def test_test_ollama_connection_success(client, session, mocker):
     mock_instance = mock_ollama.return_value
     mock_instance.base_url = "http://test-ollama"
     mock_instance.mode = "default"
+    mock_instance.check_connection = AsyncMock(return_value=True)
     
     # Mock httpx
     mock_response = MagicMock()
@@ -171,4 +172,4 @@ async def test_test_ollama_connection_success(client, session, mocker):
     
     assert response.status_code == 200
     assert response.json()["status"] == "success"
-    assert "gemma3:4b" in response.json()["models"]
+    assert "Successfully connected" in response.json()["message"]

@@ -13,11 +13,12 @@ def test_ollama_client_default_config(mock_db, mocker):
     mock_db.query.return_value.filter.return_value.first.return_value = None
     
     # Mock settings.ollama_model to be consistent
+    mocker.patch("ravioli.backend.core.ollama.settings.ollama_host", "http://localhost:11434")
     mocker.patch("ravioli.backend.core.ollama.settings.ollama_model", "gemma3:4b")
     
     client = OllamaClient(mock_db)
     assert client.mode == "default"
-    assert "localhost" in client.base_url or "ollama" in client.base_url
+    assert "localhost" in client.base_url
     assert client.model == "gemma3:4b"
     assert client.api_key == ""
 
@@ -53,7 +54,7 @@ def test_ollama_client_local_mode_docker(mock_db, mocker):
     assert client.base_url == "http://host.docker.internal:11434"
 
 @pytest.mark.anyio
-async def test_generate_description_success(mock_db, mocker):
+async def test_generate_success(mock_db, mocker):
     # Mock settings - must use encrypted key
     encrypted_key = encrypt_value("key")
     setting = SystemSetting(key="ollama", value={"mode": "cloud", "api_key": encrypted_key})
@@ -64,13 +65,13 @@ async def test_generate_description_success(mock_db, mocker):
     # Mock httpx response
     mock_response = MagicMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {"response": "A beautiful dataset."}
+    mock_response.json.return_value = {"response": "AI output"}
     
     mock_httpx = mocker.patch("httpx.AsyncClient.post", new_callable=AsyncMock)
     mock_httpx.return_value = mock_response
     
-    desc = await client.generate_description("test.csv", "sample data")
-    assert desc == "A beautiful dataset."
+    res = await client.generate("test prompt", "Test Task")
+    assert res == "AI output"
     
     # Verify headers (Auth should be present in cloud mode)
     args, kwargs = mock_httpx.call_args
@@ -78,41 +79,14 @@ async def test_generate_description_success(mock_db, mocker):
     assert "Bearer key" in kwargs["headers"]["Authorization"]
 
 @pytest.mark.anyio
-async def test_generate_description_auth_failure(mock_db, mocker):
-    encrypted_key = encrypt_value("wrong")
-    setting = SystemSetting(key="ollama", value={"mode": "cloud", "api_key": encrypted_key})
-    mock_db.query.return_value.filter.return_value.first.return_value = setting
-    
+async def test_check_connection_success(mock_db, mocker):
     client = OllamaClient(mock_db)
     
     mock_response = MagicMock()
-    mock_response.status_code = 401
-    mock_response.text = "Unauthorized"
+    mock_response.status_code = 200
     
-    mock_httpx = mocker.patch("httpx.AsyncClient.post", new_callable=AsyncMock)
+    mock_httpx = mocker.patch("httpx.AsyncClient.get", new_callable=AsyncMock)
     mock_httpx.return_value = mock_response
     
-    with pytest.raises(Exception) as exc:
-        await client.generate_description("test.csv", "sample")
-    assert "authentication failed" in str(exc.value)
-
-@pytest.mark.anyio
-async def test_generate_suggested_prompts(mock_db, mocker):
-    client = OllamaClient(mock_db)
-    
-    # Mock _generate instead of full HTTP call for brevity
-    mock_gen = mocker.patch.object(OllamaClient, "_generate", new_callable=AsyncMock)
-    mock_gen.return_value = "- Analyze the trends.\n- Check anomalies.\n- Compare segments."
-    
-    prompts = await client.generate_suggested_prompts("data.csv", "Summary", "Context")
-    
-    assert len(prompts) == 3
-    assert prompts[0] == "Analyze the trends."
-    assert prompts[1] == "Check anomalies."
-    assert prompts[2] == "Compare segments."
-    
-    # Verify fallback
-    mock_gen.side_effect = Exception("AI failed")
-    fallback_prompts = await client.generate_suggested_prompts("data.csv", "Summary", "Context")
-    assert len(fallback_prompts) == 3
-    assert "Perform a deep dive" in fallback_prompts[0]
+    is_ok = await client.check_connection()
+    assert is_ok is True

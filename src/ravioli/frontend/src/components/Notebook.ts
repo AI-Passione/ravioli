@@ -1,6 +1,7 @@
 import { store } from '../store';
 import { api } from '../services/api';
 import MarkdownIt from 'markdown-it';
+import Chart from 'chart.js/auto';
 
 const md = new MarkdownIt({
   html: false,
@@ -32,6 +33,46 @@ function renderMarkdown(content: string) {
   });
 
   return md.render(transformed);
+}
+
+function renderChart(canvasId: string, vizData: any) {
+  const ctx = document.getElementById(canvasId) as HTMLCanvasElement;
+  if (!ctx) return;
+
+  new Chart(ctx, {
+    type: vizData.chart_type,
+    data: vizData.data,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: {
+            color: '#94a3b8',
+            font: { family: 'Inter', size: 10 }
+          }
+        },
+        title: {
+          display: true,
+          text: vizData.title,
+          color: '#f8fafc',
+          font: { family: 'Inter', size: 14, weight: 'bold' }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#64748b', font: { size: 10 } }
+        },
+        y: {
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#64748b', font: { size: 10 } }
+        }
+      }
+    }
+  });
 }
 
 export function renderNotebook() {
@@ -182,6 +223,11 @@ export function renderNotebook() {
             <div class="prose prose-invert max-w-none text-on-surface-variant leading-relaxed font-body-lg">
               ${renderMarkdown(log.content)}
             </div>
+            ${log.data && log.data.type === 'chart' ? `
+              <div class="mt-6 glass-panel p-6 rounded-2xl border-primary/20 h-80 relative">
+                <canvas id="chart-${log.id}"></canvas>
+              </div>
+            ` : ''}
           </div>
         </div>
       `).join('')}
@@ -231,6 +277,13 @@ export function renderNotebook() {
     if (scrollContainer) {
       scrollContainer.scrollTop = scrollContainer.scrollHeight;
     }
+    
+    // Initialize any existing charts
+    logs.forEach(log => {
+      if (log.data && log.data.type === 'chart') {
+        renderChart(`chart-${log.id}`, log.data);
+      }
+    });
   }, 100);
 
   const input = container.querySelector('#cell-input') as HTMLTextAreaElement;
@@ -371,6 +424,31 @@ export function renderNotebook() {
         if (streamingContent) {
           streamingContent.innerHTML = renderMarkdown(fullText);
         }
+        
+        // Handle visualization if present in the stream
+        const vizMatch = fullText.match(/\[VIZ\]({.*})/);
+        if (vizMatch) {
+          try {
+            const vizData = JSON.parse(vizMatch[1]);
+            // Remove the [VIZ] tag from display
+            fullText = fullText.replace(/\[VIZ\].*$/, '');
+            if (streamingContent) {
+              streamingContent.innerHTML = renderMarkdown(fullText);
+            }
+            
+            // Append chart container
+            const chartId = `chart-live-${Date.now()}`;
+            const chartDiv = document.createElement('div');
+            chartDiv.className = 'mt-6 glass-panel p-6 rounded-2xl border-primary/20 h-80 relative animate-in zoom-in-95 duration-500';
+            chartDiv.innerHTML = `<canvas id="${chartId}"></canvas>`;
+            streamingContent.parentElement?.appendChild(chartDiv);
+            
+            setTimeout(() => renderChart(chartId, vizData), 100);
+          } catch (e) {
+            console.error("Failed to parse viz payload", e);
+          }
+        }
+
         btn.removeAttribute('disabled');
         btn.classList.remove('opacity-50');
         // Refresh to get official logs and IDs

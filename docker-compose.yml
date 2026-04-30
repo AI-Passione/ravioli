@@ -47,6 +47,8 @@ services:
       - .env
     networks:
       - ravioli_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: always
 
   frontend:
@@ -64,6 +66,8 @@ services:
 
     networks:
       - ravioli_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: always
 
 volumes:

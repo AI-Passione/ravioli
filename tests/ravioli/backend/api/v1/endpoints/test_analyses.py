@@ -123,9 +123,10 @@ def test_get_suggested_prompts(client, session, mocker):
     session.query().filter().first.return_value = MockAnalysis()
     session.query().filter().order_by().limit().all.return_value = []
     
-    # Mock OllamaClient
-    mock_ollama = mocker.patch("ravioli.backend.core.ollama.OllamaClient.generate_suggested_prompts", new_callable=AsyncMock)
-    mock_ollama.return_value = ["Prompt 1", "Prompt 2", "Prompt 3"]
+    # Mock AI Agent and Skill
+    mocker.patch("ravioli.backend.api.v1.endpoints.analyses.KowalskiAgent")
+    mock_skill = mocker.patch("ravioli.backend.api.v1.endpoints.analyses.skill_comm.generate_suggested_prompts", new_callable=AsyncMock)
+    mock_skill.return_value = ["Prompt 1", "Prompt 2", "Prompt 3"]
     
     # Execute request
     response = client.get(f"/api/v1/analyses/{analysis_id}/suggested-prompts")
@@ -135,7 +136,7 @@ def test_get_suggested_prompts(client, session, mocker):
     data = response.json()
     assert len(data) == 3
     assert data[0] == "Prompt 1"
-    assert mock_ollama.called
+    assert mock_skill.called
 
 def test_get_suggested_prompts_not_found(client, session):
     # Mock session to return None

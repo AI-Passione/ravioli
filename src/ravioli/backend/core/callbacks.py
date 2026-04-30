@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional
-from langchain.callbacks.base import BaseCallbackHandler
+from langchain_core.callbacks import BaseCallbackHandler
 
 class StreamlitThinkingCallback(BaseCallbackHandler):
     """Callback Handler that prints to a Streamlit container."""
