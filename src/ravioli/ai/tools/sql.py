@@ -68,7 +68,7 @@ Your query should be compatible with DuckDB. Use the provided schema.
         return sql
     except Exception as e:
         logger.error(f"SQL Generation failed: {e}")
-        return None
+        raise e
 
 def clean_sql_query(query: str) -> str:
     """Helper to clean SQL from the agent."""

@@ -58,7 +58,7 @@ class KowalskiAgent:
             logger.warning(f"KowalskiAgent: [WARNING] Failed to load dossier/skills: {e}")
         return f"{persona}\n\n## SPECIALIZED SKILLS\n{skills}" if skills else persona
 
-    async def generate(self, prompt_text: str, task_name: str, temperature: float = 0.1, parser: Any = None) -> Union[str, Dict]:
+    async def generate(self, prompt_text: str, task_name: str, temperature: float = 0.1, parser: Any = None, model: str = None) -> Union[str, Dict]:
         """Internal helper for persona-injected generation."""
         try:
             full_prompt = f"{self.persona}\n\nTask: {prompt_text}"
@@ -66,7 +66,8 @@ class KowalskiAgent:
                 prompt=full_prompt,
                 task_name=task_name,
                 temperature=temperature,
-                num_predict=1000
+                num_predict=1000,
+                model=model
             )
             if parser: return parser.parse(response_text)
             return response_text
@@ -97,8 +98,8 @@ class KowalskiAgent:
                     yield {"answer_type": "viz", "sql": sql, "viz": viz}
                     return
             yield {"answer_type": "text"}
-        except Exception:
-            yield {"answer_type": "text"}
+        except Exception as e:
+            yield {"answer_type": "error", "message": str(e)}
 
     # --- Infrastructure ---
 
