@@ -29,6 +29,9 @@ async def create_viz_payload(
 
         for col in df.select_dtypes(include=['datetime64', 'datetimetz']).columns:
             df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+            
+        import pandas as pd
+        df = df.astype(object).where(pd.notna(df), None)
         
         parser = JsonOutputParser(pydantic_object=VizStrategy)
         prompt = PromptTemplate.from_template("""You are Kowalski, a data visualization expert.
