@@ -166,7 +166,7 @@ async def upload_file(
                 if extension == '.xml':
                     results = await asyncio.to_thread(data_ingestor.ingest_xml, file_path, file.filename, schema="s_manual")
                 else: # .gpx
-                    results = await asyncio.to_thread(data_ingestor.ingest_gpx, file_path, file.filename, schema="s_manual")
+                    results = await asyncio.to_thread(data_ingestor.ingest_gpx, file_path, file.filename, table_name=table_name, schema="s_manual")
                 
                 valid_results = [r for r in results if r["status"] == "completed"]
                 
