@@ -4,7 +4,7 @@ import re
 import httpx
 import os
 import pandas as pd
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, AsyncGenerator
 from ravioli.backend.core.config import settings
 from ravioli.backend.data.olap.duckdb_manager import duckdb_manager
 from ravioli.backend.core.models import SystemSetting
@@ -45,8 +45,6 @@ class KowalskiSQLAgent:
         # Handle Docker-to-Host communication
         if "localhost" in url or "127.0.0.1" in url or "ollama" in url:
             if os.path.exists("/.dockerenv"):
-                # If we are in docker and trying to reach localhost or the 'ollama' placeholder,
-                # we likely want the host machine where Ollama is actually running.
                 return url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal").replace("ollama", "host.docker.internal")
         return url
 
@@ -94,13 +92,11 @@ class KowalskiSQLAgent:
     def _get_schema(self, table_name: str, schema_name: str = "main") -> str:
         """Extracts the CREATE TABLE statement for context."""
         try:
-            # More reliable way to get DDL in DuckDB
             sql = "SELECT sql FROM duckdb_tables WHERE schema_name = ? AND table_name = ?"
             result = duckdb_manager.connection.execute(sql, [schema_name, table_name]).fetchone()
             if result and result[0]:
                 return result[0]
             
-            # Fallback to column info if SQL is missing
             cols = duckdb_manager.connection.execute(f'DESCRIBE "{schema_name}"."{table_name}"').fetchall()
             return f"Table {table_name} columns: {', '.join([c[0] for c in cols])}"
         except Exception as e:
@@ -120,14 +116,10 @@ Your query should be compatible with DuckDB. Use the provided schema.
 ### Response (use duckdb):
 """
         try:
-            # RAM Swap: Unload persona model before loading SQL brain
             await self.unload_model(self.model_persona)
-            
-            # Generate SQL with immediate unload
             logger.info("Ollama: [BRAIN] Generating surgical SQL via duckdb-nsql...")
             response = await self._generate(prompt, self.model_sql, keep_alive=0)
             
-            # Extract SQL from potential markdown or prefixes
             sql = response.strip()
             if "```sql" in sql:
                 sql = re.search(r"```sql\s*(.*?)\s*```", sql, re.DOTALL).group(1)
@@ -146,7 +138,6 @@ Your query should be compatible with DuckDB. Use the provided schema.
         Executes SQL and uses LLM to decide on best chart type and formatting.
         """
         try:
-            # Load Persona model for formatting/decision
             logger.info("Ollama: [VOICE] Kowalski is analyzing query results for visualization...")
             
             df = duckdb_manager.connection.execute(sql).fetchdf()
@@ -188,7 +179,6 @@ JSON:"""
             labels = df[config["labels_column"]].tolist()
             datasets = []
             
-            # AI Passione Palette (Premium Neons/Teals)
             colors = [
                 "rgba(0, 245, 212, 0.6)",  # Neon Teal
                 "rgba(18, 113, 255, 0.6)",  # Electric Blue
@@ -227,8 +217,11 @@ JSON:"""
             logger.error(f"Visualization payload creation failed: {e}")
             return {"type": "error", "message": f"Visualization failed: {str(e)}"}
 
-    async def process_question(self, question: str, table_name: str, schema_name: str = "main") -> Dict[str, Any]:
-        """High-level entry point to process a question and get either text or viz."""
+    async def process_question(self, question: str, table_name: str, schema_name: str = "main") -> AsyncGenerator[Any, None]:
+        """
+        High-level entry point to process a question and get either text or viz.
+        Yields strings (status updates) and finally a dict (result).
+        """
         prompt = f"""Is this a question that requires a data visualization (chart, plot, graph)? 
 Question: "{question}"
 Respond ONLY with 'YES' or 'NO'."""
@@ -238,18 +231,24 @@ Respond ONLY with 'YES' or 'NO'."""
             decision = await self._generate(prompt, self.model_persona)
             
             if "YES" in decision.upper():
+                yield "_[Kowalski is engaging the Statistical Brain for visualization...]_"
                 logger.info("Ollama: [ANALYSIS] Visualization required. Engaging SQL Brain.")
+                
+                yield "_[Generating surgical SQL query...]_"
                 sql = await self.generate_sql(question, table_name, schema_name)
+                
                 if sql:
+                    yield f"_[Executing query and assembling vision strategy...]_"
                     viz_payload = await self.create_viz_payload(sql, question)
-                    return {
+                    yield {
                         "answer_type": "viz",
                         "sql": sql,
                         "viz": viz_payload
                     }
+                    return
             
             logger.info("Ollama: [ANALYSIS] Standard textual response sufficient.")
-            return {"answer_type": "text"}
+            yield {"answer_type": "text"}
         except Exception as e:
             logger.error(f"Ollama: [ERROR] Process question failed: {e}")
-            return {"answer_type": "text", "error": str(e)}
+            yield {"answer_type": "text", "error": str(e)}

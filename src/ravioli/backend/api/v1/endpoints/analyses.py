@@ -5,6 +5,7 @@ import asyncio
 import io
 import logging
 import uuid
+import json
 from typing import List
 from uuid import UUID
 from pathlib import Path
@@ -330,12 +331,17 @@ async def stream_question(
                 logger.error(f"Error resolving table context for analysis {analysis_id}: {e}")
 
         try:
-            # 1. Ask the SQL Agent if this should be a visualization
+            # 1. Engage the SQL Agent with progress streaming
             viz_payload = None
             if table_name:
-                viz_result = await sql_agent.process_question(question, table_name, schema_name)
-                if viz_result["answer_type"] == "viz":
-                    viz_payload = viz_result["viz"]
+                async for update in sql_agent.process_question(question, table_name, schema_name):
+                    if isinstance(update, str):
+                        # Yield status update to user
+                        yield f"data: {update}\n\n"
+                    elif isinstance(update, dict):
+                        if update.get("answer_type") == "viz":
+                            viz_payload = update.get("viz")
+                        break
 
             # 2. Stream the textual answer from Gemma (persona)
             async for token in client.stream_answer(filename, summary, context_str, question):

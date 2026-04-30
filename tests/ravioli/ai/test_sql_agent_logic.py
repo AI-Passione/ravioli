@@ -75,3 +75,20 @@ async def test_create_viz_payload_logic(agent):
         assert payload["chart_type"] == "bar"
         assert payload["data"]["labels"] == ["A", "B"]
         assert payload["data"]["datasets"][0]["data"] == [10, 20]
+
+@pytest.mark.anyio
+async def test_process_question_generator(agent):
+    """Verify that process_question yields status updates before the result."""
+    with patch.object(agent, "_generate", return_value="YES"):
+        with patch.object(agent, "generate_sql", return_value="SELECT 1"):
+            with patch.object(agent, "create_viz_payload", return_value={"type": "chart"}):
+                updates = []
+                async for update in agent.process_question("test", "table"):
+                    updates.append(update)
+                
+                # Should yield at least 3 strings (progress) and 1 dict (result)
+                assert len(updates) >= 4
+                assert isinstance(updates[0], str)
+                assert "Kowalski is engaging" in updates[0]
+                assert isinstance(updates[-1], dict)
+                assert updates[-1]["answer_type"] == "viz"
