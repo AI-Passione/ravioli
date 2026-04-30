@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, AsyncGenerator
+from typing import List, AsyncGenerator
 
 logger = logging.getLogger(__name__)
 

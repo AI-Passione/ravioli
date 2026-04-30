@@ -1,7 +1,7 @@
 import json
 import re
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,8 @@ async def extract_insights(result_markdown: str, generate_func) -> dict:
         try:
             raw = await generate_func(prompt, "Extract Insights", temperature=0.3)
             bullets = [line.lstrip("-*• ").strip() for line in raw.splitlines() if re.match(r"^\s*[-*•]\s+.{10,}", line)]
-        except Exception: pass
+        except Exception:
+            logger.debug("Failed to extract fallback insights via model output.", exc_info=True)
 
     return {
         "bullets": bullets[:20],
